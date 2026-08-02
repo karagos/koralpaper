@@ -25,7 +25,7 @@ const state = {
   board: null,           // {name,w,h,x,y} artboard, or null = unlimited canvas
 };
 const defaults = {
-  stroke:'ink', fill:'cream', fillStyle:'solid', dash:'solid', sw:2, sketch:1, round:1,
+  stroke:'ink', fill:'cream', fillStyle:'solid', dash:'solid', sw:4, sketch:1, round:1,
   opacity:100, font:'sans', size:21, align:'center',
   curve:0, elbow:false, startHead:'none', endHead:'arrow',
   fillByType: { rect:'cream', diamond:'cream', ellipse:'cream', chip:'periwinkle', icon:'none' },
@@ -84,6 +84,12 @@ function migrateElements(els, ver){
     if (v < 2 && el.type === 'icon' && el.kind === 'asterisk' && (!el.fill || el.fill === 'none')){
       el.fill = (el.stroke && el.stroke !== 'none') ? el.stroke : 'coral';
       el.stroke = 'none';
+    }
+    if (v < 4){
+      // v3.1.0: every width preset moved one stage up for visibility
+      if (el.sw === 1.2) el.sw = 2;
+      else if (el.sw === 2) el.sw = 4;
+      else if (el.sw === 4) el.sw = 6;
     }
   }
   return els;
@@ -407,7 +413,7 @@ function scheduleAutosave(){
     try {
       const doc = JSON.parse(serialize());
       localStorage.setItem(STORE_KEY, JSON.stringify({
-        v: 3, appVersion: APP_VERSION,
+        v: 4, appVersion: APP_VERSION,
         pages: doc.pages, pageIndex: doc.pageIndex,
         camera: state.camera, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
         theme: state.theme, bgColor: state.bgColor, board: state.board,
@@ -2476,7 +2482,7 @@ function download(name, url){
 function saveJSON(){
   const doc = JSON.parse(serialize());
   const data = {
-    app: 'koralpaper', version: 3, appVersion: APP_VERSION,
+    app: 'koralpaper', version: 4, appVersion: APP_VERSION,
     pages: doc.pages, pageIndex: doc.pageIndex,
     appState: { theme: state.theme, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
       bgColor: state.bgColor, board: state.board },
@@ -2611,7 +2617,7 @@ function tplLinkedInCarousel(){
   const pageNo = n => mk('chip', 950, 60, 70, 56, { text: n, fill: 'blush', size: 18 });
   const pages = [];
   // 1 — cover
-  const swipe = mk('arrow', 840, 1130, 0, 0, { stroke: 'coral', sw: 2, curve: 0.18 });
+  const swipe = mk('arrow', 840, 1130, 0, 0, { stroke: 'coral', sw: 4, curve: 0.18 });
   swipe.points = [[0, 0], [170, 0]];
   swipe.endHead = 'arrow'; swipe.text = 'swipe';
   pages.push({ name: 'Cover', elements: [
@@ -2667,7 +2673,7 @@ function tplFlowchart(){
   const no = mk('rect', 360, 380, 230, 90, { fill: 'blush', text: 'Rework', size: 21 });
   els.push(start, step, dec, yes, no);
   const link = (a, b2, label, curve) => {
-    const ar = mk('arrow', a.x + a.w / 2, a.y + a.h / 2, 0, 0, { stroke: 'ink', sw: 2, curve: curve || 0 });
+    const ar = mk('arrow', a.x + a.w / 2, a.y + a.h / 2, 0, 0, { stroke: 'ink', sw: 4, curve: curve || 0 });
     ar.points = [[0, 0], [10, 10]];
     ar.startBind = a.id; ar.endBind = b2.id;
     if (label) ar.text = label;
@@ -2826,7 +2832,7 @@ function exportExcalidraw(){
     backgroundColor: resolveFill(p, el.fill) || 'transparent',
     fillStyle: (!el.fillStyle || el.fillStyle === 'solid') ? 'solid'
       : el.fillStyle === 'cross' ? 'cross-hatch' : 'hachure',
-    strokeWidth: el.sw <= 1.5 ? 1 : el.sw <= 3 ? 2 : 4,
+    strokeWidth: el.sw <= 2.5 ? 1 : el.sw <= 4.5 ? 2 : 4,
     strokeStyle: el.dash === 'dashed' ? 'dashed' : el.dash === 'dotted' ? 'dotted' : 'solid',
     roughness: el.sketch === 0 ? 0 : el.sketch === 2 ? 2 : 1,
     opacity: el.opacity == null ? 100 : el.opacity,
@@ -2937,7 +2943,7 @@ function importExcalidraw(data){
       stroke: (!ex.strokeColor || ex.strokeColor === 'transparent') ? 'none' : ex.strokeColor,
       fill: (!ex.backgroundColor || ex.backgroundColor === 'transparent') ? 'none' : ex.backgroundColor,
       fillStyle: ex.fillStyle === 'solid' ? 'solid' : ex.fillStyle === 'cross-hatch' ? 'cross' : 'hachure',
-      sw: (ex.strokeWidth || 1) <= 1 ? 1.2 : ex.strokeWidth <= 2 ? 2 : 4,
+      sw: (ex.strokeWidth || 1) <= 1 ? 2 : ex.strokeWidth <= 2 ? 4 : 6,
       dash: ex.strokeStyle === 'dashed' ? 'dashed' : ex.strokeStyle === 'dotted' ? 'dotted' : 'solid',
       sketch: ex.roughness === 0 ? 0 : ex.roughness === 2 ? 2 : 1,
       opacity: ex.opacity == null ? 100 : ex.opacity,
@@ -3218,7 +3224,7 @@ function demoElements(){
   const star = mk('icon', 700, 120, 104, 104, { stroke: 'none', fill: 'coral', kind: 'asterisk' });
   mk('icon', 520, 168, 58, 58, { kind: 'spiral', stroke: 'ink' });
   mk('icon', 90, 470, 160, 104, { kind: 'cloud', stroke: 'ink', fill: 'sky' });
-  mk('icon', 968, 300, 46, 62, { kind: 'question', stroke: 'coral', sw: 3.5 });
+  mk('icon', 968, 300, 46, 62, { kind: 'question', stroke: 'coral', sw: 5 });
 
   const a1 = newElement('arrow', 0, 0, { stroke: 'ink', curve: 0.22 });
   a1.points = [[0,0],[10,10]];
@@ -3226,7 +3232,7 @@ function demoElements(){
   a1.x = chip.x + 60; a1.y = chip.y + 60;
   els.push(a1);
 
-  const a2 = newElement('arrow', 0, 0, { stroke: 'coral', curve: -0.2, sw: 2 });
+  const a2 = newElement('arrow', 0, 0, { stroke: 'coral', curve: -0.2, sw: 4 });
   a2.points = [[0,0],[10,10]];
   a2.startBind = sticky.id; a2.endBind = sticky2.id;
   a2.x = sticky.x + 100; a2.y = sticky.y;

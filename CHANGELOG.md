@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.1.0 — 2026-08-02
+- **Bolder line widths**: all three stroke-width stages moved one step up —
+  Fine 1.2→2, Medium 2→4, Thick 4→6 — so lines are clearly distinguishable
+  at a glance. The default width is the new Medium (4). Existing sketches
+  migrate automatically on open (each preset value maps to its new stage);
+  the demo scene and built-in templates use the new widths, and the
+  Excalidraw import/export width mapping follows the new scale.
+
 ## v3.0.1 — 2026-08-02
 - **Help card 2.0**: reorganized into sections (Tools, Editing, Files &
   view, Arrows, Images & art styles, More) and audited against the real
