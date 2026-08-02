@@ -1,5 +1,12 @@
 # KoralPaper — *Draw your thinking* (v3.2.0)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+![Platform: any browser, offline](https://img.shields.io/badge/Platform-any%20browser%20·%20offline-1F1E1B)
+![Dependencies: zero](https://img.shields.io/badge/Dependencies-zero-2ea44f)
+[![Built with: Claude](https://img.shields.io/badge/Built%20with-Claude-D97757?logo=anthropic&logoColor=white)](https://claude.com)
+[![Made by: CAIO Group](https://img.shields.io/badge/Made%20by-CAIO%20Group-C96442)](https://wearecaio.com)
+[![GitHub stars](https://img.shields.io/github/stars/karagos/koralpaper?style=social)](https://github.com/karagos/koralpaper/stargazers)
+
 > A creation by **Stefanos Karagos**, CAIO Group — [wearecaio.com](https://wearecaio.com)
 > Version history in [CHANGELOG.md](CHANGELOG.md). The version also shows at
 > the bottom of the ☰ menu and is written into every saved .json.
