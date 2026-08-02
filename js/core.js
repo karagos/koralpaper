@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.2.0';
+const APP_VERSION = '3.3.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -912,9 +912,29 @@ function iconPrims(el){
   return prims;
 }
 
+/* Google Material Symbols: path data lives ON the element (el.mpath, fetched
+   once when stamped), so saved documents render fully offline. ViewBox is
+   Google's "0 -960 960 960". */
+function materialTransform(el){
+  const b = boundsOf(el);
+  const s = Math.min(b.w, b.h) / 960;
+  return { s, tx: b.x + (b.w - 960 * s) / 2, ty: b.y + (b.h - 960 * s) / 2 + 960 * s };
+}
 function drawIcon(ctx, el, pal){
   const strokeColor = resolveStroke(pal, el.stroke);
   const fillColor = resolveFill(pal, el.fill);
+  if (el.kind === 'material'){
+    const col = strokeColor || fillColor;
+    if (!col || !el.mpath) return;
+    const { s, tx, ty } = materialTransform(el);
+    ctx.save();
+    ctx.translate(tx, ty);
+    ctx.scale(s, s);
+    ctx.fillStyle = col;
+    ctx.fill(new Path2D(el.mpath));
+    ctx.restore();
+    return;
+  }
   const dash = dashArrayOf(el);
   const patterned = el.fillStyle && el.fillStyle !== 'solid';
   let patternCache = null;
@@ -2226,6 +2246,13 @@ function renderSceneSVG(elements, opts){
         }
         // prims are element-local — translate into place
         parts.push(`<g transform="translate(${svgNum(eb.x)} ${svgNum(eb.y)})">${inner.join('')}</g>`);
+      }
+    }
+    else if (el.type === 'icon' && el.kind === 'material'){
+      const col = resolveStroke(pal, el.stroke) || resolveFill(pal, el.fill);
+      if (col && el.mpath){
+        const { s, tx, ty } = materialTransform(el);
+        parts.push(`<path d="${el.mpath}" transform="translate(${svgNum(tx)} ${svgNum(ty)}) scale(${svgNum(s)})" fill="${col}"/>`);
       }
     }
     else if (el.type === 'icon'){

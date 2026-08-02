@@ -229,6 +229,21 @@ body.dark .menu button.danger{color:#F09070;}
 .iconmenu svg{width:22px; height:22px; overflow:visible; fill:none; stroke:currentColor;
   stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round;}
 .iconmenu svg .fillme{fill:currentColor; stroke:none;}
+.iconmenu .menuhead{grid-column:1 / -1; margin-top:4px;}
+#miSearch{
+  grid-column:1 / -1; box-sizing:border-box; margin:2px 0 3px;
+  padding:7px 9px; border:1.5px solid var(--line-soft); border-radius:9px;
+  background:var(--card); color:var(--ink); font-size:12.5px;
+}
+#miSearch:focus{outline:none; border-color:var(--coral);}
+#miGrid{grid-column:1 / -1; display:grid; grid-template-columns:repeat(3, 1fr); gap:4px;}
+#miGrid button{
+  height:38px; border-radius:9px; border:1.5px solid transparent;
+  display:flex; align-items:center; justify-content:center;
+}
+#miGrid button:hover{background:var(--card-2);}
+#miGrid button.sel{background:var(--coral); color:#FBF6EE;}
+#miGrid svg{width:22px; height:22px; fill:currentColor; stroke:none;}
 
 .segment{display:flex; gap:4px; flex-wrap:wrap;}
 .segment button{

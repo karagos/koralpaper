@@ -1,5 +1,17 @@
 # KoralPaper — Changelog
 
+## v3.3.0 — 2026-08-02
+- **Google Material icons**: the icon menu (✳) now includes Google's
+  Material Symbols library — the 9 most popular icons by default, a search
+  field over 3,000 icons (names *and* tags: try "money", "arrow", "idea"),
+  and a **Recently used** row that replaces the defaults as you work.
+  Click an icon and stamp it like any other. Icons take your stroke color,
+  scale as vectors, and export perfectly to SVG/PNG/PDF. Each icon is
+  fetched from Google once (internet needed that first time), then cached —
+  and the vector path is stored inside your document, so saved sketches
+  render fully offline forever. Enter in the search field picks the first
+  result.
+
 ## v3.2.0 — 2026-08-02
 - **Settings panel**: the ? button now opens a side panel with two tabs —
   Help (the shortcuts card) and **Settings**. Settings holds three sliders

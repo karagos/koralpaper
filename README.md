@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.2.0)
+# KoralPaper — *Draw your thinking* (v3.3.0)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 ![Platform: any browser, offline](https://img.shields.io/badge/Platform-any%20browser%20·%20offline-1F1E1B)
@@ -38,7 +38,11 @@ an example scene). Press **?** inside the app for the full shortcuts card.
 - **Icon library (S):** the 6-spoke KoralPaper asterisk, the three brand
   marks (asterisk on paper, paper & stroke, paper thought), spiral, cloud,
   star, heart, lightning bolt, speech bubble, exclamation, question mark,
-  checkmark — all hand-drawn; click the ✳ toolbar button to pick
+  checkmark — all hand-drawn; click the ✳ toolbar button to pick.
+  **Plus Google Material icons**: search 3,000 Material Symbols right in
+  the icon menu (popular 9 + recently-used shown by default) and stamp
+  them as scalable vectors. Fetched from Google once per icon, cached, and
+  embedded in your document — saved sketches stay fully offline
 - **Text everywhere:** double-click any shape to type inside it (text wraps and
   the shape grows); standalone text elements; **arrows and lines take labels**
   that ride their midpoint and follow every move and bend

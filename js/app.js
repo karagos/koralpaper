@@ -738,10 +738,21 @@ function onPointerDown(ev){
       if (defaults.stroke === 'none') style.stroke = 'ink';
       if ((defaults.fillByType.icon || 'none') === 'none') style.fill = 'coral';
     }
+    if (iconKind === 'material'){
+      if (defaults.stroke === 'none') style.stroke = 'ink';
+      style.glyphName = materialName;
+      style.mpath = miMem.get(materialName) || '';
+    }
   } else {
     style.dash = defaults.dash;
   }
   const el = newElement(state.tool, gx, gy, style);
+  if (el.type === 'icon' && el.kind === 'material' && !el.mpath && el.glyphName){
+    // path not cached yet — fill it in as soon as the fetch lands
+    miFetch(el.glyphName)
+      .then(d => { el.mpath = d; requestRender(); scheduleAutosave(); })
+      .catch(() => showHint('Could not load that icon — internet is needed once per icon'));
+  }
   if (isLinear(el)){
     el.curve = (el.type === 'arrow') ? defaults.curve : 0;
     el.elbow = (el.type === 'arrow' || el.type === 'line') ? !!defaults.elbow : false;
@@ -1846,6 +1857,103 @@ function refreshTextMetrics(){
 }
 
 /* ── icon menu ─────────────────────────────────────── */
+/* ── Google Material icons (fonts.google.com/icons) ──
+   The catalog (names + search tags) ships with the app; the actual vector
+   path is fetched from fonts.gstatic.com the first time an icon is used,
+   then cached — and stored inside the element, so documents stay offline. */
+let materialName = null;
+const MI_CACHE_KEY = 'koralpaper.mi.v1';
+const miMem = new Map();
+try {
+  const stored = JSON.parse(localStorage.getItem(MI_CACHE_KEY) || '{}');
+  for (const k of Object.keys(stored)) miMem.set(k, stored[k]);
+} catch (e){ /* fresh cache */ }
+function miPersist(){
+  try {
+    const keys = [...miMem.keys()].slice(-300); // cap the stored cache
+    const out = {};
+    for (const k of keys) out[k] = miMem.get(k);
+    localStorage.setItem(MI_CACHE_KEY, JSON.stringify(out));
+  } catch (e){}
+}
+function miFetch(name){
+  if (miMem.has(name)) return Promise.resolve(miMem.get(name));
+  return fetch(`https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/${name}/default/24px.svg`)
+    .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.text(); })
+    .then(txt => {
+      const d = [...txt.matchAll(/ d="([^"]+)"/g)].map(m => m[1]).join(' ');
+      if (!d) throw new Error('no path data');
+      miMem.set(name, d); miPersist();
+      return d;
+    });
+}
+let miCatalog = null;
+function miRecent(){
+  try { return JSON.parse(localStorage.getItem('koralpaper.mi.recent') || '[]'); } catch (e){ return []; }
+}
+function miRemember(name){
+  try {
+    localStorage.setItem('koralpaper.mi.recent',
+      JSON.stringify([name, ...miRecent().filter(n => n !== name)].slice(0, 9)));
+  } catch (e){}
+}
+function miSearchList(q){
+  if (!miCatalog)
+    miCatalog = MATERIAL_ICONS.split('\n').map(line => {
+      const bar = line.indexOf('|');
+      const name = bar < 0 ? line : line.slice(0, bar);
+      return { name, hay: (name + ' ' + (bar < 0 ? '' : line.slice(bar + 1))).replace(/[_,]/g, ' ') };
+    });
+  q = q.trim().toLowerCase();
+  if (!q){
+    const rec = miRecent();
+    return [...rec, ...MATERIAL_POPULAR.filter(n => !rec.includes(n))].slice(0, 9);
+  }
+  const out = [];
+  for (const it of miCatalog){
+    if (it.name.startsWith(q)){ out.push(it.name); if (out.length >= 9) return out; }
+  }
+  for (const it of miCatalog){
+    if (!out.includes(it.name) && it.hay.includes(q)){
+      out.push(it.name);
+      if (out.length >= 9) break;
+    }
+  }
+  return out;
+}
+function pickMaterial(name){
+  materialName = name;
+  iconKind = 'material';
+  miRemember(name);
+  miFetch(name).catch(() => showHint('Could not load that icon — internet is needed once per icon'));
+  markIconMenu();
+  setTool('icon');
+  $('iconMenu').classList.add('hidden');
+}
+function miRenderGrid(names){
+  const grid = $('miGrid');
+  grid.replaceChildren();
+  for (const name of names){
+    const b = document.createElement('button');
+    b.title = name.replace(/_/g, ' ');
+    b.dataset.mi = name;
+    b.addEventListener('click', ev => { ev.stopPropagation(); pickMaterial(name); });
+    grid.appendChild(b);
+    miFetch(name).then(d => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 -960 960 960');
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', d);
+      p.setAttribute('fill', 'currentColor');
+      p.setAttribute('stroke', 'none');
+      svg.appendChild(p);
+      b.replaceChildren(svg);
+      markIconMenu();
+    }).catch(() => { b.textContent = '·'; b.disabled = true; });
+  }
+  markIconMenu();
+}
+
 const ICON_GLYPHS = {
   asterisk: '<g style="stroke-width:2.5"><path d="M10 3.2 L10 16.8"/><path d="M4.1 6.6 L15.9 13.4"/><path d="M15.9 6.6 L4.1 13.4"/></g>',
   paperast: '<path d="M5 2.6 L15 2.6 Q17 2.6 17 4.6 L17 15.4 Q17 17.4 15 17.4 L5 17.4 Q3 17.4 3 15.4 L3 4.6 Q3 2.6 5 2.6 Z"/><g style="stroke-width:1.7"><path d="M10 6.6 L10 13.4"/><path d="M7 8.3 L13 11.7"/><path d="M13 8.3 L7 11.7"/></g>',
@@ -1885,11 +1993,38 @@ function buildIconMenu(){
     });
     menu.appendChild(b);
   }
+  // Google Material icons: search + 3×3 grid (recents/popular by default)
+  const head = document.createElement('div');
+  head.className = 'menuhead';
+  head.textContent = 'Google Material icons';
+  menu.appendChild(head);
+  const search = document.createElement('input');
+  search.type = 'text';
+  search.id = 'miSearch';
+  search.placeholder = 'Search 3,000 icons…';
+  search.spellcheck = false;
+  search.addEventListener('click', ev => ev.stopPropagation());
+  search.addEventListener('input', () => miRenderGrid(miSearchList(search.value)));
+  search.addEventListener('keydown', ev => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter'){
+      const first = $('miGrid').querySelector('button:not(:disabled)');
+      if (first) pickMaterial(first.dataset.mi);
+    }
+    if (ev.key === 'Escape') $('iconMenu').classList.add('hidden');
+  });
+  menu.appendChild(search);
+  const grid = document.createElement('div');
+  grid.id = 'miGrid';
+  menu.appendChild(grid);
+  miRenderGrid(miSearchList(''));
   markIconMenu();
 }
 function markIconMenu(){
-  document.querySelectorAll('#iconMenu button').forEach(b =>
-    b.classList.toggle('sel', b.dataset.kind === iconKind));
+  document.querySelectorAll('#iconMenu > button').forEach(b =>
+    b.classList.toggle('sel', iconKind !== 'material' && b.dataset.kind === iconKind));
+  document.querySelectorAll('#miGrid button').forEach(b =>
+    b.classList.toggle('sel', iconKind === 'material' && b.dataset.mi === materialName));
 }
 $('iconToolBtn').addEventListener('click', ev => {
   ev.stopPropagation();
