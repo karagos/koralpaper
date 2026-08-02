@@ -240,7 +240,13 @@ body.dark .menu button.danger{color:#F09070;}
 #miGrid button{
   height:38px; border-radius:9px; border:1.5px solid transparent;
   display:flex; align-items:center; justify-content:center;
+  position:relative;
 }
+#miGrid button.pin::after{
+  content:'★'; position:absolute; top:0px; right:3px;
+  font-size:9px; color:var(--coral);
+}
+#miGrid button.sel.pin::after{color:#FBF6EE;}
 #miGrid button:hover{background:var(--card-2);}
 #miGrid button.sel{background:var(--coral); color:#FBF6EE;}
 #miGrid svg{width:22px; height:22px; fill:currentColor; stroke:none;}

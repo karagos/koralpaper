@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.3.0';
+const APP_VERSION = '3.4.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -67,21 +67,45 @@ const COLOR_TITLES = { gdark:'dark grey', gmid:'grey', glight:'light grey' };
 
 /* fonts: three offline system stacks + a curated Google Fonts list.
    Google fonts load via a <link> when online and fall back gracefully offline. */
+const FONT_GROUPS = ['Built-in', 'Sans & display', 'Serif', 'Mono', 'Hand & script', 'Pixel & dot'];
 const FONTS = {
-  serif: { label:'Serif — classic', stack:'"Iowan Old Style","Palatino Linotype",Palatino,"Times New Roman",Georgia,serif', weight:'500' },
-  sans:  { label:'Sans — notes', stack:'"Avenir Next",Avenir,"Helvetica Neue",Helvetica,Arial,sans-serif', weight:'600' },
-  hand:  { label:'Hand — marker', stack:'"Chalkboard SE","Comic Sans MS","Segoe Print","Bradley Hand",cursive', weight:'400' },
-  caveat:     { label:'Caveat', stack:'"Caveat","Chalkboard SE",cursive', weight:'600', google:'Caveat:wght@400;600' },
-  patrick:    { label:'Patrick Hand', stack:'"Patrick Hand","Chalkboard SE",cursive', weight:'400', google:'Patrick+Hand' },
-  kalam:      { label:'Kalam', stack:'"Kalam","Chalkboard SE",cursive', weight:'400', google:'Kalam:wght@400;700' },
-  architects: { label:'Architects Daughter', stack:'"Architects Daughter","Chalkboard SE",cursive', weight:'400', google:'Architects+Daughter' },
-  shadows:    { label:'Shadows Into Light', stack:'"Shadows Into Light","Bradley Hand",cursive', weight:'400', google:'Shadows+Into+Light' },
-  jetbrains:  { label:'JetBrains Mono', stack:'"JetBrains Mono","SF Mono",Menlo,monospace', weight:'500', google:'JetBrains+Mono:wght@400;500;600' },
-  ibmplex:    { label:'IBM Plex Mono', stack:'"IBM Plex Mono","SF Mono",Menlo,monospace', weight:'500', google:'IBM+Plex+Mono:wght@400;500;600' },
-  lora:       { label:'Lora', stack:'"Lora",Georgia,serif', weight:'500', google:'Lora:wght@400;500;600' },
-  playfair:   { label:'Playfair Display', stack:'"Playfair Display",Georgia,serif', weight:'500', google:'Playfair+Display:wght@400;500;600' },
-  dmsans:     { label:'DM Sans', stack:'"DM Sans","Helvetica Neue",sans-serif', weight:'500', google:'DM+Sans:wght@400;500;700' },
-  spacegrotesk:{ label:'Space Grotesk', stack:'"Space Grotesk","Helvetica Neue",sans-serif', weight:'500', google:'Space+Grotesk:wght@400;500;600' },
+  serif: { label:'Serif — classic', stack:'"Iowan Old Style","Palatino Linotype",Palatino,"Times New Roman",Georgia,serif', weight:'500', group:'Built-in' },
+  sans:  { label:'Sans — notes', stack:'"Avenir Next",Avenir,"Helvetica Neue",Helvetica,Arial,sans-serif', weight:'600', group:'Built-in' },
+  hand:  { label:'Hand — marker', stack:'"Chalkboard SE","Comic Sans MS","Segoe Print","Bradley Hand",cursive', weight:'400', group:'Built-in' },
+
+  inter:      { label:'Inter', stack:'"Inter","Helvetica Neue",sans-serif', weight:'500', google:'Inter:wght@400;500;700', group:'Sans & display' },
+  montserrat: { label:'Montserrat', stack:'"Montserrat","Helvetica Neue",sans-serif', weight:'500', google:'Montserrat:wght@400;500;700', group:'Sans & display' },
+  robotocond: { label:'Roboto Condensed', stack:'"Roboto Condensed","Helvetica Neue",sans-serif', weight:'500', google:'Roboto+Condensed:wght@400;700', group:'Sans & display' },
+  bebas:      { label:'Bebas Neue', stack:'"Bebas Neue","Helvetica Neue",sans-serif', weight:'400', google:'Bebas+Neue', group:'Sans & display' },
+  fjalla:     { label:'Fjalla One', stack:'"Fjalla One","Helvetica Neue",sans-serif', weight:'400', google:'Fjalla+One', group:'Sans & display' },
+  oswald:     { label:'Oswald', stack:'"Oswald","Helvetica Neue",sans-serif', weight:'500', google:'Oswald:wght@400;600', group:'Sans & display' },
+  imbue:      { label:'Imbue', stack:'"Imbue",Georgia,serif', weight:'500', google:'Imbue:wght@400;600', group:'Sans & display' },
+  dmsans:     { label:'DM Sans', stack:'"DM Sans","Helvetica Neue",sans-serif', weight:'500', google:'DM+Sans:wght@400;500;700', group:'Sans & display' },
+  spacegrotesk:{ label:'Space Grotesk', stack:'"Space Grotesk","Helvetica Neue",sans-serif', weight:'500', google:'Space+Grotesk:wght@400;500;600', group:'Sans & display' },
+
+  playfair:   { label:'Playfair Display', stack:'"Playfair Display",Georgia,serif', weight:'500', google:'Playfair+Display:wght@400;500;600', group:'Serif' },
+  ptserif:    { label:'PT Serif', stack:'"PT Serif",Georgia,serif', weight:'400', google:'PT+Serif:wght@400;700', group:'Serif' },
+  lora:       { label:'Lora', stack:'"Lora",Georgia,serif', weight:'500', google:'Lora:wght@400;500;600', group:'Serif' },
+
+  jetbrains:  { label:'JetBrains Mono', stack:'"JetBrains Mono","SF Mono",Menlo,monospace', weight:'500', google:'JetBrains+Mono:wght@400;500;600', group:'Mono' },
+  ibmplex:    { label:'IBM Plex Mono', stack:'"IBM Plex Mono","SF Mono",Menlo,monospace', weight:'500', google:'IBM+Plex+Mono:wght@400;500;600', group:'Mono' },
+  sharetech:  { label:'Share Tech Mono', stack:'"Share Tech Mono","SF Mono",Menlo,monospace', weight:'400', google:'Share+Tech+Mono', group:'Mono' },
+
+  caveat:     { label:'Caveat', stack:'"Caveat","Chalkboard SE",cursive', weight:'600', google:'Caveat:wght@400;600', group:'Hand & script' },
+  patrick:    { label:'Patrick Hand', stack:'"Patrick Hand","Chalkboard SE",cursive', weight:'400', google:'Patrick+Hand', group:'Hand & script' },
+  kalam:      { label:'Kalam', stack:'"Kalam","Chalkboard SE",cursive', weight:'400', google:'Kalam:wght@400;700', group:'Hand & script' },
+  architects: { label:'Architects Daughter', stack:'"Architects Daughter","Chalkboard SE",cursive', weight:'400', google:'Architects+Daughter', group:'Hand & script' },
+  shadows:    { label:'Shadows Into Light', stack:'"Shadows Into Light","Bradley Hand",cursive', weight:'400', google:'Shadows+Into+Light', group:'Hand & script' },
+  lobster:    { label:'Lobster Two', stack:'"Lobster Two",cursive', weight:'400', google:'Lobster+Two:wght@400;700', group:'Hand & script' },
+  playwritenz:{ label:'Playwrite NZ Guides', stack:'"Playwrite NZ Guides",cursive', weight:'400', google:'Playwrite+NZ+Guides', group:'Hand & script' },
+  unkempt:    { label:'Unkempt', stack:'"Unkempt","Chalkboard SE",cursive', weight:'400', google:'Unkempt:wght@400;700', group:'Hand & script' },
+  kaushan:    { label:'Kaushan Script', stack:'"Kaushan Script",cursive', weight:'400', google:'Kaushan+Script', group:'Hand & script' },
+
+  bitcountprop:{ label:'Bitcount Prop Single', stack:'"Bitcount Prop Single",monospace', weight:'400', google:'Bitcount+Prop+Single', group:'Pixel & dot' },
+  bitcountsingle:{ label:'Bitcount Single', stack:'"Bitcount Single",monospace', weight:'400', google:'Bitcount+Single', group:'Pixel & dot' },
+  bitcountink:{ label:'Bitcount Prop Double Ink', stack:'"Bitcount Prop Double Ink",monospace', weight:'400', google:'Bitcount+Prop+Double+Ink', group:'Pixel & dot' },
+  tiny5:      { label:'Tiny5', stack:'"Tiny5",monospace', weight:'400', google:'Tiny5', group:'Pixel & dot' },
+  doto:       { label:'Doto', stack:'"Doto",monospace', weight:'600', google:'Doto:wght@400;600;700', group:'Pixel & dot' },
 };
 function fontCSS(font, size){
   const f = FONTS[font] || FONTS.sans;

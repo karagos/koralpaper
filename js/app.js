@@ -1833,15 +1833,18 @@ function buildFontSelect(){
   const hidden = document.createElement('option');
   hidden.value = ''; hidden.hidden = true; hidden.textContent = '—';
   sel.appendChild(hidden);
-  const gSys = document.createElement('optgroup'); gSys.label = 'Built-in';
-  const gGoo = document.createElement('optgroup'); gGoo.label = 'Google Fonts';
+  const groups = new Map(FONT_GROUPS.map(g => {
+    const og = document.createElement('optgroup');
+    og.label = g;
+    return [g, og];
+  }));
   for (const [key, f] of Object.entries(FONTS)){
     const o = document.createElement('option');
     o.value = key; o.textContent = f.label;
     o.style.fontFamily = f.stack;
-    (f.google ? gGoo : gSys).appendChild(o);
+    (groups.get(f.group) || groups.get('Built-in')).appendChild(o);
   }
-  sel.appendChild(gSys); sel.appendChild(gGoo);
+  for (const og of groups.values()) sel.appendChild(og);
   sel.addEventListener('change', () => { if (sel.value) applyStyle({ font: sel.value }); });
 }
 function loadGoogleFonts(){
@@ -1891,6 +1894,17 @@ let miCatalog = null;
 function miRecent(){
   try { return JSON.parse(localStorage.getItem('koralpaper.mi.recent') || '[]'); } catch (e){ return []; }
 }
+function miPinned(){
+  try { return JSON.parse(localStorage.getItem('koralpaper.mi.pinned') || '[]'); } catch (e){ return []; }
+}
+function miTogglePin(name){
+  const p = miPinned();
+  const next = p.includes(name) ? p.filter(n => n !== name) : [...p, name].slice(-18);
+  try { localStorage.setItem('koralpaper.mi.pinned', JSON.stringify(next)); } catch (e){}
+  showHint(next.includes(name) ? `“${name.replace(/_/g,' ')}” pinned — it now leads the icon grid`
+                               : `“${name.replace(/_/g,' ')}” unpinned`);
+  miRenderGrid(miSearchList($('miSearch').value));
+}
 function miRemember(name){
   try {
     localStorage.setItem('koralpaper.mi.recent',
@@ -1906,8 +1920,12 @@ function miSearchList(q){
     });
   q = q.trim().toLowerCase();
   if (!q){
-    const rec = miRecent();
-    return [...rec, ...MATERIAL_POPULAR.filter(n => !rec.includes(n))].slice(0, 9);
+    const pin = miPinned();
+    const rec = miRecent().filter(n => !pin.includes(n));
+    const merged = [...pin, ...rec,
+      ...MATERIAL_POPULAR.filter(n => !pin.includes(n) && !rec.includes(n))];
+    // grid grows (up to 18) when the user has pinned more than fits in 9
+    return merged.slice(0, Math.max(9, Math.min(18, pin.length)));
   }
   const out = [];
   for (const it of miCatalog){
@@ -1933,11 +1951,17 @@ function pickMaterial(name){
 function miRenderGrid(names){
   const grid = $('miGrid');
   grid.replaceChildren();
+  const pinned = miPinned();
   for (const name of names){
     const b = document.createElement('button');
-    b.title = name.replace(/_/g, ' ');
+    b.title = name.replace(/_/g, ' ') + ' — right-click to pin';
     b.dataset.mi = name;
+    b.classList.toggle('pin', pinned.includes(name));
     b.addEventListener('click', ev => { ev.stopPropagation(); pickMaterial(name); });
+    b.addEventListener('contextmenu', ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      miTogglePin(name);
+    });
     grid.appendChild(b);
     miFetch(name).then(d => {
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

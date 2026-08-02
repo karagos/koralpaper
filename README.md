@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.3.0)
+# KoralPaper — *Draw your thinking* (v3.4.0)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 ![Platform: any browser, offline](https://img.shields.io/badge/Platform-any%20browser%20·%20offline-1F1E1B)
@@ -49,10 +49,15 @@ an example scene). Press **?** inside the app for the full shortcuts card.
 - **Excalidraw interop:** ☰ → Export page to Excalidraw; opening a
   .excalidraw file imports it onto a new page (bound labels, groups, images
   and colors survive the round trip)
-- **Fonts:** 3 built-in stacks (serif/sans/hand) plus a Google Fonts picker —
-  Caveat, Patrick Hand, Kalam, Architects Daughter, Shadows Into Light,
-  JetBrains Mono, IBM Plex Mono, Lora, Playfair Display, DM Sans, Space
-  Grotesk (need internet once; system fallbacks offline)
+- **Fonts:** 3 built-in stacks (serif/sans/hand) plus a grouped Google
+  Fonts picker with 32 families — Sans & display (Inter, Montserrat,
+  Roboto Condensed, Bebas Neue, Fjalla One, Oswald, Imbue, DM Sans, Space
+  Grotesk), Serif (Playfair Display, PT Serif, Lora), Mono (JetBrains
+  Mono, IBM Plex Mono, Share Tech Mono), Hand & script (Caveat, Patrick
+  Hand, Kalam, Architects Daughter, Shadows Into Light, Lobster Two,
+  Playwrite NZ Guides, Unkempt, Kaushan Script), and Pixel & dot
+  (Bitcount ×3, Tiny5, Doto) — need internet once; system fallbacks
+  offline
 - **Glued arrows:** draw an arrow from one shape to another — it binds to both
   borders and follows when shapes move, resize, or rotate. Aim for the four
   side dots (N/E/S/W) to pin the arrow to a specific side; drop in the middle

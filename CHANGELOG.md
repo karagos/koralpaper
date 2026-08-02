@@ -1,5 +1,20 @@
 # KoralPaper — Changelog
 
+## v3.4.0 — 2026-08-02
+- **Pin your icons**: right-click any Google Material icon in the picker to
+  pin it (★). Pinned icons always lead the default grid — ahead of recents
+  and the popular set — and the grid grows up to 18 slots as you pin more.
+  Right-click again to unpin.
+- **21 new Google Fonts**, organized into groups in the font picker
+  (Sans & display / Serif / Mono / Hand & script / Pixel & dot):
+  Inter, Montserrat, Roboto Condensed, Bebas Neue, Fjalla One, Oswald,
+  Imbue · Playfair Display, PT Serif · Share Tech Mono · Lobster Two,
+  Playwrite NZ Guides, Unkempt, Kaushan Script · Bitcount Prop Single,
+  Bitcount Single, Bitcount Prop Double Ink, Tiny5, Doto — alongside the
+  existing library. (Two names from the request corrected to their
+  official Google Fonts names: "Playwrite New Zealand Guides" → Playwrite
+  NZ Guides, "Dotto" → Doto.)
+
 ## v3.3.0 — 2026-08-02
 - **Google Material icons**: the icon menu (✳) now includes Google's
   Material Symbols library — the 9 most popular icons by default, a search
