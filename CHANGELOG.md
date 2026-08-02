@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.5.1 — 2026-08-02
+- **Fixed: the Text tool places text again.** Clicking with the Text tool
+  created the editor, but the browser's default click behavior immediately
+  moved focus away — the editor blurred, committed its empty text, and
+  deleted it, so nothing ever appeared. The click's default action is now
+  suppressed for text placement, and the editor re-claims focus if
+  anything steals it in the same tick.
+
 ## v3.5.0 — 2026-08-02
 - **Fixed: fonts now apply on first selection.** Google font files load
   lazily and canvas drawing doesn't trigger the download, so a freshly

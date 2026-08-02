@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.5.0)
+# KoralPaper — *Draw your thinking* (v3.5.1)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 ![Platform: any browser, offline](https://img.shields.io/badge/Platform-any%20browser%20·%20offline-1F1E1B)

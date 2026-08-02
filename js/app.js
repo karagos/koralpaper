@@ -707,6 +707,10 @@ function onPointerDown(ev){
   }
 
   if (state.tool === 'text'){
+    // the browser's default pointerdown action would move focus to the
+    // canvas right after this handler, blurring the fresh editor — the
+    // blur commits the empty text and deletes it. Prevent that.
+    if (ev.preventDefault) ev.preventDefault();
     const el = newElement('text', sx, sy, {
       stroke: defaults.stroke === 'paper' ? 'ink' : defaults.stroke,
       font: defaults.font, size: defaults.size, align: 'left', opacity: defaults.opacity,
@@ -1164,6 +1168,14 @@ function openTextEditor(el, isNew){
   positionEditor();
   editorEl.focus();
   editorEl.select();
+  // defend the focus: if a default action (or anything else) steals it in
+  // this same tick, take it back on the next frame
+  requestAnimationFrame(() => {
+    if (editing && document.activeElement !== editorEl){
+      editorEl.focus({ preventScroll: true });
+      editorEl.select();
+    }
+  });
   requestRender();
 }
 function positionEditor(){
