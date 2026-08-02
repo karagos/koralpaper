@@ -1,5 +1,17 @@
 # KoralPaper — Changelog
 
+## v3.7.0 — 2026-08-02
+- **New template: "Black carousel"** — a faithful conversion of an
+  HTML carousel design (1080×1350, black paper, electric-yellow accent,
+  Archivo + Space Grotesk) into fully editable KoralPaper pages. Three of
+  its layouts ship: **Stats** (big yellow figures with hairline dividers),
+  **Highlight word** (headline with a yellow highlight chip + image
+  placeholder), and **Numbered steps** (01/02/03 with titles and dim
+  captions). Everything is drawn neat (no wobble) to match the source.
+- Templates can now set the **paper color** (this one turns the paper
+  black; ☰ → "Reset paper color" restores the theme).
+- **Archivo** joined the font library (Sans & display).
+
 ## v3.6.0 — 2026-08-02
 - **White joins the palettes**, and both stroke and fill now open with a
   clean neutral ramp: black → dark grey → grey → light grey → **white**,

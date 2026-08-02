@@ -2988,8 +2988,99 @@ function tplQuoteCard(){
   ];
   return { board: { name: 'Quote card', w: 1080, h: 1080, x: 0, y: 0 }, pages: [{ name: 'Quote', elements: els }] };
 }
+/* "Black carousel" — faithful conversion of Stefanos's Claude-designed
+   1080×1350 carousel (black #0b0b0b paper, electric-yellow #EFE94A accent,
+   Archivo headings + Space Grotesk body). Three of its sixteen layouts:
+   Stats, Highlight word, Numbered steps. Everything neat (sketch 0). */
+function tplBlackCarousel(){
+  const { mk, txt } = tplHelpers();
+  const YEL = '#EFE94A', BLACK = '#0b0b0b', WHITE = '#FFFFFF', DIM = '#9E9E9E', LINE = '#2A2A2A';
+  const N = { sketch: 0 };
+  const R = 1022; // right edge (1080 − 58 padding)
+  const header = (els) => {
+    const logo = mk('rect', 58, 58, 36, 36, { fill: YEL, stroke: 'none', ...N });
+    const p = txt(0, 61, 'P', 23, { font: 'archivo', stroke: BLACK, ...N });
+    p.x = 76 - p.w / 2;
+    const left = txt(107, 60, 'Pixel', 25, { font: 'spacegrotesk', stroke: WHITE, ...N });
+    const right = txt(0, 61, 'Introduction', 23, { font: 'spacegrotesk', stroke: DIM, ...N });
+    right.x = R - right.w;
+    els.push(logo, p, left, right);
+  };
+  const footer = (els) => {
+    const l = txt(58, 1262, '@pixel', 23, { font: 'spacegrotesk', stroke: DIM, ...N });
+    const r = txt(0, 1262, 'pixel.com', 23, { font: 'spacegrotesk', stroke: DIM, ...N });
+    r.x = R - r.w;
+    els.push(l, r);
+  };
+  const divider = (y) => {
+    const ln = mk('line', 58, y, 0, 0, { stroke: LINE, sw: 1.7, ...N });
+    ln.points = [[0, 0], [964, 0]];
+    ln.endHead = 'none';
+    return ln;
+  };
+
+  /* ── 03 Stats ── */
+  const stats = [];
+  header(stats);
+  const rows = [
+    ['93%',  'of first impressions\nare visual',        204],
+    ['2.7x', 'higher engagement\nwith strong branding', 440],
+    ['5s',   'is all you get\nto grab attention',       676],
+  ];
+  for (const [num, label, y] of rows){
+    stats.push(txt(58, y, num, 132, { font: 'archivo', stroke: YEL, ...N }));
+    stats.push(txt(438, y + 24, label, 32, { font: 'spacegrotesk', stroke: WHITE, ...N }));
+  }
+  stats.push(divider(388), divider(624));
+  footer(stats);
+
+  /* ── 08 Highlight word ── */
+  const hi = [];
+  header(hi);
+  const h1 = txt(58, 190, 'We build', 88, { font: 'archivo', stroke: WHITE, ...N });
+  const chipText = txt(0, 196, 'software', 88, { font: 'archivo', stroke: BLACK, ...N });
+  const chip = mk('rect', 58 + h1.w + 24, 186, chipText.w + 36, 112, { fill: YEL, stroke: 'none', ...N });
+  chipText.x = chip.x + 18;
+  const h2 = txt(58, 294, 'that outlasts', 88, { font: 'archivo', stroke: WHITE, ...N });
+  const h3 = txt(58, 398, 'your rivals.', 88, { font: 'archivo', stroke: WHITE, ...N });
+  const slot = mk('rect', 58, 582, 964, 560, { fill: 'none', stroke: DIM, dash: 'dashed', ...N });
+  slot.text = 'Drop your image here — skyline / towers, b&w';
+  slot.font = 'spacegrotesk'; slot.size = 26;
+  hi.push(h1, chip, chipText, h2, h3, slot);
+  footer(hi);
+
+  /* ── 14 Numbered steps ── */
+  const steps = [];
+  header(steps);
+  steps.push(txt(58, 194, 'Three moves that', 82, { font: 'archivo', stroke: WHITE, ...N }));
+  steps.push(txt(58, 280, 'change everything', 82, { font: 'archivo', stroke: WHITE, ...N }));
+  const stepRows = [
+    ['01', 'Say one thing',          'Pick the single idea you want to own and cut the rest.',      460],
+    ['02', "Show it, don't claim it", 'Proof beats adjectives every single time.',                   690],
+    ['03', 'Repeat until boring',    "The moment you're sick of it is when they start noticing.",   920],
+  ];
+  for (const [num, title, para, y] of stepRows){
+    steps.push(txt(58, y, num, 64, { font: 'archivo', stroke: YEL, ...N }));
+    steps.push(txt(214, y + 6, title, 40, { font: 'archivo', stroke: WHITE, ...N }));
+    steps.push(txt(214, y + 64, para, 26, { font: 'spacegrotesk', stroke: DIM, ...N }));
+  }
+  steps.push(divider(610), divider(840));
+  footer(steps);
+
+  return {
+    pages: [
+      { name: 'Stats', elements: stats },
+      { name: 'Highlight', elements: hi },
+      { name: 'Steps', elements: steps },
+    ],
+    board: { name: 'Black carousel', w: 1080, h: 1350, x: 0, y: 0 },
+    bg: BLACK,
+  };
+}
+
 const TEMPLATES = [
   { id: 'li-carousel', name: 'LinkedIn carousel', desc: '5 slides: cover, two content, photo, CTA — header & footer on every slide', build: tplLinkedInCarousel },
+  { id: 'black-carousel', name: 'Black carousel', desc: 'Stats, Highlight word & Numbered steps — 1080×1350, black paper + electric yellow (sets the paper color)', build: tplBlackCarousel },
   { id: 'flowchart', name: 'Flowchart kit', desc: 'Start, steps, decision diamond, labeled glued arrows', build: tplFlowchart },
   { id: 'versus', name: 'Comparison / Versus', desc: 'Two columns with pros & cons and a verdict sticky', build: tplVersus },
   { id: 'quote', name: 'Quote card', desc: '1080×1080 square with a big serif quote', build: tplQuoteCard },
@@ -3022,6 +3113,7 @@ function applyTemplate(def){
   for (const pg of built.pages)
     state.pages.push(makePage(clonePageElements(pg.elements), pg.name));
   if (built.board) state.board = { ...built.board };
+  if (built.bg){ state.bgColor = built.bg; syncPaperUI(); }
   state.pageIndex = startIdx;
   state.elements = state.pages[startIdx].elements;
   state.selection = new Set();
