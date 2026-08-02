@@ -1,5 +1,7 @@
 # KoralPaper — *Draw your thinking* (v3.8.0)
 
+![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 ![Platform: any browser, offline](https://img.shields.io/badge/Platform-any%20browser%20·%20offline-1F1E1B)
 ![Dependencies: zero](https://img.shields.io/badge/Dependencies-zero-2ea44f)
