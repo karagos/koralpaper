@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.7.1)
+# KoralPaper — *Draw your thinking* (v3.8.0)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 ![Platform: any browser, offline](https://img.shields.io/badge/Platform-any%20browser%20·%20offline-1F1E1B)
@@ -27,8 +27,8 @@ Download or clone this repository, then double-click **`index.html`** —
 it runs fully offline from `file://` in any modern browser (built on macOS,
 works anywhere Chrome/Safari/Firefox run). Your sketch autosaves to the
 browser's local storage and reopens exactly where you left it next time;
-a first run starts with a blank document (☰ → "Load the demo sketch" shows
-an example scene). Press **?** inside the app for the full shortcuts card.
+a first run starts with a blank document (☰ → "Load the KoralPaper tour" shows
+a one-page showcase of every feature). Press **?** inside the app for the full shortcuts card.
 
 ## What it does
 
@@ -140,7 +140,7 @@ an example scene). Press **?** inside the app for the full shortcuts card.
   PNG (2×) or **SVG** — each with background or transparent — autosave
   to localStorage
 - Press **?** in the app for the full shortcut card. The ☰ menu has
-  Save/Open/Export/Demo/Reset-paper/Clear; the ⬇ button (top right) is a
+  Save/Open/Export/Tour/Reset-paper/Clear; the ⬇ button (top right) is a
   quick export menu (PNG/SVG ± background, Save).
 
 ## Files

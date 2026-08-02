@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.8.0 — 2026-08-02
+- **The demo is now the KoralPaper tour**: ☰ → "Load the KoralPaper tour"
+  replaces "Load the demo sketch". It adds a 1920×1080 page where every
+  feature demonstrates itself — glued/curved/elbow/dashed arrows with
+  labels and arrowheads, neat mode, icon stamps incl. Google Material
+  icons, four Google Fonts, all six fill styles, sticky notes, free draw,
+  and chips for templates/pages/exports. Loads as a new page (nothing of
+  yours is replaced) and works fully offline. The same document ships as
+  `examples/koralpaper-tour.json`.
+
 ## v3.7.1 — 2026-08-02
 - **Font library kept curated**: the Archivo family added in v3.7.0 is
   removed again. The Black carousel template now uses **Space Grotesk**
