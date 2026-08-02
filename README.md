@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.1.0)
+# KoralPaper — *Draw your thinking* (v3.2.0)
 
 > A creation by **Stefanos Karagos**, CAIO Group — [wearecaio.com](https://wearecaio.com)
 > Version history in [CHANGELOG.md](CHANGELOG.md). The version also shows at

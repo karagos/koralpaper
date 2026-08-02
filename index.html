@@ -194,9 +194,9 @@
     </div>
     <div class="row" id="rowWidth"><label>Width</label>
       <div class="segment" id="widthSeg">
-        <button data-v="2" title="Fine"><svg viewBox="0 0 20 20"><path d="M3.5 10 Q10 9.6 16.5 10" style="stroke-width:1.4"/></svg></button>
-        <button data-v="4" title="Medium"><svg viewBox="0 0 20 20"><path d="M3.5 10 Q10 9.6 16.5 10" style="stroke-width:2.8"/></svg></button>
-        <button data-v="6" title="Thick"><svg viewBox="0 0 20 20"><path d="M3.5 10 Q10 9.6 16.5 10" style="stroke-width:4.4"/></svg></button>
+        <button data-v="1.7" title="Fine"><svg viewBox="0 0 20 20"><path d="M3.5 10 Q10 9.6 16.5 10" style="stroke-width:1.3"/></svg></button>
+        <button data-v="3.3" title="Medium"><svg viewBox="0 0 20 20"><path d="M3.5 10 Q10 9.6 16.5 10" style="stroke-width:2.5"/></svg></button>
+        <button data-v="5" title="Thick"><svg viewBox="0 0 20 20"><path d="M3.5 10 Q10 9.6 16.5 10" style="stroke-width:3.8"/></svg></button>
       </div>
     </div>
     <div class="row" id="rowSketch"><label>Line style</label>
@@ -330,8 +330,13 @@
     </div>
   </div>
 
-  <!-- ── Shortcuts card ────────────────────────────── -->
+  <!-- ── Help / Settings side panel ────────────────── -->
   <div class="island shortcuts hidden" id="shortcutsCard">
+    <div class="paneltabs">
+      <button id="tabHelp" class="sel">Help</button>
+      <button id="tabSettings">Settings</button>
+    </div>
+    <div id="helpPane">
     <h3>Shortcuts &amp; tips</h3>
     <table>
       <tr><td class="sect">Tools</td></tr>
@@ -360,6 +365,19 @@
         multi-page documents · ☰ → <b>Templates</b> for ready-made pages · the <b>∞ / size button</b>
         (bottom left) sets exact canvas sizes for social formats.</td></tr>
     </table>
+    </div>
+    <div id="settingsPane" class="hidden">
+      <h3>Settings</h3>
+      <p class="setdesc">Line width presets — these values power the Fine / Medium / Thick
+        buttons in the style panel and every new element you draw.</p>
+      <div class="setrow"><label>Fine</label>
+        <input type="range" id="setFine" min="0.5" max="8" step="0.1"><b id="setFineVal"></b></div>
+      <div class="setrow"><label>Medium</label>
+        <input type="range" id="setMedium" min="0.5" max="10" step="0.1"><b id="setMediumVal"></b></div>
+      <div class="setrow"><label>Thick</label>
+        <input type="range" id="setThick" min="0.5" max="14" step="0.1"><b id="setThickVal"></b></div>
+      <div class="setactions"><button class="minipill" id="setWidthsReset">Reset to defaults</button></div>
+    </div>
     <p class="credit"><b>KoralPaper</b> is a creation by <b>Stefanos Karagos</b>, CAIO Group ·
       <a href="https://wearecaio.com" target="_blank" rel="noopener">wearecaio.com</a></p>
   </div>

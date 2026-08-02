@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.2.0 — 2026-08-02
+- **Settings panel**: the ? button now opens a side panel with two tabs —
+  Help (the shortcuts card) and **Settings**. Settings holds three sliders
+  for the Fine / Medium / Thick line-width presets: they update the style
+  panel buttons and the default width live, and persist in the browser.
+  "Reset to defaults" restores the standard values.
+- **New width defaults**: Fine 1.7, Medium 3.3, Thick 5 (softening the
+  brief 2/4/6 of v3.1.0). Documents saved under either older scale migrate
+  automatically on open.
+
 ## v3.1.0 — 2026-08-02
 - **Bolder line widths**: all three stroke-width stages moved one step up —
   Fine 1.2→2, Medium 2→4, Thick 4→6 — so lines are clearly distinguishable

@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.1.0';
+const APP_VERSION = '3.2.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -116,7 +116,7 @@ function newElement(type, x, y, style){
     id: uid(), type, x, y, w: 0, h: 0, angle: 0,
     seed: Math.floor(Math.random() * 2 ** 31),
     stroke: 'ink', fill: 'none', fillStyle: 'solid', dash: 'solid',
-    sw: 4, sketch: 1, round: 1, opacity: 100,
+    sw: 3.3, sketch: 1, round: 1, opacity: 100,
     text: '', font: 'sans', size: 21, align: 'center',
     groupId: null,
   };

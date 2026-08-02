@@ -24,8 +24,21 @@ const state = {
   bgColor: null,         // custom paper color (hex) or null = theme default
   board: null,           // {name,w,h,x,y} artboard, or null = unlimited canvas
 };
+/* user-adjustable width presets (Settings panel), persisted separately */
+const SETTINGS_KEY = 'koralpaper.settings';
+const DEFAULT_WIDTHS = { fine: 1.7, medium: 3.3, thick: 5 };
+const widths = { ...DEFAULT_WIDTHS };
+try {
+  const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+  if (s.widths) for (const k of Object.keys(DEFAULT_WIDTHS))
+    if (typeof s.widths[k] === 'number') widths[k] = clamp(s.widths[k], 0.5, 14);
+} catch (e){ /* fresh settings */ }
+function saveSettings(){
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ widths })); } catch (e){}
+}
+
 const defaults = {
-  stroke:'ink', fill:'cream', fillStyle:'solid', dash:'solid', sw:4, sketch:1, round:1,
+  stroke:'ink', fill:'cream', fillStyle:'solid', dash:'solid', sw:widths.medium, sketch:1, round:1,
   opacity:100, font:'sans', size:21, align:'center',
   curve:0, elbow:false, startHead:'none', endHead:'arrow',
   fillByType: { rect:'cream', diamond:'cream', ellipse:'cream', chip:'periwinkle', icon:'none' },
@@ -86,10 +99,15 @@ function migrateElements(els, ver){
       el.stroke = 'none';
     }
     if (v < 4){
-      // v3.1.0: every width preset moved one stage up for visibility
-      if (el.sw === 1.2) el.sw = 2;
-      else if (el.sw === 2) el.sw = 4;
-      else if (el.sw === 4) el.sw = 6;
+      // pre-v3.1 presets (1.2 / 2 / 4) → current stages
+      if (el.sw === 1.2) el.sw = 1.7;
+      else if (el.sw === 2) el.sw = 3.3;
+      else if (el.sw === 4) el.sw = 5;
+    } else if (v === 4){
+      // the short-lived v3.1.0 presets (2 / 4 / 6) → current stages
+      if (el.sw === 2) el.sw = 1.7;
+      else if (el.sw === 4) el.sw = 3.3;
+      else if (el.sw === 6) el.sw = 5;
     }
   }
   return els;
@@ -413,7 +431,7 @@ function scheduleAutosave(){
     try {
       const doc = JSON.parse(serialize());
       localStorage.setItem(STORE_KEY, JSON.stringify({
-        v: 4, appVersion: APP_VERSION,
+        v: 5, appVersion: APP_VERSION,
         pages: doc.pages, pageIndex: doc.pageIndex,
         camera: state.camera, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
         theme: state.theme, bgColor: state.bgColor, board: state.board,
@@ -2384,6 +2402,47 @@ $('exportMenu').addEventListener('click', ev => {
   runFileAction(b.dataset.act);
 });
 $('helpBtn').addEventListener('click', () => $('shortcutsCard').classList.toggle('hidden'));
+
+/* ── Help / Settings side panel ─────────────────────── */
+function setPanelTab(t){
+  $('tabHelp').classList.toggle('sel', t === 'help');
+  $('tabSettings').classList.toggle('sel', t === 'settings');
+  $('helpPane').classList.toggle('hidden', t !== 'help');
+  $('settingsPane').classList.toggle('hidden', t !== 'settings');
+}
+$('tabHelp').addEventListener('click', () => setPanelTab('help'));
+$('tabSettings').addEventListener('click', () => setPanelTab('settings'));
+
+const WIDTH_KEYS = ['fine', 'medium', 'thick'];
+function syncSettingsUI(){
+  for (const k of WIDTH_KEYS){
+    const id = 'set' + k[0].toUpperCase() + k.slice(1);
+    $(id).value = widths[k];
+    $(id + 'Val').textContent = String(widths[k]);
+  }
+}
+function applyWidthPresets(){
+  document.querySelectorAll('#widthSeg button').forEach((b, i) => {
+    const k = WIDTH_KEYS[i];
+    b.dataset.v = widths[k];
+    b.title = k[0].toUpperCase() + k.slice(1) + ' (' + widths[k] + ')';
+  });
+  syncPanel();
+}
+WIDTH_KEYS.forEach(k => {
+  const id = 'set' + k[0].toUpperCase() + k.slice(1);
+  $(id).addEventListener('input', () => {
+    const old = widths[k];
+    widths[k] = Number($(id).value);
+    if (defaults.sw === old) defaults.sw = widths[k]; // keep the active preset live
+    syncSettingsUI(); applyWidthPresets(); saveSettings();
+  });
+});
+$('setWidthsReset').addEventListener('click', () => {
+  Object.assign(widths, DEFAULT_WIDTHS);
+  defaults.sw = widths.medium;
+  syncSettingsUI(); applyWidthPresets(); saveSettings();
+});
 function zoomFocusPoint(){
   // zoom toward the selection's center when something is selected
   if (state.selection.size){
@@ -2482,7 +2541,7 @@ function download(name, url){
 function saveJSON(){
   const doc = JSON.parse(serialize());
   const data = {
-    app: 'koralpaper', version: 4, appVersion: APP_VERSION,
+    app: 'koralpaper', version: 5, appVersion: APP_VERSION,
     pages: doc.pages, pageIndex: doc.pageIndex,
     appState: { theme: state.theme, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
       bgColor: state.bgColor, board: state.board },
@@ -2617,7 +2676,7 @@ function tplLinkedInCarousel(){
   const pageNo = n => mk('chip', 950, 60, 70, 56, { text: n, fill: 'blush', size: 18 });
   const pages = [];
   // 1 — cover
-  const swipe = mk('arrow', 840, 1130, 0, 0, { stroke: 'coral', sw: 4, curve: 0.18 });
+  const swipe = mk('arrow', 840, 1130, 0, 0, { stroke: 'coral', sw: 3.3, curve: 0.18 });
   swipe.points = [[0, 0], [170, 0]];
   swipe.endHead = 'arrow'; swipe.text = 'swipe';
   pages.push({ name: 'Cover', elements: [
@@ -2673,7 +2732,7 @@ function tplFlowchart(){
   const no = mk('rect', 360, 380, 230, 90, { fill: 'blush', text: 'Rework', size: 21 });
   els.push(start, step, dec, yes, no);
   const link = (a, b2, label, curve) => {
-    const ar = mk('arrow', a.x + a.w / 2, a.y + a.h / 2, 0, 0, { stroke: 'ink', sw: 4, curve: curve || 0 });
+    const ar = mk('arrow', a.x + a.w / 2, a.y + a.h / 2, 0, 0, { stroke: 'ink', sw: 3.3, curve: curve || 0 });
     ar.points = [[0, 0], [10, 10]];
     ar.startBind = a.id; ar.endBind = b2.id;
     if (label) ar.text = label;
@@ -2943,7 +3002,7 @@ function importExcalidraw(data){
       stroke: (!ex.strokeColor || ex.strokeColor === 'transparent') ? 'none' : ex.strokeColor,
       fill: (!ex.backgroundColor || ex.backgroundColor === 'transparent') ? 'none' : ex.backgroundColor,
       fillStyle: ex.fillStyle === 'solid' ? 'solid' : ex.fillStyle === 'cross-hatch' ? 'cross' : 'hachure',
-      sw: (ex.strokeWidth || 1) <= 1 ? 2 : ex.strokeWidth <= 2 ? 4 : 6,
+      sw: (ex.strokeWidth || 1) <= 1 ? widths.fine : ex.strokeWidth <= 2 ? widths.medium : widths.thick,
       dash: ex.strokeStyle === 'dashed' ? 'dashed' : ex.strokeStyle === 'dotted' ? 'dotted' : 'solid',
       sketch: ex.roughness === 0 ? 0 : ex.roughness === 2 ? 2 : 1,
       opacity: ex.opacity == null ? 100 : ex.opacity,
@@ -3232,7 +3291,7 @@ function demoElements(){
   a1.x = chip.x + 60; a1.y = chip.y + 60;
   els.push(a1);
 
-  const a2 = newElement('arrow', 0, 0, { stroke: 'coral', curve: -0.2, sw: 4 });
+  const a2 = newElement('arrow', 0, 0, { stroke: 'coral', curve: -0.2, sw: 3.3 });
   a2.points = [[0,0],[10,10]];
   a2.startBind = sticky.id; a2.endBind = sticky2.id;
   a2.x = sticky.x + 100; a2.y = sticky.y;
@@ -3255,6 +3314,8 @@ function boot(){
   buildSwatches();
   buildPaperSwatches();
   buildFontSelect();
+  syncSettingsUI();
+  applyWidthPresets();
   buildIconMenu();
   buildBoardMenu();
   loadGoogleFonts();
