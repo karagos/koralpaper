@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.5.1';
+const APP_VERSION = '3.6.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -44,26 +44,26 @@ function distToSegment(px, py, x1, y1, x2, y2){
 const PALETTES = {
   light: {
     bg: '#F2EFE6', grid: 'rgba(32,29,24,0.075)',
-    stroke: { ink:'#26221C', gdark:'#524E45', gmid:'#8B8578', glight:'#BEB8AA',
+    stroke: { ink:'#26221C', gdark:'#524E45', gmid:'#8B8578', glight:'#BEB8AA', white:'#FFFFFF',
               coral:'#C96442', blue:'#5B6BB8', green:'#5E7F65', plum:'#8C5A78', paper:'#F6F3EA' },
-    fill:   { none:null, cream:'#FAF7EE', coral:'#C96442', terracotta:'#E6C2AC', blush:'#F0D8CB', periwinkle:'#C6CFEE',
+    fill:   { none:null, cream:'#FAF7EE', white:'#FFFFFF', coral:'#C96442', terracotta:'#E6C2AC', blush:'#F0D8CB', periwinkle:'#C6CFEE',
               sage:'#C4D4C4', butter:'#EEDFA9', sky:'#C6DBDF',
               glight:'#DCD7CA', gmid:'#ACA69A', gdark:'#6E6A5F', ink:'#26221C' },
     select: '#C96442', guide: '#C96442', bindHint: '#5B6BB8',
   },
   dark: {
     bg: '#23211C', grid: 'rgba(236,231,218,0.06)',
-    stroke: { ink:'#EAE4D6', gdark:'#CFC9BC', gmid:'#948E82', glight:'#635E55',
+    stroke: { ink:'#EAE4D6', gdark:'#CFC9BC', gmid:'#948E82', glight:'#635E55', white:'#FFFFFF',
               coral:'#DE8B6B', blue:'#93A2E4', green:'#94B39A', plum:'#C08FAD', paper:'#2A2823' },
-    fill:   { none:null, cream:'#37342D', coral:'#DE8B6B', terracotta:'#69452F', blush:'#5F443A', periwinkle:'#3D4569',
+    fill:   { none:null, cream:'#37342D', white:'#FFFFFF', coral:'#DE8B6B', terracotta:'#69452F', blush:'#5F443A', periwinkle:'#3D4569',
               sage:'#3C4F41', butter:'#5C5230', sky:'#39505A',
               glight:'#3B3831', gmid:'#59544B', gdark:'#8B857A', ink:'#EAE4D6' },
     select: '#DE8B6B', guide: '#DE8B6B', bindHint: '#93A2E4',
   },
 };
-const STROKE_KEYS = ['none','ink','gdark','gmid','glight','coral','blue','green','plum'];
-const FILL_KEYS = ['none','cream','coral','terracotta','blush','periwinkle','sage','butter','sky','glight','gmid','gdark','ink'];
-const COLOR_TITLES = { gdark:'dark grey', gmid:'grey', glight:'light grey' };
+const STROKE_KEYS = ['none','ink','gdark','gmid','glight','white','coral','blue','green','plum'];
+const FILL_KEYS = ['none','ink','gdark','gmid','glight','white','cream','coral','terracotta','blush','periwinkle','sage','butter','sky'];
+const COLOR_TITLES = { ink:'black', gdark:'dark grey', gmid:'grey', glight:'light grey' };
 
 /* fonts: three offline system stacks + a curated Google Fonts list.
    Google fonts load via a <link> when online and fall back gracefully offline. */

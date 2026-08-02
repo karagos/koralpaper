@@ -1,5 +1,12 @@
 # KoralPaper — Changelog
 
+## v3.6.0 — 2026-08-02
+- **White joins the palettes**, and both stroke and fill now open with a
+  clean neutral ramp: black → dark grey → grey → light grey → **white**,
+  followed by the colors (fill keeps cream right after the ramp). White
+  stays true white in dark mode too — handy for chalk-style lines on ink
+  paper.
+
 ## v3.5.1 — 2026-08-02
 - **Fixed: the Text tool places text again.** Clicking with the Text tool
   created the editor, but the browser's default click behavior immediately

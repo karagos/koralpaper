@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.5.1)
+# KoralPaper — *Draw your thinking* (v3.6.0)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 ![Platform: any browser, offline](https://img.shields.io/badge/Platform-any%20browser%20·%20offline-1F1E1B)
@@ -125,7 +125,7 @@ an example scene). Press **?** inside the app for the full shortcuts card.
 - **Editing:** undo/redo (⌘Z / ⇧⌘Z), copy/paste/cut, ⌘D duplicate, ⌥-drag
   duplicate, layer order (front/back/forward/backward), opacity
 - **Styling:** Anthropic palette (ink, coral, periwinkle, sage, terracotta,
-  butter…) **plus light/medium/dark greys** in both stroke and fill, a
+  butter…) **plus a black→greys→white neutral ramp** opening both stroke and fill, a
   **custom color picker** (rainbow swatch) with a hex field, a **no-stroke
   option** (fill-only shapes), **six fill styles** (solid, hatched, dense
   lines, cross-hatch, dots, waves — they work on icons too), 3 stroke
