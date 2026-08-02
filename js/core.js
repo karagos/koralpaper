@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.7.0';
+const APP_VERSION = '3.7.1';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -73,7 +73,6 @@ const FONTS = {
   sans:  { label:'Sans — notes', stack:'"Avenir Next",Avenir,"Helvetica Neue",Helvetica,Arial,sans-serif', weight:'600', group:'Built-in' },
   hand:  { label:'Hand — marker', stack:'"Chalkboard SE","Comic Sans MS","Segoe Print","Bradley Hand",cursive', weight:'400', group:'Built-in' },
 
-  archivo:    { label:'Archivo', stack:'"Archivo","Helvetica Neue",sans-serif', weight:'700', google:'Archivo:wght@400;600;700;800', group:'Sans & display' },
   inter:      { label:'Inter', stack:'"Inter","Helvetica Neue",sans-serif', weight:'500', google:'Inter:wght@400;500;700', group:'Sans & display' },
   montserrat: { label:'Montserrat', stack:'"Montserrat","Helvetica Neue",sans-serif', weight:'500', google:'Montserrat:wght@400;500;700', group:'Sans & display' },
   robotocond: { label:'Roboto Condensed', stack:'"Roboto Condensed","Helvetica Neue",sans-serif', weight:'500', google:'Roboto+Condensed:wght@400;700', group:'Sans & display' },

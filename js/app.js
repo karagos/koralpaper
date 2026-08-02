@@ -92,6 +92,7 @@ function migrateElements(els, ver){
     if (el.type === 'asterisk'){ el.type = 'icon'; el.kind = 'asterisk'; }
     if (el.type === 'icon' && !el.kind) el.kind = 'asterisk';
     if (!el.dash) el.dash = 'solid';
+    if (el.font === 'archivo') el.font = 'spacegrotesk'; // short-lived v3.7.0 font
     // legacy boolean arrowheads → named head kinds
     if (el.startHead === undefined && 'startArrow' in el){
       el.startHead = el.startArrow ? 'arrow' : 'none';
@@ -2990,8 +2991,9 @@ function tplQuoteCard(){
 }
 /* "Black carousel" — faithful conversion of Stefanos's Claude-designed
    1080×1350 carousel (black #0b0b0b paper, electric-yellow #EFE94A accent,
-   Archivo headings + Space Grotesk body). Three of its sixteen layouts:
-   Stats, Highlight word, Numbered steps. Everything neat (sketch 0). */
+   Space Grotesk throughout — the design's own body face, substituting its
+   original heading font to stay within the app's curated library). Three
+   of its sixteen layouts: Stats, Highlight word, Numbered steps. */
 function tplBlackCarousel(){
   const { mk, txt } = tplHelpers();
   const YEL = '#EFE94A', BLACK = '#0b0b0b', WHITE = '#FFFFFF', DIM = '#9E9E9E', LINE = '#2A2A2A';
@@ -2999,7 +3001,7 @@ function tplBlackCarousel(){
   const R = 1022; // right edge (1080 − 58 padding)
   const header = (els) => {
     const logo = mk('rect', 58, 58, 36, 36, { fill: YEL, stroke: 'none', ...N });
-    const p = txt(0, 61, 'P', 23, { font: 'archivo', stroke: BLACK, ...N });
+    const p = txt(0, 61, 'P', 23, { font: 'spacegrotesk', stroke: BLACK, ...N });
     p.x = 76 - p.w / 2;
     const left = txt(107, 60, 'Pixel', 25, { font: 'spacegrotesk', stroke: WHITE, ...N });
     const right = txt(0, 61, 'Introduction', 23, { font: 'spacegrotesk', stroke: DIM, ...N });
@@ -3028,7 +3030,7 @@ function tplBlackCarousel(){
     ['5s',   'is all you get\nto grab attention',       676],
   ];
   for (const [num, label, y] of rows){
-    stats.push(txt(58, y, num, 132, { font: 'archivo', stroke: YEL, ...N }));
+    stats.push(txt(58, y, num, 132, { font: 'spacegrotesk', stroke: YEL, ...N }));
     stats.push(txt(438, y + 24, label, 32, { font: 'spacegrotesk', stroke: WHITE, ...N }));
   }
   stats.push(divider(388), divider(624));
@@ -3037,12 +3039,12 @@ function tplBlackCarousel(){
   /* ── 08 Highlight word ── */
   const hi = [];
   header(hi);
-  const h1 = txt(58, 190, 'We build', 88, { font: 'archivo', stroke: WHITE, ...N });
-  const chipText = txt(0, 196, 'software', 88, { font: 'archivo', stroke: BLACK, ...N });
+  const h1 = txt(58, 190, 'We build', 88, { font: 'spacegrotesk', stroke: WHITE, ...N });
+  const chipText = txt(0, 196, 'software', 88, { font: 'spacegrotesk', stroke: BLACK, ...N });
   const chip = mk('rect', 58 + h1.w + 24, 186, chipText.w + 36, 112, { fill: YEL, stroke: 'none', ...N });
   chipText.x = chip.x + 18;
-  const h2 = txt(58, 294, 'that outlasts', 88, { font: 'archivo', stroke: WHITE, ...N });
-  const h3 = txt(58, 398, 'your rivals.', 88, { font: 'archivo', stroke: WHITE, ...N });
+  const h2 = txt(58, 294, 'that outlasts', 88, { font: 'spacegrotesk', stroke: WHITE, ...N });
+  const h3 = txt(58, 398, 'your rivals.', 88, { font: 'spacegrotesk', stroke: WHITE, ...N });
   const slot = mk('rect', 58, 582, 964, 560, { fill: 'none', stroke: DIM, dash: 'dashed', ...N });
   slot.text = 'Drop your image here — skyline / towers, b&w';
   slot.font = 'spacegrotesk'; slot.size = 26;
@@ -3052,16 +3054,16 @@ function tplBlackCarousel(){
   /* ── 14 Numbered steps ── */
   const steps = [];
   header(steps);
-  steps.push(txt(58, 194, 'Three moves that', 82, { font: 'archivo', stroke: WHITE, ...N }));
-  steps.push(txt(58, 280, 'change everything', 82, { font: 'archivo', stroke: WHITE, ...N }));
+  steps.push(txt(58, 194, 'Three moves that', 82, { font: 'spacegrotesk', stroke: WHITE, ...N }));
+  steps.push(txt(58, 280, 'change everything', 82, { font: 'spacegrotesk', stroke: WHITE, ...N }));
   const stepRows = [
     ['01', 'Say one thing',          'Pick the single idea you want to own and cut the rest.',      460],
     ['02', "Show it, don't claim it", 'Proof beats adjectives every single time.',                   690],
     ['03', 'Repeat until boring',    "The moment you're sick of it is when they start noticing.",   920],
   ];
   for (const [num, title, para, y] of stepRows){
-    steps.push(txt(58, y, num, 64, { font: 'archivo', stroke: YEL, ...N }));
-    steps.push(txt(214, y + 6, title, 40, { font: 'archivo', stroke: WHITE, ...N }));
+    steps.push(txt(58, y, num, 64, { font: 'spacegrotesk', stroke: YEL, ...N }));
+    steps.push(txt(214, y + 6, title, 40, { font: 'spacegrotesk', stroke: WHITE, ...N }));
     steps.push(txt(214, y + 64, para, 26, { font: 'spacegrotesk', stroke: DIM, ...N }));
   }
   steps.push(divider(610), divider(840));

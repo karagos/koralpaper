@@ -1,5 +1,12 @@
 # KoralPaper — Changelog
 
+## v3.7.1 — 2026-08-02
+- **Font library kept curated**: the Archivo family added in v3.7.0 is
+  removed again. The Black carousel template now uses **Space Grotesk**
+  throughout — the design's own body face — so headings and text share one
+  family from the existing list. Any elements already created with Archivo
+  migrate to Space Grotesk automatically.
+
 ## v3.7.0 — 2026-08-02
 - **New template: "Black carousel"** — a faithful conversion of an
   HTML carousel design (1080×1350, black paper, electric-yellow accent,
