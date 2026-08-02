@@ -1,5 +1,17 @@
 # KoralPaper — Changelog
 
+## v3.5.0 — 2026-08-02
+- **Fixed: fonts now apply on first selection.** Google font files load
+  lazily and canvas drawing doesn't trigger the download, so a freshly
+  picked font painted with a fallback until re-selected. The app now
+  requests the font file explicitly on selection (and for every font a
+  document uses), and repaints automatically the moment a font arrives.
+- **Text sizes are customizable**: Settings gained four sliders for the
+  S / M / L / XL text presets (defaults 16 / 21 / 29 / 42), working exactly
+  like the width presets — live, persistent, and included in "Reset to
+  defaults".
+- Imbue moved to the Serif group in the font picker.
+
 ## v3.4.0 — 2026-08-02
 - **Pin your icons**: right-click any Google Material icon in the picker to
   pin it (★). Pinned icons always lead the default grid — ahead of recents

@@ -24,22 +24,26 @@ const state = {
   bgColor: null,         // custom paper color (hex) or null = theme default
   board: null,           // {name,w,h,x,y} artboard, or null = unlimited canvas
 };
-/* user-adjustable width presets (Settings panel), persisted separately */
+/* user-adjustable width + text-size presets (Settings panel), persisted separately */
 const SETTINGS_KEY = 'koralpaper.settings';
 const DEFAULT_WIDTHS = { fine: 1.7, medium: 3.3, thick: 5 };
+const DEFAULT_SIZES = { s: 16, m: 21, l: 29, xl: 42 };
 const widths = { ...DEFAULT_WIDTHS };
+const sizes = { ...DEFAULT_SIZES };
 try {
   const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
   if (s.widths) for (const k of Object.keys(DEFAULT_WIDTHS))
     if (typeof s.widths[k] === 'number') widths[k] = clamp(s.widths[k], 0.5, 14);
+  if (s.sizes) for (const k of Object.keys(DEFAULT_SIZES))
+    if (typeof s.sizes[k] === 'number') sizes[k] = clamp(Math.round(s.sizes[k]), 8, 160);
 } catch (e){ /* fresh settings */ }
 function saveSettings(){
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ widths })); } catch (e){}
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ widths, sizes })); } catch (e){}
 }
 
 const defaults = {
   stroke:'ink', fill:'cream', fillStyle:'solid', dash:'solid', sw:widths.medium, sketch:1, round:1,
-  opacity:100, font:'sans', size:21, align:'center',
+  opacity:100, font:'sans', size:sizes.m, align:'center',
   curve:0, elbow:false, startHead:'none', endHead:'arrow',
   fillByType: { rect:'cream', diamond:'cream', ellipse:'cream', chip:'periwinkle', icon:'none' },
 };
@@ -405,6 +409,7 @@ function commit(){
   syncHistoryButtons();
   scheduleAutosave();
   scheduleThumbRefresh();
+  preloadDocFonts(); // any newly-referenced Google font starts downloading
 }
 function restore(json){
   const doc = JSON.parse(json);
@@ -1845,14 +1850,40 @@ function buildFontSelect(){
     (groups.get(f.group) || groups.get('Built-in')).appendChild(o);
   }
   for (const og of groups.values()) sel.appendChild(og);
-  sel.addEventListener('change', () => { if (sel.value) applyStyle({ font: sel.value }); });
+  sel.addEventListener('change', () => {
+    if (!sel.value) return;
+    requestFontLoad(sel.value); // fetch the file now — 'loadingdone' repaints
+    applyStyle({ font: sel.value });
+  });
 }
 function loadGoogleFonts(){
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = googleFontsHref();
-  link.onload = () => document.fonts.ready.then(refreshTextMetrics);
+  link.onload = () => { preloadDocFonts(); document.fonts.ready.then(refreshTextMetrics); };
   document.head.appendChild(link); // fails silently offline — system fallbacks kick in
+}
+/* The stylesheet only DEFINES the fonts; the files download lazily when the
+   DOM uses them — and canvas drawing doesn't count. So we explicitly request
+   every Google font the document uses, and re-render whenever one arrives. */
+const fontLoadRequested = new Set();
+function preloadDocFonts(){
+  for (const p of state.pages) for (const el of p.elements) requestFontLoad(el.font);
+}
+function requestFontLoad(key){
+  const f = FONTS[key];
+  if (!f || !f.google || fontLoadRequested.has(key)) return;
+  fontLoadRequested.add(key);
+  try { document.fonts.load(`${f.weight} 21px ${f.stack.split(',')[0]}`).catch(() => {}); }
+  catch (e){}
+}
+if (document.fonts && document.fonts.addEventListener){
+  document.fonts.addEventListener('loadingdone', () => {
+    // a font file just arrived: re-measure text drawn with fallbacks, repaint
+    for (const p of state.pages) for (const el of p.elements)
+      if (el.type === 'text' && FONTS[el.font] && FONTS[el.font].google) autosizeText(el);
+    requestRender(); scheduleThumbRefresh();
+  });
 }
 function refreshTextMetrics(){
   for (const el of state.elements) if (el.type === 'text') autosizeText(el);
@@ -2573,11 +2604,17 @@ $('tabHelp').addEventListener('click', () => setPanelTab('help'));
 $('tabSettings').addEventListener('click', () => setPanelTab('settings'));
 
 const WIDTH_KEYS = ['fine', 'medium', 'thick'];
+const SIZE_KEYS = ['s', 'm', 'l', 'xl'];
+const sizeInputId = k => 'setSize' + k[0].toUpperCase() + k.slice(1);
 function syncSettingsUI(){
   for (const k of WIDTH_KEYS){
     const id = 'set' + k[0].toUpperCase() + k.slice(1);
     $(id).value = widths[k];
     $(id + 'Val').textContent = String(widths[k]);
+  }
+  for (const k of SIZE_KEYS){
+    $(sizeInputId(k)).value = sizes[k];
+    $(sizeInputId(k) + 'Val').textContent = String(sizes[k]);
   }
 }
 function applyWidthPresets(){
@@ -2585,6 +2622,11 @@ function applyWidthPresets(){
     const k = WIDTH_KEYS[i];
     b.dataset.v = widths[k];
     b.title = k[0].toUpperCase() + k.slice(1) + ' (' + widths[k] + ')';
+  });
+  document.querySelectorAll('#sizeSeg button').forEach((b, i) => {
+    const k = SIZE_KEYS[i];
+    b.dataset.v = sizes[k];
+    b.title = k.toUpperCase() + ' (' + sizes[k] + 'px)';
   });
   syncPanel();
 }
@@ -2597,9 +2639,19 @@ WIDTH_KEYS.forEach(k => {
     syncSettingsUI(); applyWidthPresets(); saveSettings();
   });
 });
+SIZE_KEYS.forEach(k => {
+  $(sizeInputId(k)).addEventListener('input', () => {
+    const old = sizes[k];
+    sizes[k] = Number($(sizeInputId(k)).value);
+    if (defaults.size === old) defaults.size = sizes[k];
+    syncSettingsUI(); applyWidthPresets(); saveSettings();
+  });
+});
 $('setWidthsReset').addEventListener('click', () => {
   Object.assign(widths, DEFAULT_WIDTHS);
+  Object.assign(sizes, DEFAULT_SIZES);
   defaults.sw = widths.medium;
+  defaults.size = sizes.m;
   syncSettingsUI(); applyWidthPresets(); saveSettings();
 });
 function zoomFocusPoint(){

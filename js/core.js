@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.4.0';
+const APP_VERSION = '3.5.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -79,7 +79,7 @@ const FONTS = {
   bebas:      { label:'Bebas Neue', stack:'"Bebas Neue","Helvetica Neue",sans-serif', weight:'400', google:'Bebas+Neue', group:'Sans & display' },
   fjalla:     { label:'Fjalla One', stack:'"Fjalla One","Helvetica Neue",sans-serif', weight:'400', google:'Fjalla+One', group:'Sans & display' },
   oswald:     { label:'Oswald', stack:'"Oswald","Helvetica Neue",sans-serif', weight:'500', google:'Oswald:wght@400;600', group:'Sans & display' },
-  imbue:      { label:'Imbue', stack:'"Imbue",Georgia,serif', weight:'500', google:'Imbue:wght@400;600', group:'Sans & display' },
+  imbue:      { label:'Imbue', stack:'"Imbue",Georgia,serif', weight:'500', google:'Imbue:wght@400;600', group:'Serif' },
   dmsans:     { label:'DM Sans', stack:'"DM Sans","Helvetica Neue",sans-serif', weight:'500', google:'DM+Sans:wght@400;500;700', group:'Sans & display' },
   spacegrotesk:{ label:'Space Grotesk', stack:'"Space Grotesk","Helvetica Neue",sans-serif', weight:'500', google:'Space+Grotesk:wght@400;500;600', group:'Sans & display' },
 
