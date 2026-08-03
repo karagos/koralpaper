@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.9.0';
+const APP_VERSION = '3.10.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -115,7 +115,7 @@ function googleFontsHref(){
   const fams = Object.values(FONTS).filter(f => f.google).map(f => 'family=' + f.google).join('&');
   return 'https://fonts.googleapis.com/css2?' + fams + '&display=swap';
 }
-function lineHeightOf(size){ return Math.round(size * 1.3); }
+function lineHeightOf(size, mult){ return Math.round(size * (mult || 1.3)); }
 
 /* colors are tokens (theme-resolved) OR raw '#rrggbb' custom values.
    stroke 'none' resolves to null → the stroke pass is skipped entirely. */
@@ -142,6 +142,7 @@ function newElement(type, x, y, style){
     stroke: 'ink', fill: 'none', fillStyle: 'solid', dash: 'solid',
     sw: 3.3, sketch: 1, round: 1, opacity: 100,
     text: '', font: 'sans', size: 21, align: 'center',
+    lh: 1.3, pgap: 0, lspace: 0, valign: 'middle',
     groupId: null,
   };
   if (type === 'chip'){ el.fill = 'periwinkle'; el.size = 16; }
@@ -202,14 +203,55 @@ function sceneBounds(elements){
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
 
-/* ── text measurement ──────────────────────────────── */
+/* ── text measurement & layout ─────────────────────── */
 const _measureCtx = document.createElement('canvas').getContext('2d');
-function measureText(text, font, size){
+function applyTracking(ctx2, el){
+  try { ctx2.letterSpacing = ((el && el.lspace) || 0) + 'px'; } catch (e){}
+}
+/* typography accessors — every element carries lh (line-height multiple),
+   pgap (extra px at hard line breaks = paragraphs) and lspace (tracking) */
+const elLH = el => lineHeightOf(el.size, el.lh);
+const elPgap = el => el.pgap || 0;
+/* the ONE text layout used by canvas, SVG, autosize and the editor:
+   maxW == null → hard \n breaks only; with maxW, soft-wraps each paragraph.
+   Returns positioned lines with per-line paragraph flags. */
+function layoutText(el, maxW){
+  _measureCtx.font = fontCSS(el.font, el.size);
+  applyTracking(_measureCtx, el);
+  const lh = elLH(el), pgap = elPgap(el);
+  const lines = [];
+  String(el.text ?? '').split('\n').forEach((raw, pi) => {
+    if (maxW == null || !raw){
+      lines.push({ text: raw, para: pi > 0 });
+      return;
+    }
+    let line = '', first = true;
+    for (const word of raw.split(' ')){
+      const test = line ? line + ' ' + word : word;
+      if (_measureCtx.measureText(test).width <= maxW || !line) line = test;
+      else {
+        lines.push({ text: line, para: first && pi > 0 });
+        first = false; line = word;
+      }
+    }
+    lines.push({ text: line, para: first && pi > 0 });
+  });
+  let w = 0;
+  for (const l of lines) w = Math.max(w, _measureCtx.measureText(l.text).width);
+  const totalH = lines.length * lh + lines.filter(l => l.para).length * pgap;
+  applyTracking(_measureCtx, null);
+  return { lines, lh, pgap, totalH, w };
+}
+function measureText(text, font, size, tyEl){
   _measureCtx.font = fontCSS(font, size);
+  applyTracking(_measureCtx, tyEl);
   const lines = String(text).split('\n');
   let w = 0;
   for (const ln of lines) w = Math.max(w, _measureCtx.measureText(ln).width);
-  return { w, h: lines.length * lineHeightOf(size), lines };
+  applyTracking(_measureCtx, null);
+  const lh = tyEl ? lineHeightOf(size, tyEl.lh) : lineHeightOf(size);
+  const pg = tyEl ? (tyEl.pgap || 0) : 0;
+  return { w, h: lines.length * lh + Math.max(0, lines.length - 1) * pg, lines };
 }
 function wrapText(text, maxW, font, size){
   _measureCtx.font = fontCSS(font, size);
@@ -547,7 +589,7 @@ function hitTest(el, px, py, zoom){
     }
     if (el.text && el.text.trim() && el.type !== 'draw'){
       const mid = pathMidpoint(pts);
-      const m = measureText(el.text, el.font, el.size);
+      const m = measureText(el.text, el.font, el.size, el);
       if (Math.abs(px - mid[0]) < m.w/2 + 9 && Math.abs(py - mid[1]) < m.h/2 + 6) return true;
     }
     return false;
@@ -1043,45 +1085,54 @@ function drawHead(ctx, el, kind, x, y, angle, size, bg){
   ctx.stroke();
 }
 
+/* starting baseline offset for a text block inside a box, honoring valign */
+function boxTextTop(el, box, totalH, pad){
+  if (el.valign === 'top') return box.y + pad;
+  if (el.valign === 'bottom') return box.y + box.h - pad - totalH;
+  return box.y + box.h / 2 - totalH / 2;
+}
 /* draw text lines inside a box */
 function drawBoxText(ctx, el, pal, box){
   if (el._editing) return;
   if (!el.text || !el.text.trim()) return;
   const pad = el.type === 'chip' ? 10 : 12;
   const maxW = Math.max(20, box.w - pad * 2);
-  const lines = wrapText(el.text, maxW, el.font, el.size);
-  const lh = lineHeightOf(el.size);
-  const totalH = lines.length * lh;
+  const lay = layoutText(el, maxW);
   ctx.font = fontCSS(el.font, el.size);
+  applyTracking(ctx, el);
   ctx.textBaseline = 'middle';
   ctx.fillStyle = (el.fill === 'ink') ? pal.bg : (resolveStroke(pal, el.stroke) || pal.stroke.ink);
-  let ty = box.y + box.h/2 - totalH/2 + lh/2;
-  for (const ln of lines){
+  let ty = boxTextTop(el, box, lay.totalH, pad) + lay.lh / 2;
+  for (const ln of lay.lines){
+    if (ln.para) ty += lay.pgap;
     let tx;
     if (el.align === 'left'){ ctx.textAlign = 'left'; tx = box.x + pad; }
     else if (el.align === 'right'){ ctx.textAlign = 'right'; tx = box.x + box.w - pad; }
     else { ctx.textAlign = 'center'; tx = box.x + box.w/2; }
-    ctx.fillText(ln, tx, ty);
-    ty += lh;
+    ctx.fillText(ln.text, tx, ty);
+    ty += lay.lh;
   }
+  applyTracking(ctx, null);
 }
 
 function drawTextElement(ctx, el, pal){
   if (el._editing) return;
-  const lines = String(el.text).split('\n');
-  const lh = lineHeightOf(el.size);
+  const lay = layoutText(el, null);
   ctx.font = fontCSS(el.font, el.size);
+  applyTracking(ctx, el);
   ctx.textBaseline = 'middle';
   ctx.fillStyle = resolveStroke(pal, el.stroke) || pal.stroke.ink;
-  let ty = el.y + lh/2;
-  for (const ln of lines){
+  let ty = el.y + lay.lh/2;
+  for (const ln of lay.lines){
+    if (ln.para) ty += lay.pgap;
     let tx;
     if (el.align === 'right'){ ctx.textAlign = 'right'; tx = el.x + el.w; }
     else if (el.align === 'center'){ ctx.textAlign = 'center'; tx = el.x + el.w/2; }
     else { ctx.textAlign = 'left'; tx = el.x; }
-    ctx.fillText(ln, tx, ty);
-    ty += lh;
+    ctx.fillText(ln.text, tx, ty);
+    ty += lay.lh;
   }
+  applyTracking(ctx, null);
 }
 
 /* ── images + algorithmic art ───────────────────────
@@ -1887,13 +1938,11 @@ function drawElement(ctx, el, pal, bg){
          every move, bend, and re-anchor automatically */
       if (el.text && el.text.trim() && !el._editing){
         const mid = pathMidpoint(pts);
-        const lines = String(el.text).split('\n');
-        const lh = lineHeightOf(el.size);
+        const lay = layoutText(el, null);
         ctx.font = fontCSS(el.font, el.size);
-        let tw = 0;
-        for (const ln of lines) tw = Math.max(tw, ctx.measureText(ln).width);
+        applyTracking(ctx, el);
         const padX = 7, padY = 3;
-        const bw2 = tw + padX * 2, bh2 = lines.length * lh + padY * 2;
+        const bw2 = lay.w + padX * 2, bh2 = lay.totalH + padY * 2;
         const x0 = mid[0] - bw2/2, y0 = mid[1] - bh2/2;
         if (bg){
           ctx.fillStyle = bg;
@@ -1905,7 +1954,13 @@ function drawElement(ctx, el, pal, bg){
         ctx.fillStyle = resolveStroke(pal, el.stroke) || pal.stroke.ink;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        lines.forEach((ln, i) => ctx.fillText(ln, mid[0], y0 + padY + lh/2 + i * lh));
+        let ly = y0 + padY + lay.lh/2;
+        for (const ln of lay.lines){
+          if (ln.para) ly += lay.pgap;
+          ctx.fillText(ln.text, mid[0], ly);
+          ly += lay.lh;
+        }
+        applyTracking(ctx, null);
       }
     }
     ctx.setLineDash([]);
@@ -2146,20 +2201,21 @@ function renderSceneSVG(elements, opts){
 
   const fontAttrs = (el) => {
     const f = FONTS[el.font] || FONTS.sans;
-    return `font-family="${svgEsc(f.stack.replace(/"/g, "'"))}" font-size="${el.size}" font-weight="${f.weight}"`;
+    const track = el.lspace ? ` letter-spacing="${svgNum(el.lspace)}"` : '';
+    return `font-family="${svgEsc(f.stack.replace(/"/g, "'"))}" font-size="${el.size}" font-weight="${f.weight}"${track}`;
   };
 
-  const textLinesSVG = (el, lines, box) => {
+  const textLinesSVG = (el, lay, box) => {
     const out = [];
     const pad2 = el.type === 'chip' ? 10 : 12;
-    const lh = lineHeightOf(el.size);
     const color = (el.type !== 'text' && el.fill === 'ink')
       ? (opts.bg || pal.bg)
       : (resolveStroke(pal, el.stroke) || pal.stroke.ink);
     let ty = el.type === 'text'
-      ? el.y + lh / 2
-      : box.y + box.h/2 - (lines.length * lh)/2 + lh/2;
-    for (const ln of lines){
+      ? el.y + lay.lh / 2
+      : boxTextTop(el, box, lay.totalH, pad2) + lay.lh / 2;
+    for (const ln of lay.lines){
+      if (ln.para) ty += lay.pgap;
       let tx, anchor;
       const align = el.align || 'center';
       if (el.type === 'text'){
@@ -2171,8 +2227,8 @@ function renderSceneSVG(elements, opts){
         else if (align === 'right'){ anchor = 'end'; tx = box.x + box.w - pad2; }
         else { anchor = 'middle'; tx = box.x + box.w/2; }
       }
-      if (ln) out.push(`<text x="${svgNum(tx)}" y="${svgNum(ty)}" ${fontAttrs(el)} fill="${color}" text-anchor="${anchor}" dominant-baseline="central">${svgEsc(ln)}</text>`);
-      ty += lh;
+      if (ln.text) out.push(`<text x="${svgNum(tx)}" y="${svgNum(ty)}" ${fontAttrs(el)} fill="${color}" text-anchor="${anchor}" dominant-baseline="central">${svgEsc(ln.text)}</text>`);
+      ty += lay.lh;
     }
     return out.join('');
   };
@@ -2302,7 +2358,7 @@ function renderSceneSVG(elements, opts){
     }
     else if (el.type === 'text'){
       if (el.text && el.text.trim())
-        parts.push(textLinesSVG(el, String(el.text).split('\n'), eb));
+        parts.push(textLinesSVG(el, layoutText(el, null), eb));
     }
     else if (isLinear(el)){
       if (!resolveStroke(pal, el.stroke)){ body.push(''); continue; }
@@ -2325,18 +2381,19 @@ function renderSceneSVG(elements, opts){
         }
         if (el.text && el.text.trim()){
           const mid = pathMidpoint(pts);
-          const lines = String(el.text).split('\n');
-          const lh = lineHeightOf(el.size);
-          const m = measureText(el.text, el.font, el.size);
+          const lay = layoutText(el, null);
           const padX = 7, padY = 3;
-          const bw2 = m.w + padX * 2, bh2 = lines.length * lh + padY * 2;
+          const bw2 = lay.w + padX * 2, bh2 = lay.totalH + padY * 2;
           const x0 = mid[0] - bw2/2, y0 = mid[1] - bh2/2;
           if (!opts.transparent)
             parts.push(`<rect x="${svgNum(x0)}" y="${svgNum(y0)}" width="${svgNum(bw2)}" height="${svgNum(bh2)}" rx="7" fill="${opts.bg || pal.bg}"/>`);
           const color = resolveStroke(pal, el.stroke) || pal.stroke.ink;
-          lines.forEach((ln, i) => {
-            if (ln) parts.push(`<text x="${svgNum(mid[0])}" y="${svgNum(y0 + padY + lh/2 + i * lh)}" ${fontAttrs(el)} fill="${color}" text-anchor="middle" dominant-baseline="central">${svgEsc(ln)}</text>`);
-          });
+          let ly = y0 + padY + lay.lh/2;
+          for (const ln of lay.lines){
+            if (ln.para) ly += lay.pgap;
+            if (ln.text) parts.push(`<text x="${svgNum(mid[0])}" y="${svgNum(ly)}" ${fontAttrs(el)} fill="${color}" text-anchor="middle" dominant-baseline="central">${svgEsc(ln.text)}</text>`);
+            ly += lay.lh;
+          }
         }
       }
     }
@@ -2355,7 +2412,7 @@ function renderSceneSVG(elements, opts){
       }
       if (el.text && el.text.trim()){
         const pad2 = el.type === 'chip' ? 10 : 12;
-        parts.push(textLinesSVG(el, wrapText(el.text, Math.max(20, eb.w - pad2*2), el.font, el.size), eb));
+        parts.push(textLinesSVG(el, layoutText(el, Math.max(20, eb.w - pad2*2)), eb));
       }
     }
 
@@ -2440,7 +2497,7 @@ function buildPDF(pages){
 
 /* refresh a text element's box from its content */
 function autosizeText(el){
-  const m = measureText(el.text || ' ', el.font, el.size);
+  const m = measureText(el.text || ' ', el.font, el.size, el);
   el.w = Math.max(10, m.w);
-  el.h = Math.max(lineHeightOf(el.size), m.h);
+  el.h = Math.max(elLH(el), m.h);
 }

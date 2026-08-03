@@ -45,6 +45,7 @@ const defaults = {
   stroke:'ink', fill:'cream', fillStyle:'solid', dash:'solid', sw:widths.medium, sketch:1, round:1,
   opacity:100, font:'sans', size:sizes.m, align:'center',
   curve:0, elbow:false, startHead:'none', endHead:'arrow',
+  lh:1.3, pgap:0, lspace:0, valign:'middle',
   fillByType: { rect:'cream', diamond:'cream', ellipse:'cream', chip:'periwinkle', icon:'none' },
 };
 let iconKind = 'asterisk'; // last-picked stamp from the icon menu
@@ -1185,7 +1186,8 @@ function positionEditor(){
   const z = state.camera.z;
   const fs = el.size * z;
   editorEl.style.font = fontCSS(el.font, fs);
-  editorEl.style.lineHeight = lineHeightOf(el.size) * z + 'px';
+  editorEl.style.lineHeight = lineHeightOf(el.size, el.lh) * z + 'px';
+  editorEl.style.letterSpacing = ((el.lspace || 0) * z) + 'px';
   if (el.type === 'text'){
     const [px, py] = toScreen(el.x, el.y);
     const m = measureText(editorEl.value || ' ', el.font, el.size);
@@ -1194,7 +1196,7 @@ function positionEditor(){
     editorEl.style.left = px + 'px';
     editorEl.style.top = py + 'px';
     editorEl.style.width = Math.max(40, (m.w + 20) * z) + 'px';
-    editorEl.style.height = Math.max(lineHeightOf(el.size), m.h) * z + 6 + 'px';
+    editorEl.style.height = Math.max(lineHeightOf(el.size, el.lh), m.h) * z + 6 + 'px';
   } else if (isLinear(el)){
     // label editor floats centered on the arrow's midpoint
     const mid = linearMidpoint(el);
@@ -1206,19 +1208,19 @@ function positionEditor(){
     editorEl.style.left = (px - w / 2) + 'px';
     editorEl.style.top = (py - (m.h * z) / 2 - 3) + 'px';
     editorEl.style.width = w + 'px';
-    editorEl.style.height = Math.max(lineHeightOf(el.size), m.h) * z + 6 + 'px';
+    editorEl.style.height = Math.max(lineHeightOf(el.size, el.lh), m.h) * z + 6 + 'px';
   } else {
     const pad = el.type === 'chip' ? 10 : 12;
     const maxW = Math.max(20, el.w - pad*2);
     const lines = wrapText(editorEl.value || ' ', maxW, el.font, el.size);
-    const th = lines.length * lineHeightOf(el.size);
+    const th = lines.length * lineHeightOf(el.size, el.lh);
     const [px, py] = toScreen(el.x + pad, el.y + el.h/2 - th/2);
     editorEl.style.whiteSpace = 'pre-wrap';
     editorEl.style.textAlign = el.align;
     editorEl.style.left = px + 'px';
     editorEl.style.top = py + 'px';
     editorEl.style.width = maxW * z + 'px';
-    editorEl.style.height = (th + lineHeightOf(el.size)) * z + 'px';
+    editorEl.style.height = (th + lineHeightOf(el.size, el.lh)) * z + 'px';
   }
   const p = pal();
   editorEl.style.color = (el.fill === 'ink') ? p.bg : resolveStroke(p, el.stroke);
@@ -1232,7 +1234,7 @@ editorEl.addEventListener('input', () => {
     // grow the container if the text no longer fits
     const pad = el.type === 'chip' ? 10 : 12;
     const lines = wrapText(el.text || ' ', Math.max(20, el.w - pad*2), el.font, el.size);
-    const needH = lines.length * lineHeightOf(el.size) + pad * 2;
+    const needH = lines.length * lineHeightOf(el.size, el.lh) + pad * 2;
     if (needH > el.h) el.h = needH;
   }
   positionEditor();
@@ -1363,7 +1365,7 @@ function reorder(mode){
 }
 
 /* ── copy / paste style ────────────────────────────── */
-const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align'];
+const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign'];
 let styleClipboard = null;
 function copyStyle(){
   const sel = selected();
@@ -1706,6 +1708,8 @@ function syncPanel(){
   show('rowFont', textish);
   show('rowSize', textish);
   show('rowAlign', textish);
+  show('rowTypo', textish);
+  show('rowValign', has('rect','diamond','ellipse','chip'));
   show('rowOpacity', true);
   const nUnits = sel.length ? alignUnits().length : 0;
   show('rowArrange', nUnits >= 2);
@@ -1754,6 +1758,13 @@ function syncPanel(){
   $('fontSelect').value = typeof fontVal === 'string' ? fontVal : '';
   markSel('#sizeSeg button', b => Number(b.dataset.v) === val('size'));
   markSel('#alignSeg button', b => b.dataset.v === val('align'));
+  markSel('#valignSeg button', b => b.dataset.v === (val('valign') || 'middle'));
+  $('tyLh').value = val('lh') ?? 1.3;
+  $('tyLhVal').textContent = '×' + $('tyLh').value;
+  $('tyPgap').value = val('pgap') ?? 0;
+  $('tyPgapVal').textContent = $('tyPgap').value + 'px';
+  $('tyLs').value = val('lspace') ?? 0;
+  $('tyLsVal').textContent = $('tyLs').value + 'px';
   $('startHeadSel').value = typeof val('startHead') === 'string' ? val('startHead') : '';
   $('endHeadSel').value = typeof val('endHead') === 'string' ? val('endHead') : '';
   const op = val('opacity');
@@ -1781,6 +1792,7 @@ document.addEventListener('click', ev => {
   else if (t.closest('#artDetailSeg') && t.dataset.detail) applyStyle({ detail: Number(t.dataset.detail) });
   else if (t.closest('#sizeSeg') && t.dataset.v) applyStyle({ size: Number(t.dataset.v) });
   else if (t.closest('#alignSeg') && t.dataset.v) applyStyle({ align: t.dataset.v });
+  else if (t.closest('#valignSeg') && t.dataset.v) applyStyle({ valign: t.dataset.v });
 });
 $('startHeadSel').addEventListener('change', ev => {
   if (ev.target.value) applyStyle({ startHead: ev.target.value });
@@ -1833,6 +1845,27 @@ for (const [id, prop, parse] of ADJ_SLIDERS){
     adjTimer = setTimeout(requestRender, 90);
   });
   $(id).addEventListener('change', () => { if (state.selection.size) commit(); });
+}
+
+/* typography sliders — line spacing, paragraph gap, letter spacing */
+const TYPO_SLIDERS = [
+  ['tyLh', 'lh', v => Number(v), v => '×' + v],
+  ['tyPgap', 'pgap', v => Number(v), v => v + 'px'],
+  ['tyLs', 'lspace', v => Number(v), v => v + 'px'],
+];
+for (const [id, prop, parse, fmt] of TYPO_SLIDERS){
+  $(id).addEventListener('input', ev => {
+    const v = parse(ev.target.value);
+    $(id + 'Val').textContent = fmt(ev.target.value);
+    applyStyleLive({ [prop]: v });
+    for (const el of selected()) if (el.type === 'text') autosizeText(el);
+    requestRender();
+  });
+  $(id).addEventListener('change', ev => {
+    applyStyle({ [prop]: parse(ev.target.value) });
+    for (const el of selected()) if (el.type === 'text') autosizeText(el);
+    requestRender();
+  });
 }
 $('adjResetBtn').addEventListener('click', () => {
   let touched = false;

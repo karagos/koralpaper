@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.9.0)
+# KoralPaper — *Draw your thinking* (v3.10.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -45,6 +45,12 @@ a one-page showcase of every feature). Press **?** inside the app for the full s
 - **Text everywhere:** double-click any shape to type inside it (text wraps and
   the shape grows); standalone text elements; **arrows and lines take labels**
   that ride their midpoint and follow every move and bend
+- **Typography controls:** per-element **line spacing** (×0.9–2.4),
+  **paragraph gap** (extra space at every hard line break, so wrapped
+  lines stay tight while paragraphs breathe), **letter spacing**
+  (−2 to +12px tracking), and **vertical alignment** inside shapes
+  (top / middle / bottom) — all live in the style panel and all carried
+  by copy/paste-style and SVG/PNG/PDF exports
 - **Excalidraw interop:** ☰ → Export page to Excalidraw; opening a
   .excalidraw file imports it onto a new page (bound labels, groups, images
   and colors survive the round trip)

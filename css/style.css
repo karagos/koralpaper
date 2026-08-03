@@ -275,6 +275,12 @@ body.dark .menu button.danger{color:#F09070;}
 #opacityRange{width:100%; accent-color:var(--coral); height:22px;}
 
 .adjrow{display:flex; align-items:center; gap:7px;}
+.typorow{align-items:flex-start;}
+.typosliders{flex:1; display:flex; flex-direction:column; gap:4px; min-width:0;}
+.typosliders b{
+  width:36px; text-align:right; font-size:10.5px;
+  font-variant-numeric:tabular-nums; color:var(--ink-soft); flex:0 0 auto;
+}
 .adjrow span{
   font-size:10.5px; font-weight:600; color:var(--ink-soft); width:52px; flex-shrink:0;
 }

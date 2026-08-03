@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.10.0 — 2026-08-02
+- **Typography controls** for all text — standalone text, text inside
+  shapes, and arrow/line labels:
+  - **Line spacing** slider (×0.9–2.4, default ×1.3).
+  - **Paragraph gap** slider (0–48px): extra space added at every hard
+    line break (Enter). Inside shapes, soft-wrapped lines keep the normal
+    line spacing while your typed paragraphs get the gap.
+  - **Letter spacing** slider (−2 to +12px tracking).
+  - **Vertical alignment** for text inside shapes: top / middle / bottom.
+  - All four travel with copy/paste-style, save into documents and
+    templates, and export identically to SVG, PNG and PDF; the in-place
+    text editor mirrors line spacing and tracking while you type.
+
 ## v3.9.0 — 2026-08-02
 - **Robust template system**:
   - Save **multi-page templates** — "Save this page…" or "Save all
