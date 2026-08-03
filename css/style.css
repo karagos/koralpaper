@@ -412,6 +412,33 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 }
 .hint.show{opacity:1;}
 
+.welcomewrap{
+  position:fixed; inset:0; z-index:60;
+  display:flex; align-items:center; justify-content:center;
+  background:color-mix(in srgb, var(--ink) 26%, transparent);
+  backdrop-filter:blur(2px);
+}
+.welcome{
+  display:block;
+  width:min(440px, calc(100vw - 48px));
+  padding:34px 36px 28px; text-align:center;
+  animation:welcomein .35s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes welcomein{ from{opacity:0; transform:translateY(14px) scale(.97);} to{opacity:1; transform:none;} }
+.welcome h2{
+  font-family:var(--serif); font-weight:500; font-size:26px;
+  margin:14px 0 2px; letter-spacing:.2px;
+}
+.welcome h2 b{font-weight:700;}
+.welcome .wmotto{
+  font-family:var(--serif); font-style:italic; font-size:16px;
+  color:var(--coral); margin:0 0 14px;
+}
+.welcome .wbody{
+  font-size:13.5px; line-height:1.55; color:var(--ink-soft); margin:0 0 20px;
+}
+.welcome .actions{justify-content:center; gap:10px; flex-wrap:wrap;}
+
 .shortcuts{
   bottom:14px; right:14px; width:390px;
   flex-direction:column; align-items:stretch; padding:16px 18px 13px; gap:8px;

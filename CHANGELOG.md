@@ -1,5 +1,16 @@
 # KoralPaper — Changelog
 
+## v3.17.0 — 2026-08-03
+- **First-run welcome.** A brand-new browser gets a warm welcome card:
+  the paper-thought mark, the motto, and two choices, "Take the 60-second
+  tour" (loads the KoralPaper tour in place of the empty page) or "Start
+  with a blank page". Shown exactly once; returning users and anyone with
+  an autosaved document never see it.
+- **Empty-canvas guidance.** A completely blank document shows faint
+  centered hints (R rectangle, A arrow, T text, ? for help) that vanish
+  forever the moment the first element lands. No overlay, no dismissing:
+  it is drawn on the paper itself.
+
 ## v3.16.0 — 2026-08-03
 - **Rendering performance layer.** While you drag, resize, rotate, bend an
   arrow, marquee-select or pan, everything that isn't moving is rasterized

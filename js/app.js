@@ -264,6 +264,24 @@ function render(){
 function drawOverlay(){
   const p = pal();
   const z = state.camera.z;
+
+  // empty-canvas guidance: only on a completely blank document, gone forever
+  // the moment the first element lands
+  if (state.pages.length === 1 && state.elements.length === 0 &&
+      !interaction && !editing && state.tool === 'select'){
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = state.theme === 'light' ? 'rgba(32,29,24,.34)' : 'rgba(236,231,218,.34)';
+    ctx.font = `italic 500 19px ${FONTS.serif.stack}`;
+    ctx.fillText('Draw your thinking', w / 2, h / 2 - 26);
+    ctx.font = `13px ${FONTS.sans.stack}`;
+    ctx.fillStyle = state.theme === 'light' ? 'rgba(32,29,24,.26)' : 'rgba(236,231,218,.26)';
+    ctx.fillText('R rectangle · A arrow · T text · double-click a shape to type', w / 2, h / 2 + 2);
+    ctx.fillText('? shortcuts & settings · ☰ templates and the tour', w / 2, h / 2 + 24);
+    ctx.restore();
+  }
+
   ctx.save();
   ctx.translate(state.camera.x, state.camera.y);
   ctx.scale(z, z);
@@ -4078,6 +4096,36 @@ function loadDemo(){
   showHint('The KoralPaper tour — every feature on this page is real');
 }
 
+/* ── first-run welcome ─────────────────────────────── */
+const WELCOME_KEY = 'koralpaper.welcomed';
+function maybeShowWelcome(hadSave){
+  let welcomed = false;
+  try { welcomed = !!localStorage.getItem(WELCOME_KEY); } catch (e){}
+  if (hadSave || welcomed) return;
+  const wrap = $('welcomeWrap');
+  wrap.classList.remove('hidden');
+  const dismiss = () => {
+    wrap.classList.add('hidden');
+    try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e){}
+  };
+  $('welcomeStart').addEventListener('click', dismiss);
+  $('welcomeTour').addEventListener('click', () => {
+    dismiss();
+    // a virgin doc is one empty page — the tour replaces it instead of
+    // leaving a blank Page 1 behind
+    const virgin = state.pages.length === 1 && state.elements.length === 0;
+    loadDemo();
+    if (virgin && state.pages.length > 1){
+      state.pages.splice(0, 1);
+      state.pageIndex = 0;
+      state.elements = state.pages[0].elements;
+      commit(); buildPageStrip();
+    }
+  });
+  // clicking the dim backdrop = start drawing
+  wrap.addEventListener('pointerdown', ev => { if (ev.target === wrap) dismiss(); });
+}
+
 /* ── boot ──────────────────────────────────────────── */
 function boot(){
   $('menuVersion').textContent = `KoralPaper v${APP_VERSION}`;
@@ -4090,7 +4138,7 @@ function boot(){
   buildIconMenu();
   buildBoardMenu();
   loadGoogleFonts();
-  loadSaved();
+  const hadSave = loadSaved();
   document.body.classList.toggle('dark', state.theme === 'dark');
   paintSwatches();
   syncToggles();
@@ -4110,6 +4158,7 @@ function boot(){
   setTool('select');
   syncZoomLabel();
   requestRender();
+  maybeShowWelcome(hadSave);
   showHint('Double-click any shape to type in it · press ? for shortcuts');
 }
 boot();

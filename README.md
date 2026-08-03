@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.16.0)
+# KoralPaper — *Draw your thinking* (v3.17.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -26,9 +26,11 @@ hundreds of elements stay perfectly fluid.
 Download or clone this repository, then double-click **`index.html`** —
 it runs fully offline from `file://` in any modern browser (built on macOS,
 works anywhere Chrome/Safari/Firefox run). Your sketch autosaves to the
-browser's local storage and reopens exactly where you left it next time;
-a first run starts with a blank document (☰ → "Load the KoralPaper tour" shows
-a one-page showcase of every feature). Press **?** inside the app for the full shortcuts card.
+browser's local storage and reopens exactly where you left it next time.
+A first run greets you with a welcome card offering the 60-second tour or a
+blank page (the tour is always available later via ☰ → "Load the KoralPaper
+tour"), and a blank canvas shows gentle starter hints until your first
+element lands. Press **?** inside the app for the full shortcuts card.
 
 ## What it does
 

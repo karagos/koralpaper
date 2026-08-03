@@ -357,6 +357,31 @@
 
   <div class="hint" id="hint"></div>
 
+  <!-- ── first-run welcome ─────────────────────────── -->
+  <div class="welcomewrap hidden" id="welcomeWrap">
+    <div class="island welcome" id="welcomeCard">
+      <svg viewBox="0 0 96 96" width="64" height="64" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M30 10 Q56 6 82 10 Q85 36 82 62 Q56 66 29 62 Q26 36 30 10 Z" stroke="var(--ink)" stroke-width="7"/>
+        <g stroke="var(--coral)" stroke-width="8">
+          <path d="M56 20 Q55 36 56 52"/>
+          <path d="M41 28 Q56 35 71 44"/>
+          <path d="M71 28 Q56 35 41 44"/>
+        </g>
+        <circle cx="24" cy="74" r="7" fill="var(--ink)"/>
+        <circle cx="13" cy="86" r="5" fill="var(--ink)"/>
+      </svg>
+      <h2>Welcome to <b>KoralPaper</b></h2>
+      <p class="wmotto">Draw your thinking.</p>
+      <p class="wbody">Wobbly hand-drawn shapes, glued arrows, sticky notes and
+        algorithmic photo art. All offline, all yours: nothing ever
+        leaves this browser.</p>
+      <div class="row actions">
+        <button class="pill" id="welcomeTour">Take the 60-second tour</button>
+        <button class="minipill" id="welcomeStart">Start with a blank page</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── page strip ────────────────────────────────── -->
   <div class="island pagestrip" id="pageStrip"></div>
 
