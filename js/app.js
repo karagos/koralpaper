@@ -1867,6 +1867,12 @@ for (const [id, prop, parse, fmt] of TYPO_SLIDERS){
     requestRender();
   });
 }
+$('tyReset').addEventListener('click', () => {
+  applyStyle({ lh: 1.3, pgap: 0, lspace: 0, valign: 'middle' });
+  for (const el of selected()) if (el.type === 'text') autosizeText(el);
+  requestRender();
+  showHint('Spacing reset to defaults');
+});
 $('adjResetBtn').addEventListener('click', () => {
   let touched = false;
   for (const el of selected()){
