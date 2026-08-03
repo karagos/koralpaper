@@ -255,6 +255,23 @@
         <button data-v="right" title="Right"><svg viewBox="0 0 20 20"><path d="M3.5 5.5 H16.5 M8 10 H16.5 M5.5 14.5 H16.5"/></svg></button>
       </div>
     </div>
+    <div class="row" id="rowRich"><label>Format</label>
+      <div class="richwrap">
+        <div class="segment richseg">
+          <button id="tsBold" title="Bold — ⌘B (selected text while editing, else the whole text)"><b>B</b></button>
+          <button id="tsItal" title="Italic — ⌘I"><i>I</i></button>
+        </div>
+        <div class="hlrow" title="Highlight the selected text (click again to remove)">
+          <button class="hldot" data-hl="#F7E36B" style="background:#F7E36B"></button>
+          <button class="hldot" data-hl="#BDE7B4" style="background:#BDE7B4"></button>
+          <button class="hldot" data-hl="#F6C6DC" style="background:#F6C6DC"></button>
+          <button class="hldot" data-hl="#BCE0F5" style="background:#BCE0F5"></button>
+          <button class="hldot" data-hl="#F2BFA4" style="background:#F2BFA4"></button>
+          <button class="hldot hlcustom" id="hlCustom" title="Custom highlight color"></button>
+          <button class="hldot hloff" id="hlOff" title="Remove highlight">✕</button>
+        </div>
+      </div>
+    </div>
     <div class="row" id="rowValign"><label>Vertical</label>
       <div class="segment" id="valignSeg">
         <button data-v="top" title="Top"><svg viewBox="0 0 20 20"><path d="M3.5 4 H16.5 M10 7.5 V16 M7 10.5 L10 7.3 L13 10.5"/></svg></button>

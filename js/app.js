@@ -53,6 +53,7 @@ const defaults = {
   opacity:100, font:'sans', size:sizes.m, align:'center',
   curve:0, elbow:false, startHead:'none', endHead:'arrow',
   lh:typo.lh, pgap:typo.pgap, lspace:typo.lspace, valign:'middle',
+  hlColor:'#F7E36B',
   fillByType: { rect:'cream', diamond:'cream', ellipse:'cream', chip:'periwinkle', icon:'none' },
 };
 let iconKind = 'asterisk'; // last-picked stamp from the icon menu
@@ -1237,6 +1238,15 @@ function positionEditor(){
 editorEl.addEventListener('input', () => {
   if (!editing) return;
   const el = editing.el;
+  // keep bold/italic/highlight runs anchored across the edit
+  const oldT = String(el.text || ''), newT = editorEl.value;
+  if (el.runs && oldT !== newT){
+    let p = 0;
+    while (p < oldT.length && p < newT.length && oldT[p] === newT[p]) p++;
+    let so = oldT.length, sn = newT.length;
+    while (so > p && sn > p && oldT[so - 1] === newT[sn - 1]){ so--; sn--; }
+    el.runs = remapRuns(el.runs, p, so - p, sn - p);
+  }
   el.text = editorEl.value;
   if (el.type === 'text') autosizeText(el);
   else if (!isLinear(el)){
@@ -1251,8 +1261,13 @@ editorEl.addEventListener('input', () => {
 });
 editorEl.addEventListener('keydown', ev => {
   ev.stopPropagation();
+  const mod = ev.metaKey || ev.ctrlKey;
+  const k = ev.key.toLowerCase();
+  if (mod && k === 'b'){ ev.preventDefault(); applyTextFormat('b'); return; }
+  if (mod && !ev.shiftKey && k === 'i'){ ev.preventDefault(); applyTextFormat('i'); return; }
+  if (mod && ev.shiftKey && k === 'h'){ ev.preventDefault(); applyTextFormat('hl', defaults.hlColor); return; }
   if (ev.key === 'Escape'){ ev.preventDefault(); commitTextEdit(); }
-  if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)){ ev.preventDefault(); commitTextEdit(); }
+  if (ev.key === 'Enter' && mod){ ev.preventDefault(); commitTextEdit(); }
 });
 editorEl.addEventListener('blur', () => commitTextEdit());
 
@@ -1582,7 +1597,8 @@ function openColorPop(prop, anchor){
   pop.style.left = Math.min(r.right + 10, window.innerWidth - 200) + 'px';
   pop.style.top = clamp(r.top - 10, 8, window.innerHeight - 60) + 'px';
   const sel = selected();
-  let cur = sel.length ? sel[0][prop]
+  let cur = prop === 'hlColor' ? defaults.hlColor
+    : sel.length ? sel[0][prop]
     : (prop === 'fill' ? (defaults.fillByType[state.tool] || defaults.fill) : defaults[prop]);
   if (typeof cur !== 'string' || cur[0] !== '#'){
     const p = pal();
@@ -1604,16 +1620,19 @@ function normalizedHex(){
 $('popColor').addEventListener('input', () => {
   const v = $('popColor').value;
   $('popHex').value = v.toUpperCase();
-  if (colorPopProp) applyStyleLive({ [colorPopProp]: v });
+  if (colorPopProp === 'hlColor') forceHighlight(v);
+  else if (colorPopProp) applyStyleLive({ [colorPopProp]: v });
 });
 $('popColor').addEventListener('change', () => {
-  if (colorPopProp) applyStyle({ [colorPopProp]: $('popColor').value });
+  if (colorPopProp === 'hlColor'){ forceHighlight($('popColor').value); commit(); syncPanel(); }
+  else if (colorPopProp) applyStyle({ [colorPopProp]: $('popColor').value });
 });
 $('popHex').addEventListener('input', () => {
   const v = normalizedHex();
   if (v){
     $('popColor').value = v;
-    if (colorPopProp) applyStyleLive({ [colorPopProp]: v });
+    if (colorPopProp === 'hlColor') forceHighlight(v);
+    else if (colorPopProp) applyStyleLive({ [colorPopProp]: v });
   }
 });
 $('popHex').addEventListener('keydown', ev => {
@@ -1621,17 +1640,19 @@ $('popHex').addEventListener('keydown', ev => {
   if (ev.key === 'Enter'){
     ev.preventDefault();
     const v = normalizedHex();
-    if (v && colorPopProp) applyStyle({ [colorPopProp]: v });
+    if (v && colorPopProp === 'hlColor'){ forceHighlight(v); commit(); syncPanel(); }
+    else if (v && colorPopProp) applyStyle({ [colorPopProp]: v });
     closeColorPop();
   }
   if (ev.key === 'Escape') closeColorPop();
 });
 $('popHex').addEventListener('blur', () => {
   const v = normalizedHex();
-  if (v && colorPopProp) applyStyle({ [colorPopProp]: v });
+  if (v && colorPopProp === 'hlColor'){ forceHighlight(v); commit(); syncPanel(); }
+  else if (v && colorPopProp) applyStyle({ [colorPopProp]: v });
 });
 document.addEventListener('pointerdown', ev => {
-  if (!ev.target.closest('#colorPop') && !ev.target.closest('.swatch.custom')) closeColorPop();
+  if (!ev.target.closest('#colorPop') && !ev.target.closest('.swatch.custom') && !ev.target.closest('#hlCustom')) closeColorPop();
   if (!ev.target.closest('#paperPop') && !ev.target.closest('#paperBtn')) closePaperPop();
   if (!ev.target.closest('#shortcutsCard') && !ev.target.closest('#helpBtn'))
     $('shortcutsCard').classList.add('hidden');
@@ -1717,6 +1738,7 @@ function syncPanel(){
   show('rowFont', textish);
   show('rowSize', textish);
   show('rowAlign', textish);
+  show('rowRich', textish);
   show('rowTypo', textish);
   show('rowValign', has('rect','diamond','ellipse','chip'));
   show('rowOpacity', true);
@@ -1768,6 +1790,9 @@ function syncPanel(){
   markSel('#sizeSeg button', b => Number(b.dataset.v) === val('size'));
   markSel('#alignSeg button', b => b.dataset.v === val('align'));
   markSel('#valignSeg button', b => b.dataset.v === (val('valign') || 'middle'));
+  const fmtEls = sel.filter(e => canHaveText(e) && e.text && e.text.trim());
+  $('tsBold').classList.toggle('sel', fmtEls.length > 0 && fmtEls.every(e => rangeHasStyle(e, 0, e.text.length, 'b')));
+  $('tsItal').classList.toggle('sel', fmtEls.length > 0 && fmtEls.every(e => rangeHasStyle(e, 0, e.text.length, 'i')));
   $('tyLh').value = val('lh') ?? 1.3;
   $('tyLhVal').textContent = '×' + $('tyLh').value;
   $('tyPgap').value = val('pgap') ?? 0;
@@ -1876,6 +1901,64 @@ for (const [id, prop, parse, fmt] of TYPO_SLIDERS){
     requestRender();
   });
 }
+/* ── rich text formatting: bold / italic / highlight ──
+   While editing: applies to the selected characters (whole text if the
+   caret is collapsed). Otherwise: applies to every selected element. */
+function formatTargets(){
+  if (editing && editing.el && (editing.el.text || editorEl.value)) return [editing.el];
+  return selected().filter(e => canHaveText(e) && e.text && e.text.trim());
+}
+function formatRange(el){
+  if (editing && editing.el === el){
+    const a = editorEl.selectionStart, b = editorEl.selectionEnd;
+    if (a !== b) return [a, b];
+  }
+  return [0, String(el.text || '').length];
+}
+function applyTextFormat(kind, color){
+  const targets = formatTargets();
+  if (!targets.length) return;
+  for (const el of targets){
+    const [a, b] = formatRange(el);
+    if (kind === 'b' || kind === 'i'){
+      const on = !rangeHasStyle(el, a, b, kind);
+      setRangeStyle(el, a, b, { [kind]: on });
+    } else if (kind === 'hl'){
+      const same = rangeHasStyle(el, a, b, 'hl', color);
+      setRangeStyle(el, a, b, { hl: same ? null : color });
+      if (!same) defaults.hlColor = color;
+    } else if (kind === 'hloff'){
+      setRangeStyle(el, a, b, { hl: null });
+    }
+    if (el.type === 'text') autosizeText(el);
+  }
+  commit(); syncPanel(); requestRender();
+  if (editing) editorEl.focus();
+}
+/* keep the editor's text selection alive when clicking format controls:
+   canceling pointerdown stops the browser from moving focus (same trick
+   that fixed text placement in v3.5.1) */
+document.querySelectorAll('#rowRich button').forEach(b =>
+  b.addEventListener('pointerdown', ev => ev.preventDefault()));
+function forceHighlight(color){
+  for (const el of formatTargets()){
+    const [a, b] = formatRange(el);
+    setRangeStyle(el, a, b, { hl: color });
+    if (el.type === 'text') autosizeText(el);
+  }
+  defaults.hlColor = color;
+  requestRender();
+}
+$('tsBold').addEventListener('click', () => applyTextFormat('b'));
+$('tsItal').addEventListener('click', () => applyTextFormat('i'));
+document.querySelectorAll('.hldot[data-hl]').forEach(b =>
+  b.addEventListener('click', () => applyTextFormat('hl', b.dataset.hl)));
+$('hlOff').addEventListener('click', () => applyTextFormat('hloff'));
+$('hlCustom').addEventListener('click', ev => {
+  ev.stopPropagation();
+  openColorPop('hlColor', $('hlCustom'));
+});
+
 $('tyReset').addEventListener('click', () => {
   // resets to YOUR defaults — adjustable in Settings, not hardcoded values
   applyStyle({ lh: typo.lh, pgap: typo.pgap, lspace: typo.lspace, valign: 'middle' });
@@ -3734,6 +3817,9 @@ window.addEventListener('keydown', ev => {
   if (mod && k === 'v'){ return; } // handled by the 'paste' event (supports images)
   if (mod && k === 'd'){ ev.preventDefault(); duplicateSelection(); return; }
   if (mod && k === 'g'){ ev.preventDefault(); ev.shiftKey ? ungroupSelection() : groupSelection(); return; }
+  if (mod && k === 'b'){ ev.preventDefault(); applyTextFormat('b'); return; }
+  if (mod && !ev.shiftKey && k === 'i'){ ev.preventDefault(); applyTextFormat('i'); return; }
+  if (mod && ev.shiftKey && k === 'h'){ ev.preventDefault(); applyTextFormat('hl', defaults.hlColor); return; }
   if (mod && k === 's'){ ev.preventDefault(); saveJSON(); return; }
   if (mod && k === 'o'){ ev.preventDefault(); fileInput.click(); return; }
   if (mod) return;

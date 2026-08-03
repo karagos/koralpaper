@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.12.0';
+const APP_VERSION = '3.13.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -107,9 +107,89 @@ const FONTS = {
   tiny5:      { label:'Tiny5', stack:'"Tiny5",monospace', weight:'400', google:'Tiny5', group:'Pixel & dot' },
   doto:       { label:'Doto', stack:'"Doto",monospace', weight:'600', google:'Doto:wght@400;600;700', group:'Pixel & dot' },
 };
-function fontCSS(font, size){
+function boldWeightOf(f){
+  if (f._bw) return f._bw;
+  let bw = 700;
+  if (f.google){
+    const m = f.google.match(/wght@([\d;]+)/);
+    if (m){
+      const ws = m[1].split(';').map(Number);
+      const heavy = ws.filter(w => w >= 600);
+      bw = heavy.length ? Math.max(...heavy) : Math.max(...ws);
+    }
+  }
+  return (f._bw = String(bw));
+}
+function fontCSS(font, size, st){
   const f = FONTS[font] || FONTS.sans;
-  return `${f.weight} ${size}px ${f.stack}`;
+  const weight = st && st.b ? boldWeightOf(f) : f.weight;
+  return `${st && st.i ? 'italic ' : ''}${weight} ${size}px ${f.stack}`;
+}
+
+/* ── rich text runs ─────────────────────────────────
+   el.runs = [{s, e, b, i, hl}] — character ranges carrying bold, italic
+   and a highlight color (hex or null). Plain text stays in el.text. */
+function styleAtChar(runs, idx){
+  if (!runs) return null;
+  for (const r of runs) if (idx >= r.s && idx < r.e) return r;
+  return null;
+}
+function setRangeStyle(el, a, b, patch){
+  const len = String(el.text || '').length;
+  if (!len) return;
+  a = clamp(a, 0, len); b = clamp(b, 0, len);
+  if (b <= a) return;
+  const chars = [];
+  for (let idx = 0; idx < len; idx++){
+    const r = styleAtChar(el.runs, idx);
+    chars.push(r ? { b: !!r.b, i: !!r.i, hl: r.hl || null } : { b: false, i: false, hl: null });
+  }
+  for (let idx = a; idx < b; idx++){
+    if (patch.b !== undefined) chars[idx].b = patch.b;
+    if (patch.i !== undefined) chars[idx].i = patch.i;
+    if (patch.hl !== undefined) chars[idx].hl = patch.hl;
+  }
+  const runs = [];
+  for (let idx = 0; idx < len; idx++){
+    const c = chars[idx];
+    if (!c.b && !c.i && !c.hl) continue;
+    const last = runs[runs.length - 1];
+    if (last && last.e === idx && !!last.b === c.b && !!last.i === c.i && (last.hl || null) === c.hl)
+      last.e = idx + 1;
+    else runs.push({ s: idx, e: idx + 1, b: c.b, i: c.i, hl: c.hl });
+  }
+  el.runs = runs.length ? runs : null;
+}
+function rangeHasStyle(el, a, b, key, color){
+  const len = String(el.text || '').length;
+  a = clamp(a, 0, len); b = clamp(b, 0, len);
+  if (b <= a || !len) return false;
+  for (let idx = a; idx < b; idx++){
+    const r = styleAtChar(el.runs, idx);
+    if (key === 'hl'){ if (!r || (r.hl || null) !== color) return false; }
+    else if (!r || !r[key]) return false;
+  }
+  return true;
+}
+/* keep run offsets valid across a text edit (replace [at, at+removed) with
+   `inserted` chars) — the standard prefix/suffix diff remap */
+function remapRuns(runs, at, removed, inserted){
+  if (!runs) return null;
+  const delta = inserted - removed;
+  const out = [];
+  for (const r of runs){
+    let s = r.s, e = r.e;
+    if (e <= at){ /* untouched before the edit */ }
+    else if (s >= at + removed){ s += delta; e += delta; }
+    else {
+      // the run overlaps the edited region
+      if (s <= at && r.e >= at + removed) e += delta;       // spans it → absorb
+      else if (s < at) e = at;                               // tail clipped
+      else { s = at + inserted; e = Math.max(s, e + delta); } // head clipped
+    }
+    if (e > s) out.push({ ...r, s, e });
+  }
+  return out.length ? out : null;
 }
 function googleFontsHref(){
   const fams = Object.values(FONTS).filter(f => f.google).map(f => 'family=' + f.google).join('&');
@@ -216,34 +296,92 @@ const elPgap = el => el.pgap || 0;
    maxW == null → hard \n breaks only; with maxW, soft-wraps each paragraph.
    Returns positioned lines with per-line paragraph flags. */
 function layoutText(el, maxW){
-  _measureCtx.font = fontCSS(el.font, el.size);
   applyTracking(_measureCtx, el);
   const lh = elLH(el), pgap = elPgap(el);
+  const runs = el.runs || null;
   const lines = [];
+  let charBase = 0; // absolute index of the current raw line's first char
+  /* build styled segments for chars [a, b) of the current raw line */
+  const mkSegs = (raw, a, b) => {
+    const segs = [];
+    let idx = a;
+    while (idx < b){
+      const st = styleAtChar(runs, charBase + idx) || {};
+      let j = idx + 1;
+      while (j < b){
+        const st2 = styleAtChar(runs, charBase + j) || {};
+        if (!!st2.b !== !!st.b || !!st2.i !== !!st.i || (st2.hl || null) !== (st.hl || null)) break;
+        j++;
+      }
+      const seg = { text: raw.slice(idx, j), b: !!st.b, i: !!st.i, hl: st.hl || null };
+      _measureCtx.font = fontCSS(el.font, el.size, seg);
+      seg.w = _measureCtx.measureText(seg.text).width;
+      segs.push(seg);
+      idx = j;
+    }
+    if (!segs.length) segs.push({ text: '', b: false, i: false, hl: null, w: 0 });
+    return segs;
+  };
+  const widthOf = (raw, a, b) => mkSegs(raw, a, b).reduce((acc, s) => acc + s.w, 0);
+  const pushLine = (raw, a, b, para) => {
+    const segs = mkSegs(raw, a, b);
+    lines.push({ segs, text: raw.slice(a, b), w: segs.reduce((acc, s) => acc + s.w, 0), para });
+  };
   /* every hard line break (Enter) starts a new PARAGRAPH and receives the
      paragraph gap; soft-wrapped continuation lines inside a shape use only
      the line spacing */
   String(el.text ?? '').split('\n').forEach((raw, pi) => {
     if (maxW == null || !raw){
-      lines.push({ text: raw, para: pi > 0 });
-      return;
-    }
-    let line = '', first = true;
-    for (const word of raw.split(' ')){
-      const test = line ? line + ' ' + word : word;
-      if (_measureCtx.measureText(test).width <= maxW || !line) line = test;
-      else {
-        lines.push({ text: line, para: first && pi > 0 });
-        first = false; line = word;
+      pushLine(raw, 0, raw.length, pi > 0);
+    } else {
+      let lineStart = 0, curEnd = 0, started = false, first = true;
+      let idx = 0;
+      for (const word of raw.split(' ')){
+        const wordEnd = idx + word.length;
+        if (widthOf(raw, lineStart, wordEnd) <= maxW || !started){
+          curEnd = wordEnd; started = true;
+        } else {
+          pushLine(raw, lineStart, curEnd, first && pi > 0);
+          first = false;
+          lineStart = idx; curEnd = wordEnd;
+        }
+        idx = wordEnd + 1; // skip the space
       }
+      pushLine(raw, lineStart, curEnd, first && pi > 0);
     }
-    lines.push({ text: line, para: first && pi > 0 });
+    charBase += raw.length + 1;
   });
   let w = 0;
-  for (const l of lines) w = Math.max(w, _measureCtx.measureText(l.text).width);
+  for (const l of lines) w = Math.max(w, l.w);
   const totalH = lines.length * lh + lines.filter(l => l.para).length * pgap;
   applyTracking(_measureCtx, null);
   return { lines, lh, pgap, totalH, w };
+}
+/* draw one laid-out line's highlights + styled segments, left edge at x0 */
+function drawRichLine(ctx, el, line, x0, ty, color){
+  let x = x0;
+  for (const seg of line.segs){
+    if (seg.hl && seg.text){
+      ctx.fillStyle = seg.hl;
+      ctx.fillRect(x - 1, ty - el.size * 0.68, seg.w + 2, el.size * 1.3);
+    }
+    x += seg.w;
+  }
+  x = x0;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = color;
+  for (const seg of line.segs){
+    if (seg.text){
+      ctx.font = fontCSS(el.font, el.size, seg);
+      ctx.fillText(seg.text, x, ty);
+    }
+    x += seg.w;
+  }
+}
+function lineLeft(align, boxL, boxR, lineW){
+  if (align === 'right') return boxR - lineW;
+  if (align === 'left') return boxL;
+  return (boxL + boxR) / 2 - lineW / 2;
 }
 function measureText(text, font, size, tyEl){
   if (tyEl != null){
@@ -1101,18 +1239,13 @@ function drawBoxText(ctx, el, pal, box){
   const pad = el.type === 'chip' ? 10 : 12;
   const maxW = Math.max(20, box.w - pad * 2);
   const lay = layoutText(el, maxW);
-  ctx.font = fontCSS(el.font, el.size);
   applyTracking(ctx, el);
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = (el.fill === 'ink') ? pal.bg : (resolveStroke(pal, el.stroke) || pal.stroke.ink);
+  const color = (el.fill === 'ink') ? pal.bg : (resolveStroke(pal, el.stroke) || pal.stroke.ink);
   let ty = boxTextTop(el, box, lay.totalH, pad) + lay.lh / 2;
   for (const ln of lay.lines){
     if (ln.para) ty += lay.pgap;
-    let tx;
-    if (el.align === 'left'){ ctx.textAlign = 'left'; tx = box.x + pad; }
-    else if (el.align === 'right'){ ctx.textAlign = 'right'; tx = box.x + box.w - pad; }
-    else { ctx.textAlign = 'center'; tx = box.x + box.w/2; }
-    ctx.fillText(ln.text, tx, ty);
+    drawRichLine(ctx, el, ln, lineLeft(el.align || 'center', box.x + pad, box.x + box.w - pad, ln.w), ty, color);
     ty += lay.lh;
   }
   applyTracking(ctx, null);
@@ -1121,18 +1254,13 @@ function drawBoxText(ctx, el, pal, box){
 function drawTextElement(ctx, el, pal){
   if (el._editing) return;
   const lay = layoutText(el, null);
-  ctx.font = fontCSS(el.font, el.size);
   applyTracking(ctx, el);
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = resolveStroke(pal, el.stroke) || pal.stroke.ink;
+  const color = resolveStroke(pal, el.stroke) || pal.stroke.ink;
   let ty = el.y + lay.lh/2;
   for (const ln of lay.lines){
     if (ln.para) ty += lay.pgap;
-    let tx;
-    if (el.align === 'right'){ ctx.textAlign = 'right'; tx = el.x + el.w; }
-    else if (el.align === 'center'){ ctx.textAlign = 'center'; tx = el.x + el.w/2; }
-    else { ctx.textAlign = 'left'; tx = el.x; }
-    ctx.fillText(ln.text, tx, ty);
+    drawRichLine(ctx, el, ln, lineLeft(el.align || 'left', el.x, el.x + el.w, ln.w), ty, color);
     ty += lay.lh;
   }
   applyTracking(ctx, null);
@@ -1942,7 +2070,6 @@ function drawElement(ctx, el, pal, bg){
       if (el.text && el.text.trim() && !el._editing){
         const mid = pathMidpoint(pts);
         const lay = layoutText(el, null);
-        ctx.font = fontCSS(el.font, el.size);
         applyTracking(ctx, el);
         const padX = 7, padY = 3;
         const bw2 = lay.w + padX * 2, bh2 = lay.totalH + padY * 2;
@@ -1954,13 +2081,12 @@ function drawElement(ctx, el, pal, bg){
           else ctx.rect(x0, y0, bw2, bh2);
           ctx.fill();
         }
-        ctx.fillStyle = resolveStroke(pal, el.stroke) || pal.stroke.ink;
-        ctx.textAlign = 'center';
+        const lcolor = resolveStroke(pal, el.stroke) || pal.stroke.ink;
         ctx.textBaseline = 'middle';
         let ly = y0 + padY + lay.lh/2;
         for (const ln of lay.lines){
           if (ln.para) ly += lay.pgap;
-          ctx.fillText(ln.text, mid[0], ly);
+          drawRichLine(ctx, el, ln, mid[0] - ln.w / 2, ly, lcolor);
           ly += lay.lh;
         }
         applyTracking(ctx, null);
@@ -2208,29 +2334,45 @@ function renderSceneSVG(elements, opts){
     return `font-family="${svgEsc(f.stack.replace(/"/g, "'"))}" font-size="${el.size}" font-weight="${f.weight}"${track}`;
   };
 
+  const richLineSVG = (el, ln, x0, ty, color) => {
+    const out = [];
+    let x = x0;
+    for (const seg of ln.segs){
+      if (seg.hl && seg.text)
+        out.push(`<rect x="${svgNum(x - 1)}" y="${svgNum(ty - el.size * 0.68)}" width="${svgNum(seg.w + 2)}" height="${svgNum(el.size * 1.3)}" fill="${seg.hl}"/>`);
+      x += seg.w;
+    }
+    x = x0;
+    const spans = [];
+    for (const seg of ln.segs){
+      if (seg.text){
+        const f = FONTS[el.font] || FONTS.sans;
+        const wgt = seg.b ? boldWeightOf(f) : f.weight;
+        const sty = seg.i ? ' font-style="italic"' : '';
+        spans.push(`<tspan x="${svgNum(x)}" font-weight="${wgt}"${sty}>${svgEsc(seg.text)}</tspan>`);
+      }
+      x += seg.w;
+    }
+    if (spans.length)
+      out.push(`<text y="${svgNum(ty)}" ${fontAttrs(el)} fill="${color}" text-anchor="start" dominant-baseline="central">${spans.join('')}</text>`);
+    return out.join('');
+  };
   const textLinesSVG = (el, lay, box) => {
     const out = [];
     const pad2 = el.type === 'chip' ? 10 : 12;
     const color = (el.type !== 'text' && el.fill === 'ink')
       ? (opts.bg || pal.bg)
       : (resolveStroke(pal, el.stroke) || pal.stroke.ink);
-    let ty = el.type === 'text'
+    const isText = el.type === 'text';
+    const boxL = isText ? el.x : box.x + pad2;
+    const boxR = isText ? el.x + el.w : box.x + box.w - pad2;
+    const align = el.align || (isText ? 'left' : 'center');
+    let ty = isText
       ? el.y + lay.lh / 2
       : boxTextTop(el, box, lay.totalH, pad2) + lay.lh / 2;
     for (const ln of lay.lines){
       if (ln.para) ty += lay.pgap;
-      let tx, anchor;
-      const align = el.align || 'center';
-      if (el.type === 'text'){
-        if (align === 'right'){ anchor = 'end'; tx = el.x + el.w; }
-        else if (align === 'center'){ anchor = 'middle'; tx = el.x + el.w/2; }
-        else { anchor = 'start'; tx = el.x; }
-      } else {
-        if (align === 'left'){ anchor = 'start'; tx = box.x + pad2; }
-        else if (align === 'right'){ anchor = 'end'; tx = box.x + box.w - pad2; }
-        else { anchor = 'middle'; tx = box.x + box.w/2; }
-      }
-      if (ln.text) out.push(`<text x="${svgNum(tx)}" y="${svgNum(ty)}" ${fontAttrs(el)} fill="${color}" text-anchor="${anchor}" dominant-baseline="central">${svgEsc(ln.text)}</text>`);
+      out.push(richLineSVG(el, ln, lineLeft(align, boxL, boxR, ln.w), ty, color));
       ty += lay.lh;
     }
     return out.join('');
@@ -2394,7 +2536,7 @@ function renderSceneSVG(elements, opts){
           let ly = y0 + padY + lay.lh/2;
           for (const ln of lay.lines){
             if (ln.para) ly += lay.pgap;
-            if (ln.text) parts.push(`<text x="${svgNum(mid[0])}" y="${svgNum(ly)}" ${fontAttrs(el)} fill="${color}" text-anchor="middle" dominant-baseline="central">${svgEsc(ln.text)}</text>`);
+            parts.push(richLineSVG(el, ln, mid[0] - ln.w / 2, ly, color));
             ly += lay.lh;
           }
         }
@@ -2500,7 +2642,7 @@ function buildPDF(pages){
 
 /* refresh a text element's box from its content */
 function autosizeText(el){
-  const m = measureText(el.text || ' ', el.font, el.size, el);
-  el.w = Math.max(10, m.w);
-  el.h = Math.max(elLH(el), m.h);
+  const lay = layoutText(el, null);
+  el.w = Math.max(10, lay.w);
+  el.h = Math.max(elLH(el), lay.totalH);
 }

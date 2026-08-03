@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.13.0 — 2026-08-03
+- **Bold, italic & highlight — on whole texts and selected ranges.**
+  A new Format row (B / I / highlight dots) plus shortcuts: ⌘B, ⌘I, ⇧⌘H.
+  With an element selected they style the whole text; while typing, select
+  characters first and only that range is styled — mix bold words, italic
+  asides and highlights freely inside one text, shape, or arrow label.
+- **Highlight colors**: five presets (yellow, green, pink, blue, peach),
+  a custom color wheel + hex, and a remove button; the last used color
+  becomes the ⇧⌘H default.
+- Styled ranges survive further editing (formatting stays anchored to its
+  characters as you type around it), wrap correctly with their true bold /
+  italic widths, and export faithfully to SVG, PNG and PDF.
+
 ## v3.12.0 — 2026-08-03
 - **Settings export / import**: Settings now ends with "Export settings…"
   (downloads a dated `koralpaper-settings-….json` carrying line widths,
