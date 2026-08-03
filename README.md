@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.22.0)
+# KoralPaper — *Draw your thinking* (v3.23.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -119,6 +119,13 @@ your first element lands. Press **?** inside the app for the full shortcuts card
   coral laser stroke whose tail evaporates in a second** — point at things
   live without marking the document. A minimal page bar wakes on mouse
   move; Esc ends the show and puts everything back exactly as it was
+- **Draw-on replay + animated export:** ☰ → "Replay the drawing" plays
+  the current page back as if a hand were sketching it — freehand strokes
+  reveal point by point, arrows sweep out of their start, shapes and text
+  ink in one after another (capped at ~20 seconds). "Export replay as
+  video (.webm)" records the same animation to a video file, perfect for
+  a LinkedIn post of your diagram drawing itself. Any click or key stops
+  the show
 - **PDF export:** ☰ or ⬇ → Export PDF. Multi-page documents open a page
   picker; with an artboard every page exports at the exact preset size with
   the grid included. Zero dependencies — works fully offline

@@ -245,6 +245,7 @@ function renderPanCached(dpr, w, h){
 }
 
 function render(){
+  if (replaying) return; // the replay loop owns the canvas
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (canvas.width !== w * dpr || canvas.height !== h * dpr){
@@ -721,6 +722,7 @@ function pinchState(){
 }
 
 function onPointerDown(ev){
+  if (replaying){ stopReplay(); return; }
   if (presenting){
     // tap turns the page, drag draws the laser
     try { canvas.setPointerCapture(ev.pointerId); } catch (e){}
@@ -3275,6 +3277,8 @@ function runFileAction(act){
   if (act === 'copyPng') copyAsPNG();
   if (act === 'copySvg') copyAsSVG();
   if (act === 'present') enterPresent();
+  if (act === 'replay') startReplay(false);
+  if (act === 'replayVid') startReplay(true);
   if (act === 'demo') loadDemo();
   if (act === 'paperReset'){
     state.bgColor = null;
@@ -4257,6 +4261,7 @@ const TOOL_KEYS = { v:'select', h:'hand', r:'rect', d:'diamond', o:'ellipse',
   c:'chip', s:'icon', a:'arrow', l:'line', p:'draw', t:'text' };
 
 window.addEventListener('keydown', ev => {
+  if (replaying){ ev.preventDefault(); stopReplay(); return; }
   if (presenting){
     const kk = ev.key;
     if (kk === 'Escape'){ ev.preventDefault(); exitPresent(); return; }
@@ -4429,6 +4434,133 @@ document.addEventListener('pointerout', ev => {
 document.addEventListener('pointerdown', hideTip, true);
 window.addEventListener('blur', hideTip);
 document.addEventListener('wheel', hideTip, { passive: true, capture: true });
+
+/* ── draw-on replay + animated export ───────────────
+   Replays the current page as if a hand were drawing it: freehand
+   strokes reveal point by point, arrows sweep out from their start
+   (an expanding clip — works for straight, curved and elbow routes),
+   shapes and text ink in with a fade-and-settle. Optionally records
+   the animation to a .webm via MediaRecorder — still zero deps. */
+let replaying = null;
+const rpEase = p => 1 - Math.pow(1 - p, 3);
+function rpSchedule(els){
+  const times = [];
+  let t = 0;
+  for (const el of els){
+    const linear = Array.isArray(el.points) && el.points.length > 1;
+    const dur = linear ? 520 : 340;
+    times.push({ start: t, dur });
+    t += linear ? 300 : 210;   // overlap: the next element starts early
+  }
+  const total = t + 520;
+  const squeeze = Math.min(1, 20000 / total);   // cap the show at ~20s
+  for (const s of times){ s.start *= squeeze; s.dur *= squeeze; }
+  return { times, total: total * squeeze };
+}
+function rpPartialDraw(el, p){
+  // freehand: reveal the real points along the path
+  const pts = el.points;
+  const n = Math.max(2, Math.ceil(pts.length * p));
+  return { ...el, points: pts.slice(0, n) };
+}
+function rpFrame(ctx2, w, h, camera, els, progs){
+  renderScene(ctx2, [], {
+    width: w, height: h, camera, pal: pal(),
+    grid: state.grid, gridSize: gsize(), bg: effectiveBg(),
+    gridColor: effectiveGridColor(), board: state.board,
+    outside: state.board ? (state.theme === 'light' ? '#DAD4C8' : '#12110F') : null,
+  });
+  const labelBg = effectiveBg();
+  ctx2.save();
+  ctx2.translate(camera.x, camera.y);
+  ctx2.scale(camera.z, camera.z);
+  for (let i = 0; i < els.length; i++){
+    const p = progs[i];
+    if (p <= 0) continue;
+    const el = els[i];
+    if (p >= 1){ drawElement(ctx2, el, pal(), labelBg); continue; }
+    const e = rpEase(p);
+    if (el.type === 'draw' && el.points && el.points.length > 2){
+      drawElement(ctx2, rpPartialDraw(el, e), pal(), labelBg);
+    } else if (Array.isArray(el.points) && el.points.length > 1){
+      // arrows & lines sweep out of their start point
+      const sx = el.x + el.points[0][0], sy = el.y + el.points[0][1];
+      const reach = Math.hypot(el.w || 0, el.h || 0) + 80;
+      ctx2.save();
+      ctx2.beginPath();
+      ctx2.arc(sx, sy, Math.max(6, e * reach), 0, Math.PI * 2);
+      ctx2.clip();
+      drawElement(ctx2, el, pal(), labelBg);
+      ctx2.restore();
+    } else {
+      ctx2.save();
+      ctx2.globalAlpha = e;
+      const cx = el.x + el.w / 2, cy = el.y + el.h / 2;
+      const s = 0.94 + 0.06 * e;
+      ctx2.translate(cx, cy); ctx2.scale(s, s); ctx2.translate(-cx, -cy);
+      drawElement(ctx2, el, pal(), labelBg);
+      ctx2.restore();
+    }
+  }
+  ctx2.restore();
+}
+function replayTick(){
+  if (!replaying) return;
+  const now = performance.now();
+  const { els, times, t0 } = replaying;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const progs = els.map((e, i) =>
+    clamp((now - t0 - times[i].start) / times[i].dur, 0, 1));
+  rpFrame(ctx, w, h, state.camera, els, progs);
+  ctx.restore();
+  const done = now - t0 > replaying.total;
+  if (done && now - t0 > replaying.total + 700){ stopReplay(); return; }
+  replaying.raf = requestAnimationFrame(replayTick);
+}
+function stopReplay(){
+  if (!replaying) return;
+  if (replaying.raf) cancelAnimationFrame(replaying.raf);
+  if (replaying.rec && replaying.rec.state !== 'inactive') replaying.rec.stop();
+  replaying = null;
+  requestRender();
+}
+function startReplay(record){
+  if (replaying) stopReplay();
+  if (presenting) return;
+  if (!state.elements.length){ showHint('Nothing to replay — the page is empty'); return; }
+  if (editing) commitTextEdit();
+  closeMenus();
+  setSelection(new Set());
+  zoomToFit();
+  const { times, total } = rpSchedule(state.elements);
+  replaying = { els: state.elements, times, total,
+    t0: performance.now() + 400, raf: null, rec: null };
+  if (record){
+    try {
+      const stream = canvas.captureStream(60);
+      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9' : 'video/webm';
+      const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+      const chunks = [];
+      rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      rec.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const name = (localStorage.getItem('asterisk.docname') || 'koralpaper') + '-replay.webm';
+        download(name, URL.createObjectURL(blob));
+        showHint('Replay saved as a .webm video');
+      };
+      rec.start();
+      replaying.rec = rec;
+      showHint('Recording the replay… it saves automatically when done');
+    } catch (e){
+      showHint('Video recording is not available in this browser — playing the replay instead');
+    }
+  }
+  replaying.raf = requestAnimationFrame(replayTick);
+}
 
 /* ── presentation mode + laser pen ──────────────────
    ⇧⌘P (or ☰ → Present). All chrome hides, the page fits the screen,

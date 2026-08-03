@@ -1,5 +1,17 @@
 # KoralPaper — Changelog
 
+## v3.23.0 — 2026-08-03
+- **Draw-on replay.** ☰ → "Replay the drawing": the current page redraws
+  itself as if a hand were sketching it — freehand strokes reveal point
+  by point, arrows sweep out from their start (works for straight,
+  curved and elbow routes), shapes and text ink in with a soft settle,
+  elements overlapping slightly in sequence. Long pages compress so the
+  whole show stays under ~20 seconds; any click or key cancels.
+- **Animated export.** ☰ → "Export replay as video (.webm)" records the
+  replay to a video file via the browser's own MediaRecorder — still
+  zero dependencies. Named after your document, saved automatically
+  when the animation completes.
+
 ## v3.22.0 — 2026-08-03
 - **Presentation mode + laser pen.** ⇧⌘P or ☰ → Present: all chrome
   disappears, the page fits the screen (fullscreen when the browser
