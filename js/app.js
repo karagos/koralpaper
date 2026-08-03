@@ -3087,10 +3087,6 @@ const TEMPLATES = [
   { id: 'versus', name: 'Comparison / Versus', desc: 'Two columns with pros & cons and a verdict sticky', build: tplVersus },
   { id: 'quote', name: 'Quote card', desc: '1080×1080 square with a big serif quote', build: tplQuoteCard },
 ];
-function loadUserTemplates(){
-  try { return JSON.parse(localStorage.getItem(TPL_STORE)) || []; }
-  catch (e){ return []; }
-}
 function clonePageElements(els){
   const idMap = new Map(), gidMap = new Map();
   const clones = els.map(e => {
@@ -3120,31 +3116,120 @@ function applyTemplate(def){
   state.elements = state.pages[startIdx].elements;
   state.selection = new Set();
   updateBoundArrows(state.elements);
+  preloadDocFonts();
   syncBoardBtn(); buildBoardMenuSel();
   commit(); buildPageStrip(); zoomToFit(); syncPanel();
   $('tplDialog').classList.add('hidden');
   showHint(`Template added — ${built.pages.length} page${built.pages.length > 1 ? 's' : ''}, fully editable`);
 }
-function saveUserTemplate(){
+
+/* ── template store: user templates + built-in overrides/hides ──────
+   Shape: { user: [tpl…], overrides: {builtinId: tpl}, hidden: [builtinId…] }
+   tpl = { id, name, pages:[{name, elements}], board, bg }
+   Migrates from the old plain-array format transparently. */
+function tplStore(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(TPL_STORE));
+    if (Array.isArray(raw)) return { user: raw, overrides: {}, hidden: [] };
+    if (raw && typeof raw === 'object')
+      return { user: raw.user || [], overrides: raw.overrides || {}, hidden: raw.hidden || [] };
+  } catch (e){}
+  return { user: [], overrides: {}, hidden: [] };
+}
+function tplSave(store){
+  try { localStorage.setItem(TPL_STORE, JSON.stringify(store)); return true; }
+  catch (e){ alert('Could not save the template (browser storage is full).'); return false; }
+}
+function loadUserTemplates(){ return tplStore().user; }
+/* snapshot the current document (or just the active page) as template data */
+function tplSnapshot(name, scope){
+  syncPageRef();
+  const strip = els => JSON.parse(JSON.stringify(els, (k, v) => k.startsWith('_') ? undefined : v));
+  const pages = scope === 'all'
+    ? state.pages.map(p => ({ name: p.name, elements: strip(p.elements) }))
+    : [{ name: state.pages[state.pageIndex].name || name, elements: strip(state.elements) }];
+  return {
+    id: uid(), name, pages,
+    board: state.board ? { ...state.board } : null,
+    bg: state.bgColor || null,
+  };
+}
+function tplAskScope(){
+  // 'all' | 'page' | null (cancelled) — only asks when it matters
+  if (state.pages.length <= 1) return 'page';
+  return confirm(`Include all ${state.pages.length} pages?\n\nOK = every page · Cancel = only the current page`)
+    ? 'all' : 'page';
+}
+function saveUserTemplate(scope){
+  const sc = scope || tplAskScope();
+  if (!sc) return;
   const name = prompt('Template name:', state.pages[state.pageIndex].name || 'My template');
   if (!name || !name.trim()) return;
-  syncPageRef();
-  const list = loadUserTemplates();
-  list.push({
-    id: uid(), name: name.trim(),
-    pages: [{ name: name.trim(),
-      elements: JSON.parse(JSON.stringify(state.elements, (k, v) => k.startsWith('_') ? undefined : v)) }],
-    board: state.board ? { ...state.board } : null,
-  });
-  try { localStorage.setItem(TPL_STORE, JSON.stringify(list)); }
-  catch (e){ alert('Could not save the template (storage is full).'); return; }
+  const store = tplStore();
+  store.user.push(tplSnapshot(name.trim(), sc));
+  if (!tplSave(store)) return;
   buildTplList();
-  showHint(`“${name.trim()}” saved to your template library`);
+  showHint(`\u201C${name.trim()}\u201D saved \u2014 ${sc === 'all' ? state.pages.length + ' pages' : '1 page'}${state.board ? ' \u00B7 ' + state.board.w + '\u00D7' + state.board.h : ''}`);
+}
+function tplUpdate(kind, id, currentName){
+  const sc = tplAskScope();
+  if (!sc) return;
+  if (!confirm(`Replace \u201C${currentName}\u201D with the ${sc === 'all' ? 'whole current document' : 'current page'}?`)) return;
+  const store = tplStore();
+  const snap = tplSnapshot(currentName, sc);
+  if (kind === 'user'){
+    const i = store.user.findIndex(t => t.id === id);
+    if (i < 0) return;
+    snap.id = id;
+    store.user[i] = snap;
+  } else {
+    snap.id = id;
+    store.overrides[id] = snap;
+  }
+  if (!tplSave(store)) return;
+  buildTplList();
+  showHint(`\u201C${currentName}\u201D updated`);
+}
+function tplRename(kind, id, oldName){
+  const name = prompt('New name:', oldName);
+  if (!name || !name.trim() || name.trim() === oldName) return;
+  const store = tplStore();
+  const t = kind === 'user' ? store.user.find(t => t.id === id) : store.overrides[id];
+  if (!t) return;
+  t.name = name.trim();
+  if (tplSave(store)) buildTplList();
+}
+function tplDelete(kind, id, name){
+  if (!confirm(`Delete \u201C${name}\u201D from the template library?`)) return;
+  const store = tplStore();
+  if (kind === 'user') store.user = store.user.filter(t => t.id !== id);
+  else {
+    delete store.overrides[id];
+    if (!store.hidden.includes(id)) store.hidden.push(id);
+  }
+  if (tplSave(store)) buildTplList();
+}
+function tplRestoreBuiltins(){
+  const store = tplStore();
+  store.overrides = {}; store.hidden = [];
+  if (tplSave(store)) buildTplList();
+  showHint('Built-in templates restored');
 }
 function buildTplList(){
   const list = $('tplList');
   list.replaceChildren();
-  const addRow = (name, desc, onApply, onDelete) => {
+  const store = tplStore();
+  const meta = t => `${t.pages.length} page${t.pages.length > 1 ? 's' : ''}` +
+    (t.board ? ` \u00B7 ${t.board.w}\u00D7${t.board.h}` : ' \u00B7 unlimited canvas') +
+    (t.bg ? ' \u00B7 custom paper' : '');
+  const mini = (label, title, fn, extraClass) => {
+    const b = document.createElement('button');
+    b.className = 'minipill tplmini' + (extraClass ? ' ' + extraClass : '');
+    b.textContent = label; b.title = title;
+    b.addEventListener('click', fn);
+    return b;
+  };
+  const addRow = (name, desc, actions) => {
     const row = document.createElement('div');
     row.className = 'tplrow';
     const info = document.createElement('div');
@@ -3153,39 +3238,46 @@ function buildTplList(){
     const ds = document.createElement('span'); ds.textContent = desc;
     info.appendChild(nm); info.appendChild(ds);
     row.appendChild(info);
-    const apply = document.createElement('button');
-    apply.className = 'minipill';
-    apply.textContent = 'Add';
-    apply.addEventListener('click', onApply);
-    row.appendChild(apply);
-    if (onDelete){
-      const del = document.createElement('button');
-      del.className = 'minipill danger tpldel';
-      del.textContent = '✕';
-      del.title = 'Delete this template';
-      del.addEventListener('click', onDelete);
-      row.appendChild(del);
-    }
+    for (const a of actions) row.appendChild(a);
     list.appendChild(row);
   };
-  for (const t of TEMPLATES) addRow(t.name, t.desc, () => applyTemplate(t));
-  const user = loadUserTemplates();
-  if (user.length){
+  for (const t of TEMPLATES){
+    if (store.hidden.includes(t.id)) continue;
+    const ov = store.overrides[t.id];
+    if (ov){
+      addRow(ov.name, meta(ov) + ' \u00B7 customized', [
+        mini('Add', 'Add these pages to the document', () => applyTemplate(ov)),
+        mini('\u270E', 'Rename', () => tplRename('builtin', t.id, ov.name)),
+        mini('\u21BB', 'Update with the current design', () => tplUpdate('builtin', t.id, ov.name)),
+        mini('\u2715', 'Delete', () => tplDelete('builtin', t.id, ov.name), 'danger tpldel'),
+      ]);
+    } else {
+      addRow(t.name, t.desc, [
+        mini('Add', 'Add these pages to the document', () => applyTemplate(t)),
+        mini('\u21BB', 'Replace this built-in with your current design', () => tplUpdate('builtin', t.id, t.name)),
+        mini('\u2715', 'Remove from the list (restorable)', () => tplDelete('builtin', t.id, t.name), 'danger tpldel'),
+      ]);
+    }
+  }
+  if (store.user.length){
     const head = document.createElement('div');
     head.className = 'menuhead';
     head.textContent = 'Your templates';
     list.appendChild(head);
-    for (const t of user)
-      addRow(t.name, `${t.pages.length} page${t.pages.length > 1 ? 's' : ''}${t.board ? ` · ${t.board.w}×${t.board.h}` : ''}`,
-        () => applyTemplate(t),
-        () => {
-          const rest = loadUserTemplates().filter(x => x.id !== t.id);
-          localStorage.setItem(TPL_STORE, JSON.stringify(rest));
-          buildTplList();
-        });
+    for (const t of store.user)
+      addRow(t.name, meta(t), [
+        mini('Add', 'Add these pages to the document', () => applyTemplate(t)),
+        mini('\u270E', 'Rename', () => tplRename('user', t.id, t.name)),
+        mini('\u21BB', 'Update with the current design', () => tplUpdate('user', t.id, t.name)),
+        mini('\u2715', 'Delete', () => tplDelete('user', t.id, t.name), 'danger tpldel'),
+      ]);
   }
+  const dirty = store.hidden.length || Object.keys(store.overrides).length;
+  $('tplRestoreBtn').classList.toggle('hidden', !dirty);
 }
-$('tplSaveBtn').addEventListener('click', saveUserTemplate);
+$('tplSaveBtn').addEventListener('click', () => saveUserTemplate('page'));
+$('tplSaveAllBtn').addEventListener('click', () => saveUserTemplate('all'));
+$('tplRestoreBtn').addEventListener('click', tplRestoreBuiltins);
 $('tplCloseBtn').addEventListener('click', () => $('tplDialog').classList.add('hidden'));
 
 /* ── Excalidraw interop ────────────────────────────── */

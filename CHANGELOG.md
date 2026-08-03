@@ -1,5 +1,19 @@
 # KoralPaper — Changelog
 
+## v3.9.0 — 2026-08-02
+- **Robust template system**:
+  - Save **multi-page templates** — "Save this page…" or "Save all
+    pages…" capture the design with its canvas size *and* paper color.
+    (With a multi-page document, Update also asks which scope you want.)
+  - **Every template is editable** — rename (✎), update-in-place with
+    your current design (↻), and delete (✕) work on your templates *and*
+    on the built-ins: replace a built-in with your own version or remove
+    it from the list entirely.
+  - **"Restore built-ins"** appears whenever a built-in was customized or
+    deleted, and brings the originals back with one click.
+  - Template rows now show what's inside: page count, canvas size (or
+    unlimited), custom paper, and a "customized" tag on modified built-ins.
+
 ## v3.8.0 — 2026-08-02
 - **The demo is now the KoralPaper tour**: ☰ → "Load the KoralPaper tour"
   replaces "Load the demo sketch". It adds a 1920×1080 page where every

@@ -311,10 +311,14 @@
   <!-- ── templates dialog ──────────────────────────── -->
   <div class="island pdfdialog tpldialog hidden" id="tplDialog">
     <h3>Templates</h3>
-    <p>Add ready-made pages — everything stays fully editable. Save any page of yours as a reusable template.</p>
+    <p>Add ready-made pages — everything stays fully editable. Save your own designs
+      (with their canvas size and paper color), and reshape any template:
+      <b>✎</b> rename · <b>↻</b> replace with your current design · <b>✕</b> delete.</p>
     <div id="tplList"></div>
     <div class="row actions">
-      <button class="minipill" id="tplSaveBtn" title="Save the current page (and its canvas size) to your library">Save current page…</button>
+      <button class="minipill" id="tplSaveBtn" title="Save the active page (with canvas size and paper color) to your library">Save this page…</button>
+      <button class="minipill" id="tplSaveAllBtn" title="Save every page of the document as one multi-page template">Save all pages…</button>
+      <button class="minipill hidden" id="tplRestoreBtn" title="Bring back deleted or customized built-in templates">Restore built-ins</button>
       <button class="minipill" id="tplCloseBtn">Close</button>
     </div>
   </div>

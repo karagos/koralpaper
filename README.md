@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.8.0)
+# KoralPaper — *Draw your thinking* (v3.9.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -93,9 +93,12 @@ a one-page showcase of every feature). Press **?** inside the app for the full s
 - **Templates:** ☰ → Templates… — built-in page sets (LinkedIn carousel
   with header/footer/title/photo/CTA slides on a 1080×1350 artboard,
   Black carousel — a crisp black + electric-yellow design set that also
-  recolors the paper, Flowchart kit, Comparison/Versus, Quote card) plus
-  "Save current page…" to keep your own layouts in a personal library
-  (stored in the browser, deletable). Applied templates arrive as fresh,
+  recolors the paper, Flowchart kit, Comparison/Versus, Quote card).
+  Save **this page or the whole multi-page document** as your own template
+  — canvas size and paper color included — then **rename (✎), update (↻),
+  or delete (✕)** any template, built-ins included: replace a built-in
+  with your own design, remove it from the list, and "Restore built-ins"
+  brings the originals back anytime. Applied templates arrive as fresh,
   fully editable pages
 - **Multi-page documents:** page strip at the bottom — click to switch, + to
   add, right-click a tab to rename/duplicate/move/delete. Undo spans pages
