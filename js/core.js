@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.10.0';
+const APP_VERSION = '3.10.1';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -220,9 +220,18 @@ function layoutText(el, maxW){
   applyTracking(_measureCtx, el);
   const lh = elLH(el), pgap = elPgap(el);
   const lines = [];
-  String(el.text ?? '').split('\n').forEach((raw, pi) => {
-    if (maxW == null || !raw){
-      lines.push({ text: raw, para: pi > 0 });
+  /* a PARAGRAPH is a block separated by one or more empty lines — the gap
+     applies only there, so ordinary multi-line text is untouched by it */
+  let afterBlank = false;
+  String(el.text ?? '').split('\n').forEach(raw => {
+    if (!raw.trim()){
+      lines.push({ text: '', para: false });
+      afterBlank = lines.length > 1; // a leading blank isn't a separator
+      return;
+    }
+    if (maxW == null){
+      lines.push({ text: raw, para: afterBlank });
+      afterBlank = false;
       return;
     }
     let line = '', first = true;
@@ -230,11 +239,12 @@ function layoutText(el, maxW){
       const test = line ? line + ' ' + word : word;
       if (_measureCtx.measureText(test).width <= maxW || !line) line = test;
       else {
-        lines.push({ text: line, para: first && pi > 0 });
+        lines.push({ text: line, para: first && afterBlank });
         first = false; line = word;
       }
     }
-    lines.push({ text: line, para: first && pi > 0 });
+    lines.push({ text: line, para: first && afterBlank });
+    afterBlank = false;
   });
   let w = 0;
   for (const l of lines) w = Math.max(w, _measureCtx.measureText(l.text).width);
@@ -243,15 +253,15 @@ function layoutText(el, maxW){
   return { lines, lh, pgap, totalH, w };
 }
 function measureText(text, font, size, tyEl){
+  if (tyEl != null){
+    const lay = layoutText({ text, font, size, lh: tyEl.lh, pgap: tyEl.pgap, lspace: tyEl.lspace }, null);
+    return { w: lay.w, h: lay.totalH, lines: lay.lines.map(l => l.text) };
+  }
   _measureCtx.font = fontCSS(font, size);
-  applyTracking(_measureCtx, tyEl);
   const lines = String(text).split('\n');
   let w = 0;
   for (const ln of lines) w = Math.max(w, _measureCtx.measureText(ln).width);
-  applyTracking(_measureCtx, null);
-  const lh = tyEl ? lineHeightOf(size, tyEl.lh) : lineHeightOf(size);
-  const pg = tyEl ? (tyEl.pgap || 0) : 0;
-  return { w, h: lines.length * lh + Math.max(0, lines.length - 1) * pg, lines };
+  return { w, h: lines.length * lineHeightOf(size), lines };
 }
 function wrapText(text, maxW, font, size){
   _measureCtx.font = fontCSS(font, size);

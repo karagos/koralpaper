@@ -1,5 +1,12 @@
 # KoralPaper — Changelog
 
+## v3.10.1 — 2026-08-02
+- **Typography tuning**: line spacing now ranges ×0.5–2.5 and letter
+  spacing −7 to +15px. **Paragraph spacing redefined** — a paragraph is a
+  block separated by an empty line (double Enter), so the slider no longer
+  stretches ordinary line breaks; it adds space only between real
+  paragraphs. Slider relabeled "Paragraph".
+
 ## v3.10.0 — 2026-08-02
 - **Typography controls** for all text — standalone text, text inside
   shapes, and arrow/line labels:
