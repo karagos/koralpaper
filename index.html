@@ -428,6 +428,12 @@
       <div class="setrow"><label>Letters</label>
         <input type="range" id="setTypoLs" min="-7" max="15" step="0.5"><b id="setTypoLsVal"></b></div>
       <div class="setactions"><button class="minipill setreset" id="setResetTypo">Reset text spacing</button></div>
+      <p class="setdesc" style="margin-top:14px">Settings file — save every value above (plus your
+        pinned icons) to a .json you can reload anytime, or move to another machine.</p>
+      <div class="setactions">
+        <button class="minipill" id="setExportBtn">Export settings…</button>
+        <button class="minipill" id="setImportBtn">Import settings…</button>
+      </div>
     </div>
     <p class="credit"><b>KoralPaper</b> is a creation by <b>Stefanos Karagos</b>, CAIO Group ·
       <a href="https://wearecaio.com" target="_blank" rel="noopener">wearecaio.com</a></p>
@@ -455,6 +461,7 @@
 <textarea id="textEditor" class="hidden" spellcheck="false"></textarea>
 <input type="file" id="fileInput" accept=".json,.excalidraw,application/json" hidden>
 <input type="file" id="imgInput" accept="image/*" multiple hidden>
+<input type="file" id="settingsInput" accept=".json,application/json" hidden>
 
 <script src="js/core.js"></script>
 <script src="js/material-icons.js"></script>

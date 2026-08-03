@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.11.1)
+# KoralPaper — *Draw your thinking* (v3.12.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -148,6 +148,8 @@ a one-page showcase of every feature). Press **?** inside the app for the full s
   Settings holds sliders for the three **line-width presets**, the four
   **S/M/L/XL text sizes**, and the **text spacing defaults** (lines,
   paragraph, letters — used by new texts and the Reset-spacing button),
+  with per-section resets and **settings export/import** (a .json carrying
+  every preset plus pinned icons, reloadable anytime or on another machine),
   applied live and persisted in the browser
 - **Files:** New document (⌥⌘N, with a save-first warning — undoable),
   Save/Open `.json` sketches — Save asks for a file name and remembers it,

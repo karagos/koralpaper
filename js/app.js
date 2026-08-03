@@ -2734,6 +2734,60 @@ $('setResetSizes').addEventListener('click', () => {
   syncSettingsUI(); applyWidthPresets(); saveSettings();
   showHint('Text-size presets reset (16 / 21 / 29 / 42)');
 });
+/* ── settings file: export / import every preference ── */
+function exportSettings(){
+  const data = {
+    app: 'koralpaper-settings', version: 1, appVersion: APP_VERSION,
+    settings: { widths: { ...widths }, sizes: { ...sizes }, typo: { ...typo } },
+    pinnedIcons: miPinned(),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  download(`koralpaper-settings-${new Date().toISOString().slice(0, 10)}.json`, URL.createObjectURL(blob));
+  showHint('Settings exported — keep the .json to reload these values anytime');
+}
+function importSettingsData(data){
+  const s = data.settings || {};
+  if (s.widths) for (const k of WIDTH_KEYS)
+    if (typeof s.widths[k] === 'number') widths[k] = clamp(s.widths[k], 0.5, 14);
+  if (s.sizes) for (const k of SIZE_KEYS)
+    if (typeof s.sizes[k] === 'number') sizes[k] = clamp(Math.round(s.sizes[k]), 8, 160);
+  if (s.typo){
+    if (typeof s.typo.lh === 'number') typo.lh = clamp(s.typo.lh, 0.5, 2.5);
+    if (typeof s.typo.pgap === 'number') typo.pgap = clamp(s.typo.pgap, 0, 48);
+    if (typeof s.typo.lspace === 'number') typo.lspace = clamp(s.typo.lspace, -7, 15);
+  }
+  if (Array.isArray(data.pinnedIcons)){
+    try {
+      localStorage.setItem('koralpaper.mi.pinned',
+        JSON.stringify(data.pinnedIcons.filter(n => typeof n === 'string').slice(0, 18)));
+    } catch (e){}
+  }
+  defaults.sw = widths.medium;
+  defaults.size = sizes.m;
+  defaults.lh = typo.lh; defaults.pgap = typo.pgap; defaults.lspace = typo.lspace;
+  saveSettings(); syncSettingsUI(); applyWidthPresets();
+  showHint(`Settings imported — widths ${widths.fine}/${widths.medium}/${widths.thick}, sizes ${sizes.s}/${sizes.m}/${sizes.l}/${sizes.xl}, spacing ×${typo.lh}/${typo.pgap}px/${typo.lspace}px`);
+}
+$('setExportBtn').addEventListener('click', exportSettings);
+$('setImportBtn').addEventListener('click', () => $('settingsInput').click());
+$('settingsInput').addEventListener('change', () => {
+  const f = $('settingsInput').files[0];
+  $('settingsInput').value = '';
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (data.app !== 'koralpaper-settings' && !data.settings)
+        throw new Error('not a settings file');
+      importSettingsData(data);
+    } catch (e){
+      alert('That file does not look like a KoralPaper settings file (.json).');
+    }
+  };
+  reader.readAsText(f);
+});
+
 $('setResetTypo').addEventListener('click', () => {
   Object.assign(typo, DEFAULT_TYPO);
   defaults.lh = typo.lh; defaults.pgap = typo.pgap; defaults.lspace = typo.lspace;

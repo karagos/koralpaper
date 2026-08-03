@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.12.0 — 2026-08-03
+- **Settings export / import**: Settings now ends with "Export settings…"
+  (downloads a dated `koralpaper-settings-….json` carrying line widths,
+  text sizes, spacing defaults, and your pinned Material icons) and
+  "Import settings…" (loads such a file, applies everything live — sliders,
+  drawing defaults, pins — and persists it). Reload a past setup anytime,
+  or carry your configuration to another machine.
+
 ## v3.11.1 — 2026-08-02
 - **Per-category resets in Settings**: the single "Reset to defaults"
   button is replaced by three — "Reset line widths", "Reset text sizes",
