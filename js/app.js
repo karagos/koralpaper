@@ -687,8 +687,41 @@ canvas.addEventListener('pointerup', onPointerUp);
 canvas.addEventListener('pointercancel', onPointerUp);
 canvas.addEventListener('dblclick', onDblClick);
 
+/* ── multi-touch: pinch zoom + two-finger pan ───────
+   Fingers are tracked by pointerId. A second finger cancels whatever the
+   first finger started (reverting any element mutation to the last commit)
+   and turns the gesture into a pinch: zoom around the moving centroid,
+   which also gives two-finger panning for free. */
+const touchPts = new Map();
+let hitScale = 1;   // fat-finger factor: handle hit areas grow on touch
+function pinchState(){
+  const [a, b] = [...touchPts.values()];
+  return { cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2,
+    d: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)) };
+}
+
 function onPointerDown(ev){
   setRouteContext(state.elements); // thumbnails may have re-pointed the router
+  hitScale = ev.pointerType === 'touch' ? 1.8 : 1;
+  if (ev.pointerType === 'touch'){
+    touchPts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (touchPts.size === 2){
+      if (editing) commitTextEdit();
+      if (interaction && interaction.kind !== 'pinch'){
+        const revert = !['pan','marquee','pinch'].includes(interaction.kind);
+        interaction = null;
+        canvas.classList.remove('panning');
+        if (revert) restore(history[histIndex]);
+      }
+      const p = pinchState();
+      interaction = { kind: 'pinch', d0: p.d, z0: state.camera.z,
+        cx0: p.cx, cy0: p.cy, camX: state.camera.x, camY: state.camera.y };
+      canvas.setPointerCapture(ev.pointerId);
+      requestRender();
+      return;
+    }
+    if (touchPts.size > 2){ canvas.setPointerCapture(ev.pointerId); return; }
+  }
   if (editing) commitTextEdit();
   closeMenus();
   canvas.setPointerCapture(ev.pointerId);
@@ -720,14 +753,14 @@ function onPointerDown(ev){
         const ends = [0, single.points.length - 1];
         for (const idx of ends){
           const [ppx, ppy] = single.points[idx];
-          if (dist(sx, sy, single.x + ppx, single.y + ppy) < 10 / z){
+          if (dist(sx, sy, single.x + ppx, single.y + ppy) < 10 * hitScale / z){
             interaction = { kind:'endpoint', el: single, idx };
             return;
           }
         }
         if (single.elbow){
           for (const h of elbowSegHandles(single)){
-            if (dist(sx, sy, h.x, h.y) < 10 / z){
+            if (dist(sx, sy, h.x, h.y) < 10 * hitScale / z){
               // first drag materializes the route into editable corners
               if (!single.elbowPts || !single.elbowPts.length){
                 const corners = elbowRoute(single).corners;
@@ -750,7 +783,7 @@ function onPointerDown(ev){
           }
         } else {
           const [mx, my] = linearMidpoint(single);
-          if (dist(sx, sy, mx, my) < 10 / z){
+          if (dist(sx, sy, mx, my) < 10 * hitScale / z){
             const a = single.points[0], b2 = single.points[single.points.length - 1];
             interaction = { kind:'curve', el: single,
               A: [single.x + a[0], single.y + a[1]],
@@ -760,14 +793,14 @@ function onPointerDown(ev){
         }
       } else {
         const [rx, ry] = rotHandlePos(sb);
-        if (dist(sx, sy, rx, ry) < 10 / z){
+        if (dist(sx, sy, rx, ry) < 10 * hitScale / z){
           interaction = { kind:'rotate', center: [sb.x + sb.w/2, sb.y + sb.h/2],
             orig: sel.map(e => ({ id: e.id, angle: e.angle || 0 })) };
           return;
         }
         const hs = handlePositions(sb);
         for (let i = 0; i < hs.length; i++){
-          if (dist(sx, sy, hs[i][0], hs[i][1]) < 9 / z){
+          if (dist(sx, sy, hs[i][0], hs[i][1]) < 9 * hitScale / z){
             interaction = makeResize(sel, sb, HANDLE_KEYS[i], ev.shiftKey);
             return;
           }
@@ -898,6 +931,24 @@ function makeResize(sel, sb, handle, shiftKey){
 }
 
 function onPointerMove(ev){
+  if (ev.pointerType === 'touch' && touchPts.has(ev.pointerId)){
+    touchPts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (interaction && interaction.kind === 'pinch'){
+      if (touchPts.size < 2) return;
+      const p = pinchState();
+      const z = clamp(interaction.z0 * (p.d / interaction.d0), 0.1, 6);
+      // the scene point under the starting centroid stays glued to the
+      // live centroid — zooming and two-finger panning in one formula
+      const ax = (interaction.cx0 - interaction.camX) / interaction.z0;
+      const ay = (interaction.cy0 - interaction.camY) / interaction.z0;
+      state.camera.z = z;
+      state.camera.x = p.cx - ax * z;
+      state.camera.y = p.cy - ay * z;
+      if (editing) positionEditor();
+      syncZoomLabel(); requestRender(); scheduleAutosave();
+      return;
+    }
+  }
   const [sx, sy] = toScene(ev.clientX, ev.clientY);
   if (!interaction){
     if ((state.tool === 'arrow' || state.tool === 'line') && !editing){
@@ -1119,6 +1170,14 @@ function resizeTo(it, sx, sy, shiftKey){
 }
 
 function onPointerUp(ev){
+  if (ev.pointerType === 'touch'){
+    touchPts.delete(ev.pointerId);
+    if (interaction && interaction.kind === 'pinch'){
+      // pinch survives until fewer than two fingers remain
+      if (touchPts.size < 2){ interaction = null; requestRender(); }
+      return;
+    }
+  }
   const it = interaction;
   interaction = null;
   guides = [];

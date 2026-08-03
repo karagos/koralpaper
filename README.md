@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.17.0)
+# KoralPaper — *Draw your thinking* (v3.18.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -135,6 +135,10 @@ element lands. Press **?** inside the app for the full shortcuts card.
 - **Photo adjustments:** Brightness / Contrast / Gamma / Sharpen sliders on
   every image — they shape both the photo and the art styles, so you can
   tune the source until the halftone/stipple/lines pop
+- **Touch & iPad:** pinch to zoom, two-finger pan (a second finger safely
+  cancels whatever the first finger started), and selection handles grow
+  their hit areas under a finger. Works with Apple Pencil too — it draws
+  like a mouse
 - **Snapping:** grid snap (G toggles the grid) + smart alignment guides against
   other elements' edges and centers (⇧G toggles)
 - **Selection:** click, shift-click, marquee, ⌘A, move, 8-handle resize,

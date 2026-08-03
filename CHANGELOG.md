@@ -1,5 +1,14 @@
 # KoralPaper — Changelog
 
+## v3.18.0 — 2026-08-03
+- **Touch & iPad support.** Pinch to zoom around the fingers' centroid,
+  which gives two-finger panning for free. A second finger landing
+  mid-gesture safely cancels whatever the first finger started (any
+  half-done drag reverts to the last committed state). Selection,
+  rotation, curve and elbow handles grow their hit areas 1.8× under a
+  finger, and the canvas suppresses long-press callouts and text
+  selection on touch devices.
+
 ## v3.17.0 — 2026-08-03
 - **First-run welcome.** A brand-new browser gets a warm welcome card:
   the paper-thought mark, the motto, and two choices, "Take the 60-second

@@ -35,7 +35,8 @@ html,body{height:100%; overflow:hidden; overscroll-behavior:none;}
 body{font-family:var(--sans); color:var(--ink); background:var(--paper);
   -webkit-font-smoothing:antialiased; touch-action:none;}
 
-#board{position:fixed; inset:0; width:100vw; height:100vh; display:block; cursor:default;}
+#board{position:fixed; inset:0; width:100vw; height:100vh; display:block; cursor:default;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;}
 #board.tool-hand{cursor:grab;} #board.panning{cursor:grabbing;}
 #board.tool-draw,#board.tool-rect,#board.tool-ellipse,#board.tool-diamond,
 #board.tool-chip,#board.tool-icon,#board.tool-arrow,#board.tool-line{cursor:crosshair;}
