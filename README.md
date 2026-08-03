@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.13.1)
+# KoralPaper — *Draw your thinking* (v3.14.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -111,6 +111,9 @@ a one-page showcase of every feature). Press **?** inside the app for the full s
 - **PDF export:** ☰ or ⬇ → Export PDF. Multi-page documents open a page
   picker; with an artboard every page exports at the exact preset size with
   the grid included. Zero dependencies — works fully offline
+- **Your gallery:** a toolbar library for reusable SVG logos (pure vector,
+  crisp at any zoom, vector in exports) and transparent PNG marks — click
+  to place, right-click to remove, persisted in the browser
 - **Images:** drag & drop or paste PNG/JPEG (toolbar 🖼 button, `I`, or
   ☰ → Import image); they act like any element — resize, rotate, glue
   arrows to them. **Crop** from the panel or right-click menu: drag across

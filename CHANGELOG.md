@@ -1,5 +1,14 @@
 # KoralPaper — Changelog
 
+## v3.14.0 — 2026-08-03
+- **Your gallery** — a new toolbar button holds your reusable assets:
+  upload **SVG logos** (kept as pure vector — crisp at any size and
+  exported as vectors) and **transparent PNGs** (downscaled for storage,
+  transparency preserved). Click an asset to place it at the center of
+  the view, right-click to remove it. The gallery persists in the browser,
+  and placed assets are ordinary image elements — resize, rotate, glue
+  arrows, even run Art styles on them; documents stay fully portable.
+
 ## v3.13.1 — 2026-08-03
 - **Formatting is visible while you edit.** Bold, italic and highlights
   now render live during editing — the canvas draws the styled text in

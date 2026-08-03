@@ -230,6 +230,19 @@ body.dark .menu button.danger{color:#F09070;}
   stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round;}
 .iconmenu svg .fillme{fill:currentColor; stroke:none;}
 .iconmenu .menuhead{grid-column:1 / -1; margin-top:4px;}
+.assetmenu{display:flex; flex-direction:column; width:248px; gap:7px; padding:10px;}
+.assetmenu .menuhead{margin-top:0; padding:0 2px 2px;}
+#assetGrid{display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;}
+#assetGrid button{
+  height:52px; border-radius:9px; border:1.5px solid var(--line-soft);
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+  background:
+    repeating-conic-gradient(var(--card-2) 0% 25%, var(--card) 0% 50%) 0 0 / 14px 14px;
+}
+#assetGrid button:hover{border-color:var(--coral);}
+#assetGrid img{max-width:88%; max-height:88%; object-fit:contain; pointer-events:none;}
+.assethint{font-size:10.5px; color:var(--ink-soft); line-height:1.45; padding:0 2px;}
+#assetAddBtn{align-self:flex-start; white-space:nowrap;}
 #miSearch{
   grid-column:1 / -1; box-sizing:border-box; margin:2px 0 3px;
   padding:7px 9px; border:1.5px solid var(--line-soft); border-radius:9px;

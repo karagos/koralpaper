@@ -2044,6 +2044,118 @@ function refreshTextMetrics(){
 }
 
 /* ── icon menu ─────────────────────────────────────── */
+/* ── user asset gallery: reusable SVG / PNG logos & marks ──
+   Assets live in the browser (koralpaper.assets.v1). SVGs keep their
+   original markup (pure vector at any size, vector in SVG exports);
+   raster images are downscaled to ≤512px with transparency preserved.
+   Stamped assets are ordinary image elements — documents stay portable. */
+const ASSET_KEY = 'koralpaper.assets.v1';
+function assetList(){
+  try { return JSON.parse(localStorage.getItem(ASSET_KEY)) || []; } catch (e){ return []; }
+}
+function assetSave(list){
+  try { localStorage.setItem(ASSET_KEY, JSON.stringify(list)); return true; }
+  catch (e){ alert('Gallery storage is full — remove an asset (right-click) and try again.'); return false; }
+}
+function assetAddFiles(files){
+  for (const f of files){
+    const isSvg = f.type === 'image/svg+xml' || /\.svg$/i.test(f.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const finish = (src) => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.naturalWidth || 300, h = img.naturalHeight || 300;
+          if (src.length > 700000){
+            alert(`“${f.name}” is too large for the gallery (max ~700 KB after processing).`);
+            return;
+          }
+          const list = assetList();
+          list.push({ id: uid(), name: f.name.replace(/\.[^.]+$/, ''), svg: isSvg, src, w, h });
+          if (assetSave(list)){
+            buildAssetGrid();
+            showHint(`“${f.name}” added to your gallery`);
+          }
+        };
+        img.onerror = () => alert(`Could not read “${f.name}”.`);
+        img.src = src;
+      };
+      if (isSvg){
+        // keep the vector source verbatim as a data URL
+        finish('data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(reader.result))));
+      } else {
+        // raster: downscale for storage, preserve transparency
+        const img0 = new Image();
+        img0.onload = () => {
+          const maxDim = 512;
+          const s = Math.min(1, maxDim / Math.max(img0.naturalWidth, img0.naturalHeight));
+          if (s >= 1){ finish(reader.result2); return; }
+          const c = document.createElement('canvas');
+          c.width = Math.round(img0.naturalWidth * s);
+          c.height = Math.round(img0.naturalHeight * s);
+          c.getContext('2d').drawImage(img0, 0, 0, c.width, c.height);
+          finish(c.toDataURL('image/png'));
+        };
+        img0.src = reader.result2 = reader.result;
+      }
+    };
+    if (isSvg) reader.readAsText(f);
+    else reader.readAsDataURL(f);
+  }
+}
+function insertAsset(a){
+  // place at the viewport center at a friendly size, keeping the aspect
+  const [cx, cy] = toScene(canvas.clientWidth / 2, canvas.clientHeight / 2);
+  const target = 240 / state.camera.z;
+  const s = target / Math.max(a.w, a.h);
+  const el = newElement('image', 0, 0, {});
+  el.src = a.src;
+  el.w = Math.max(20, a.w * s);
+  el.h = Math.max(20, a.h * s);
+  el.x = cx - el.w / 2; el.y = cy - el.h / 2;
+  state.elements.push(el);
+  setSelection(new Set([el.id]));
+  setTool('select');
+  commit(); requestRender();
+  $('assetMenu').classList.add('hidden');
+}
+function buildAssetGrid(){
+  const grid = $('assetGrid');
+  grid.replaceChildren();
+  const list = assetList();
+  $('assetHint').textContent = list.length
+    ? 'Click to place · right-click to remove. SVG stays pure vector, PNG keeps transparency.'
+    : 'Your reusable logos & marks live here — add an SVG or transparent PNG to get started.';
+  for (const a of list){
+    const b = document.createElement('button');
+    b.title = a.name + ' — right-click to remove';
+    const im = document.createElement('img');
+    im.src = a.src;
+    b.appendChild(im);
+    b.addEventListener('click', ev => { ev.stopPropagation(); insertAsset(a); });
+    b.addEventListener('contextmenu', ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      if (!confirm(`Remove “${a.name}” from your gallery?`)) return;
+      assetSave(assetList().filter(x => x.id !== a.id));
+      buildAssetGrid();
+    });
+    grid.appendChild(b);
+  }
+}
+$('assetToolBtn').addEventListener('click', ev => {
+  ev.stopPropagation();
+  const menu = $('assetMenu');
+  const wasHidden = menu.classList.contains('hidden');
+  closeMenus(); closeColorPop(); closePaperPop();
+  if (wasHidden){ buildAssetGrid(); menu.classList.remove('hidden'); }
+});
+$('assetMenu').addEventListener('click', ev => ev.stopPropagation());
+$('assetAddBtn').addEventListener('click', ev => { ev.stopPropagation(); $('assetInput').click(); });
+$('assetInput').addEventListener('change', () => {
+  assetAddFiles([...$('assetInput').files]);
+  $('assetInput').value = '';
+});
+
 /* ── Google Material icons (fonts.google.com/icons) ──
    The catalog (names + search tags) ships with the app; the actual vector
    path is fetched from fonts.gstatic.com the first time an icon is used,
@@ -2918,6 +3030,7 @@ $('menuBtn').addEventListener('click', ev => {
 function closeMenus(){
   $('fileMenu').classList.add('hidden');
   $('iconMenu').classList.add('hidden');
+  $('assetMenu').classList.add('hidden');
   $('exportMenu').classList.add('hidden');
   $('boardMenu').classList.add('hidden');
   $('gridMenu').classList.add('hidden');
