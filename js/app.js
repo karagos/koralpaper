@@ -175,6 +175,75 @@ function requestRender(){
   requestAnimationFrame(() => { renderQueued = false; render(); });
 }
 
+function sceneOpts(w, h, camera){
+  return {
+    width: w, height: h, camera, pal: pal(),
+    grid: state.grid, gridSize: gsize(),
+    bg: effectiveBg(), gridColor: effectiveGridColor(),
+    board: state.board, outside: state.board ? outsideColor() : null,
+  };
+}
+
+/* ── interaction-time render cache ──────────────────
+   During drags/pans, static elements are rasterized once to an offscreen
+   bitmap; each frame only blits it and redraws the few moving elements —
+   heavy documents stay at full frame rate. The cache lives exactly as long
+   as one interaction and is dropped the moment it ends. */
+let staticCache = null;
+const CACHE_KINDS = new Set(['move','resize','rotate','curve','elbowSeg','endpoint','create','marquee','pan']);
+function movingIdsFor(it){
+  let base;
+  if (it.kind === 'move') base = new Set(it.ids);
+  else if (it.kind === 'resize' || it.kind === 'rotate') base = new Set(state.selection);
+  else if (it.kind === 'marquee') base = new Set();
+  else base = new Set([it.el.id]); // create / curve / elbowSeg / endpoint
+  for (const el of state.elements)
+    if (isLinear(el) && (base.has(el.startBind) || base.has(el.endBind))) base.add(el.id);
+  return base;
+}
+function renderInteractionCached(it, dpr, w, h){
+  const camKey = state.camera.x + ',' + state.camera.y + ',' + state.camera.z + ',' + w + 'x' + h;
+  const moving = movingIdsFor(it);
+  const movKey = [...moving].sort().join('|');
+  if (!staticCache || staticCache.it !== it || staticCache.camKey !== camKey || staticCache.movKey !== movKey){
+    const off = document.createElement('canvas');
+    off.width = Math.max(1, w * dpr); off.height = Math.max(1, h * dpr);
+    const octx = off.getContext('2d');
+    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    renderScene(octx, state.elements.filter(e => !moving.has(e.id)), sceneOpts(w, h, state.camera));
+    staticCache = { c: off, it, camKey, movKey };
+  }
+  ctx.drawImage(staticCache.c, 0, 0, w, h);
+  setRouteContext(state.elements); // routes must see every obstacle
+  const p = pal(), bgc = effectiveBg();
+  ctx.save();
+  ctx.translate(state.camera.x, state.camera.y);
+  ctx.scale(state.camera.z, state.camera.z);
+  for (const el of state.elements) if (moving.has(el.id)) drawElement(ctx, el, p, bgc);
+  ctx.restore();
+  drawOverlay();
+}
+function renderPanCached(dpr, w, h){
+  const M = 400; // extra margin so short pans never hit the bitmap edge
+  const cam = state.camera;
+  if (!staticCache || staticCache.kind !== 'pan' || staticCache.it !== interaction ||
+      staticCache.z !== cam.z ||
+      Math.abs(cam.x - staticCache.cam.x) > M || Math.abs(cam.y - staticCache.cam.y) > M){
+    const off = document.createElement('canvas');
+    off.width = (w + 2 * M) * dpr; off.height = (h + 2 * M) * dpr;
+    const octx = off.getContext('2d');
+    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    renderScene(octx, state.elements,
+      sceneOpts(w + 2 * M, h + 2 * M, { x: cam.x + M, y: cam.y + M, z: cam.z }));
+    staticCache = { kind: 'pan', c: off, cam: { x: cam.x, y: cam.y }, z: cam.z, it: interaction };
+  }
+  const dx = cam.x - staticCache.cam.x, dy = cam.y - staticCache.cam.y;
+  ctx.fillStyle = state.board ? outsideColor() : effectiveBg();
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(staticCache.c, -M + dx, -M + dy, w + 2 * M, h + 2 * M);
+  drawOverlay();
+}
+
 function render(){
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -182,12 +251,13 @@ function render(){
     canvas.width = w * dpr; canvas.height = h * dpr;
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  renderScene(ctx, state.elements, {
-    width: w, height: h, camera: state.camera, pal: pal(),
-    grid: state.grid, gridSize: gsize(),
-    bg: effectiveBg(), gridColor: effectiveGridColor(),
-    board: state.board, outside: state.board ? outsideColor() : null,
-  });
+  const it = interaction;
+  if (it && CACHE_KINDS.has(it.kind) && state.elements.length >= 12){
+    if (it.kind === 'pan') return renderPanCached(dpr, w, h);
+    return renderInteractionCached(it, dpr, w, h);
+  }
+  staticCache = null;
+  renderScene(ctx, state.elements, sceneOpts(w, h, state.camera));
   drawOverlay();
 }
 

@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.16.0 — 2026-08-03
+- **Rendering performance layer.** While you drag, resize, rotate, bend an
+  arrow, marquee-select or pan, everything that isn't moving is rasterized
+  once to an offscreen bitmap and each frame just blits it, redrawing only
+  the moving elements (plus any arrows glued to them). On a 300-element
+  document a drag frame drops from ~4.2ms to ~0.03ms — heavy documents now
+  drag as smoothly as empty ones. Pans blit a padded snapshot and re-render
+  fully on release; the cache lives only for the duration of one gesture,
+  so the settled picture is always the true full render.
+
 ## v3.15.0 — 2026-08-03
 - **"One line" rebuilt for faces.** Four compounding fixes make the single
   continuous line actually read as a portrait:
