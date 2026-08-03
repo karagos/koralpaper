@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.10.1';
+const APP_VERSION = '3.10.2';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -220,18 +220,12 @@ function layoutText(el, maxW){
   applyTracking(_measureCtx, el);
   const lh = elLH(el), pgap = elPgap(el);
   const lines = [];
-  /* a PARAGRAPH is a block separated by one or more empty lines — the gap
-     applies only there, so ordinary multi-line text is untouched by it */
-  let afterBlank = false;
-  String(el.text ?? '').split('\n').forEach(raw => {
-    if (!raw.trim()){
-      lines.push({ text: '', para: false });
-      afterBlank = lines.length > 1; // a leading blank isn't a separator
-      return;
-    }
-    if (maxW == null){
-      lines.push({ text: raw, para: afterBlank });
-      afterBlank = false;
+  /* every hard line break (Enter) starts a new PARAGRAPH and receives the
+     paragraph gap; soft-wrapped continuation lines inside a shape use only
+     the line spacing */
+  String(el.text ?? '').split('\n').forEach((raw, pi) => {
+    if (maxW == null || !raw){
+      lines.push({ text: raw, para: pi > 0 });
       return;
     }
     let line = '', first = true;
@@ -239,12 +233,11 @@ function layoutText(el, maxW){
       const test = line ? line + ' ' + word : word;
       if (_measureCtx.measureText(test).width <= maxW || !line) line = test;
       else {
-        lines.push({ text: line, para: first && afterBlank });
+        lines.push({ text: line, para: first && pi > 0 });
         first = false; line = word;
       }
     }
-    lines.push({ text: line, para: first && afterBlank });
-    afterBlank = false;
+    lines.push({ text: line, para: first && pi > 0 });
   });
   let w = 0;
   for (const l of lines) w = Math.max(w, _measureCtx.measureText(l.text).width);

@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.10.1)
+# KoralPaper — *Draw your thinking* (v3.10.2)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -46,8 +46,8 @@ a one-page showcase of every feature). Press **?** inside the app for the full s
   the shape grows); standalone text elements; **arrows and lines take labels**
   that ride their midpoint and follow every move and bend
 - **Typography controls:** per-element **line spacing** (×0.5–2.5),
-  **paragraph spacing** (extra space between blank-line-separated
-  paragraphs — ordinary line breaks are untouched), **letter spacing**
+  **paragraph spacing** (extra space at every Enter — soft-wrapped
+  lines inside shapes keep the line spacing), **letter spacing**
   (−7 to +15px tracking), and **vertical alignment** inside shapes
   (top / middle / bottom) — all live in the style panel and all carried
   by copy/paste-style and SVG/PNG/PDF exports

@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.10.2 — 2026-08-02
+- **Paragraph spacing works on a single Enter**: every hard line break now
+  receives the paragraph gap, while soft-wrapped lines inside shapes keep
+  the line spacing — so the two sliders stay independent where it matters.
+- **Slider values always visible**: the Spacing section shows each value
+  (×1.3, 24px, 0px) in bold on its own header line above a full-width
+  slider — easy to read and easy to match across every text in a document.
+
 ## v3.10.1 — 2026-08-02
 - **Typography tuning**: line spacing now ranges ×0.5–2.5 and letter
   spacing −7 to +15px. **Paragraph spacing redefined** — a paragraph is a
