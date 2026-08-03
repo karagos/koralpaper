@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.13.0';
+const APP_VERSION = '3.13.1';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -1234,7 +1234,6 @@ function boxTextTop(el, box, totalH, pad){
 }
 /* draw text lines inside a box */
 function drawBoxText(ctx, el, pal, box){
-  if (el._editing) return;
   if (!el.text || !el.text.trim()) return;
   const pad = el.type === 'chip' ? 10 : 12;
   const maxW = Math.max(20, box.w - pad * 2);
@@ -1252,7 +1251,6 @@ function drawBoxText(ctx, el, pal, box){
 }
 
 function drawTextElement(ctx, el, pal){
-  if (el._editing) return;
   const lay = layoutText(el, null);
   applyTracking(ctx, el);
   ctx.textBaseline = 'middle';
@@ -2067,7 +2065,7 @@ function drawElement(ctx, el, pal, bg){
       }
       /* label riding the midpoint — derived from the path, so it follows
          every move, bend, and re-anchor automatically */
-      if (el.text && el.text.trim() && !el._editing){
+      if (el.text && el.text.trim()){
         const mid = pathMidpoint(pts);
         const lay = layoutText(el, null);
         applyTracking(ctx, el);

@@ -1176,6 +1176,12 @@ function openTextEditor(el, isNew){
   editing = { el, isNew };
   el._editing = true;
   editorEl.value = el.text || '';
+  // the canvas draws the (rich) text live underneath; the editor only
+  // contributes the caret and the selection band
+  editorEl.style.color = 'transparent';
+  const pnow = pal();
+  editorEl.style.caretColor = (el.type !== 'text' && el.fill === 'ink')
+    ? pnow.bg : (resolveStroke(pnow, el.stroke) || pnow.stroke.ink);
   editorEl.classList.remove('hidden');
   positionEditor();
   editorEl.focus();
@@ -1233,7 +1239,9 @@ function positionEditor(){
     editorEl.style.height = (th + lineHeightOf(el.size, el.lh)) * z + 'px';
   }
   const p = pal();
-  editorEl.style.color = (el.fill === 'ink') ? p.bg : resolveStroke(p, el.stroke);
+  // the canvas paints the text; the editor stays a transparent input layer
+  editorEl.style.color = 'transparent';
+  editorEl.style.caretColor = (el.fill === 'ink') ? p.bg : (resolveStroke(p, el.stroke) || p.stroke.ink);
 }
 editorEl.addEventListener('input', () => {
   if (!editing) return;

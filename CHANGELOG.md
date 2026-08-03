@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.13.1 — 2026-08-03
+- **Formatting is visible while you edit.** Bold, italic and highlights
+  now render live during editing — the canvas draws the styled text in
+  place, and the editor overlay contributes only the caret and the
+  selection band. Press ⌘B mid-edit and see it instantly.
+
 ## v3.13.0 — 2026-08-03
 - **Bold, italic & highlight — on whole texts and selected ranges.**
   A new Format row (B / I / highlight dots) plus shortcuts: ⌘B, ⌘I, ⇧⌘H.

@@ -453,3 +453,7 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 
 ::-webkit-scrollbar{width:9px;}
 ::-webkit-scrollbar-thumb{background:var(--line-soft); border-radius:8px;}
+
+/* while editing, the textarea is a transparent input layer over the live
+   canvas text — keep its selection band visible but let the glyphs show */
+#textEditor::selection{background:rgba(91,107,184,.30); color:transparent;}
