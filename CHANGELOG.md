@@ -1,5 +1,16 @@
 # KoralPaper — Changelog
 
+## v3.21.0 — 2026-08-03
+- **Tooltips everywhere.** Every button in the app — tools, top-bar
+  toggles, style panel controls, zoom bar, art styles, templates — now
+  shows a fast, styled tooltip on hover: the tool's name plus its
+  keyboard shortcut rendered as a key chip. Tips appear in ~⅓ of a
+  second (instantly when scanning along a row of buttons), flip above
+  controls near the bottom edge, follow the light/dark theme, and always
+  reflect live state (the grid button says which mode is active). The
+  browser's slow native bubbles are gone; the five highlight-color dots
+  got names too.
+
 ## v3.20.1 — 2026-08-03
 - **Replay the welcome.** ? → Settings → "Show the welcome screen again"
   brings the first-run welcome card back on demand — for reviewing it, or

@@ -400,6 +400,23 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 
 .menukey{float:right; font-size:11px; color:var(--ink-soft); letter-spacing:.4px;}
 
+#tooltip{
+  position:fixed; z-index:99; pointer-events:none;
+  background:var(--ink); color:var(--paper);
+  font-size:12px; line-height:1.45; letter-spacing:.1px;
+  padding:5px 10px 6px; border-radius:8px; max-width:270px;
+  box-shadow:0 4px 14px -4px rgba(0,0,0,.35);
+  opacity:0; transform:translateY(2px);
+  transition:opacity .13s ease, transform .13s ease;
+}
+#tooltip.show{opacity:1; transform:none;}
+#tooltip .tipkey{
+  display:inline-block; margin-left:8px; padding:0 6px;
+  border-radius:5px; font-size:11px; font-weight:600; letter-spacing:.6px;
+  background:color-mix(in srgb, var(--paper) 22%, transparent);
+}
+body.dark #tooltip{box-shadow:0 4px 14px -4px rgba(0,0,0,.7);}
+
 .menuver{
   font-size:11px; color:var(--ink-soft); text-align:center;
   padding:7px 0 3px; border-top:1.5px solid var(--line-soft); margin-top:4px;

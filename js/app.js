@@ -2567,7 +2567,7 @@ $('themeBtn').addEventListener('click', () => {
 });
 function syncToggles(){
   $('gridBtn').classList.toggle('on', state.grid !== 'off');
-  $('gridBtn').title = `Grid: ${state.grid === 'off' ? 'off' : state.grid} — G cycles`;
+  $('gridBtn').title = `Grid (now ${state.grid === 'off' ? 'off' : state.grid}), click for options — G`;
   $('snapBtn').classList.toggle('on', state.snap);
 }
 
@@ -4315,6 +4315,76 @@ function loadDemo(){
   commit(); buildPageStrip(); zoomToFit(); syncPanel();
   showHint('The KoralPaper tour — every feature on this page is real');
 }
+
+/* ── tooltips ───────────────────────────────────────
+   Every control's `title` becomes a fast, styled tooltip: the title is
+   consumed into data-tip on first hover (so the browser's slow native
+   bubble never shows) and re-consumed whenever code writes a fresh
+   title (grid button, page tabs, size presets all update theirs).
+   A "Name — ⌘K" pattern renders the shortcut as a key chip. */
+const tipEl = document.createElement('div');
+tipEl.id = 'tooltip';
+document.body.appendChild(tipEl);
+let tipTimer = null, tipTarget = null, tipShownAt = 0;
+function tipTextOf(el){
+  const t = el.getAttribute('title');
+  if (t){ el.dataset.tip = t; el.removeAttribute('title'); }
+  return el.dataset.tip || null;
+}
+function renderTip(text){
+  tipEl.textContent = '';
+  const m = text.match(/^(.*?) — ([⌘⇧⌥⌃]*[A-Za-z?!0-9]{1,2}|[⌘⇧⌥⌃]+[A-Za-z?!0-9]{1,2}|\?|[⌘⇧⌥⌃]?drag|⇧1)$/);
+  if (m){
+    tipEl.append(m[1]);
+    const key = document.createElement('span');
+    key.className = 'tipkey';
+    key.textContent = m[2];
+    tipEl.append(key);
+  } else {
+    tipEl.append(text.replace(/ — /g, ': '));
+  }
+}
+function placeTip(target){
+  const r = target.getBoundingClientRect();
+  tipEl.style.left = '0px'; tipEl.style.top = '0px';    // reset before measuring
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  let x = r.left + r.width / 2 - w / 2;
+  x = Math.max(8, Math.min(x, window.innerWidth - w - 8));
+  let y = r.bottom + 9;
+  if (y + h + 8 > window.innerHeight) y = r.top - h - 9;
+  tipEl.style.left = x + 'px';
+  tipEl.style.top = y + 'px';
+}
+function hideTip(){
+  clearTimeout(tipTimer); tipTimer = null;
+  if (tipEl.classList.contains('show')) tipShownAt = performance.now();
+  tipEl.classList.remove('show');
+  tipTarget = null;
+}
+document.addEventListener('pointerover', ev => {
+  if (ev.pointerType === 'touch') return;
+  const t = ev.target.closest ? ev.target.closest('[title], [data-tip]') : null;
+  if (!t || t.tagName === 'SELECT' || t.tagName === 'OPTION'){ if (tipTarget) hideTip(); return; }
+  if (t === tipTarget) return;
+  hideTip();
+  tipTarget = t;
+  // chain quickly when the user is scanning from button to button
+  const delay = performance.now() - tipShownAt < 450 ? 60 : 350;
+  tipTimer = setTimeout(() => {
+    if (tipTarget !== t || !document.contains(t)) return;
+    const text = tipTextOf(t);
+    if (!text) return;
+    renderTip(text);
+    placeTip(t);
+    tipEl.classList.add('show');
+  }, delay);
+}, true);
+document.addEventListener('pointerout', ev => {
+  if (tipTarget && !tipTarget.contains(ev.relatedTarget)) hideTip();
+}, true);
+document.addEventListener('pointerdown', hideTip, true);
+window.addEventListener('blur', hideTip);
+document.addEventListener('wheel', hideTip, { passive: true, capture: true });
 
 /* ── first-run welcome ─────────────────────────────── */
 const WELCOME_KEY = 'koralpaper.welcomed';
