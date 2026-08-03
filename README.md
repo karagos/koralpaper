@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.20.0)
+# KoralPaper — *Draw your thinking* (v3.20.1)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -29,8 +29,9 @@ works anywhere Chrome/Safari/Firefox run). Your sketch autosaves to the
 browser's local storage and reopens exactly where you left it next time.
 A first run greets you with a welcome card offering the 60-second tour or a
 blank page (the tour is always available later via ☰ → "Load the KoralPaper
-tour"), and a blank canvas shows gentle starter hints until your first
-element lands. Press **?** inside the app for the full shortcuts card.
+tour", and the card itself replays anytime from ? → Settings → "Show the
+welcome screen again"), and a blank canvas shows gentle starter hints until
+your first element lands. Press **?** inside the app for the full shortcuts card.
 
 ## What it does
 

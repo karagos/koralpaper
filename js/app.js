@@ -4322,8 +4322,16 @@ function maybeShowWelcome(hadSave){
   let welcomed = false;
   try { welcomed = !!localStorage.getItem(WELCOME_KEY); } catch (e){}
   if (hadSave || welcomed) return;
+  showWelcome();
+}
+function showWelcome(){
+  $('welcomeWrap').classList.remove('hidden');
+  $('shortcutsCard').classList.add('hidden');
+}
+/* welcome buttons — wired once, so the card can also be replayed from
+   Settings ("Show the welcome screen again") */
+{
   const wrap = $('welcomeWrap');
-  wrap.classList.remove('hidden');
   const dismiss = () => {
     wrap.classList.add('hidden');
     try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e){}
@@ -4344,6 +4352,7 @@ function maybeShowWelcome(hadSave){
   });
   // clicking the dim backdrop = start drawing
   wrap.addEventListener('pointerdown', ev => { if (ev.target === wrap) dismiss(); });
+  $('setShowWelcome').addEventListener('click', showWelcome);
 }
 
 /* ── boot ──────────────────────────────────────────── */

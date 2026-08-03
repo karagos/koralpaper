@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.20.1 — 2026-08-03
+- **Replay the welcome.** ? → Settings → "Show the welcome screen again"
+  brings the first-run welcome card back on demand — for reviewing it, or
+  for showing someone the intro on a machine that has already seen it.
+  Dismissing it never touches the current document.
+
 ## v3.20.0 — 2026-08-03
 - **Undo that matches intention.** Rapid repeats of the same
   micro-operation now fold into one history step: ten arrow-key nudges
