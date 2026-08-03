@@ -3071,12 +3071,53 @@ $('helpBtn').addEventListener('click', () => $('shortcutsCard').classList.toggle
 /* ── Help / Settings side panel ─────────────────────── */
 function setPanelTab(t){
   $('tabHelp').classList.toggle('sel', t === 'help');
+  $('tabClaude').classList.toggle('sel', t === 'claude');
   $('tabSettings').classList.toggle('sel', t === 'settings');
   $('helpPane').classList.toggle('hidden', t !== 'help');
+  $('claudePane').classList.toggle('hidden', t !== 'claude');
   $('settingsPane').classList.toggle('hidden', t !== 'settings');
 }
 $('tabHelp').addEventListener('click', () => setPanelTab('help'));
+$('tabClaude').addEventListener('click', () => setPanelTab('claude'));
 $('tabSettings').addEventListener('click', () => setPanelTab('settings'));
+$('claudeLinkBtn').addEventListener('click', () => {
+  $('shortcutsCard').classList.remove('hidden');
+  setPanelTab('claude');
+});
+
+/* the fallback prompt: teaches any Claude the KoralPaper file format */
+const DESIGN_PROMPT = `You are designing a diagram for KoralPaper, a hand-drawn-style sketch app. Answer ONLY with a JSON code block in exactly this format, nothing else:
+
+{"app":"koralpaper","version":5,
+ "pages":[{"name":"Page 1","elements":[ ...elements... ]}],
+ "appState":{"board":{"name":"Slide","w":1920,"h":1080,"x":0,"y":0}}}
+
+Element format (every field shown with a valid example):
+- Box: {"id":"el1","type":"rect","x":100,"y":100,"w":190,"h":92,"angle":0,"seed":12345,"stroke":"ink","fill":"periwinkle","fillStyle":"solid","dash":"solid","sw":3.3,"sketch":1,"round":1,"opacity":100,"text":"Step 1","font":"sans","size":21,"align":"center","groupId":null}
+- Other shapes: same but "type":"diamond" (decisions), "ellipse" (start/end), "chip" (small label pill, size 16)
+- Text: same fields with "type":"text","fill":"none","align":"left" and w,h roughly fitting the text
+- Arrow between shapes: {"id":"a1","type":"arrow","x":0,"y":0,"w":10,"h":10,"angle":0,"seed":23456,"stroke":"ink","fill":"none","fillStyle":"solid","dash":"solid","sw":3.3,"sketch":1,"round":1,"opacity":100,"text":"","font":"sans","size":16,"align":"center","groupId":null,"points":[[0,0],[10,0]],"curve":0,"elbow":false,"elbowPts":null,"startHead":"none","endHead":"arrow","startBind":"el1","endBind":"el2","startAnchor":null,"endAnchor":null}
+  startBind/endBind reference element ids; the app glues and routes the arrow automatically. "text" on an arrow becomes its label. "elbow":true gives right-angle routing.
+
+Rules:
+- ids: any unique short strings. seed: any random integer per element.
+- stroke colors: ink, gdark, gmid, glight, white, coral, blue, green, plum, or #hex
+- fill colors: none, cream, white, coral, terracotta, blush, periwinkle, sage, butter, sky, glight, gmid, gdark, ink, or #hex
+- Coordinates: y grows downward, origin top-left of the board. Typical box 190×92, gaps 100 to 120 px, keep 60 px margins.
+- "sketch":1 = hand-drawn wobble (default look), 0 = neat.
+- Multi-page is allowed: more entries in "pages". Omit "board" in appState for an unlimited canvas.
+
+The user saves your JSON as a .json file and opens it in KoralPaper. Now design what the user asks below, thinking about clear layout and generous spacing.
+
+MY REQUEST: `;
+$('copyPromptBtn').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(DESIGN_PROMPT);
+    showHint('Design prompt copied — paste it into any Claude, add your request');
+  } catch (e){
+    prompt('Copy this prompt:', DESIGN_PROMPT);
+  }
+});
 
 const WIDTH_KEYS = ['fine', 'medium', 'thick'];
 const SIZE_KEYS = ['s', 'm', 'l', 'xl'];
@@ -4450,6 +4491,228 @@ document.addEventListener('pointerout', ev => {
 document.addEventListener('pointerdown', hideTip, true);
 window.addEventListener('blur', hideTip);
 document.addEventListener('wheel', hideTip, { passive: true, capture: true });
+
+/* ── Claude link: the MCP bridge client ─────────────
+   When the KoralPaper MCP extension runs inside Claude Desktop it
+   opens a tiny bridge on 127.0.0.1:8137. The app long-polls it;
+   Claude's tool calls arrive as commands, results go back, and the
+   ✳ indicator lights up while the link is alive. Everything Claude
+   draws lands as ordinary elements — editable, undoable (one ⌘Z per
+   command), saved like anything else. */
+const CLAUDE_BRIDGE = 'http://127.0.0.1:8137';
+let claudeLinked = false;
+
+function setClaudeLinked(on){
+  if (on === claudeLinked) return;
+  claudeLinked = on;
+  $('claudeLinkBtn').classList.toggle('hidden', !on);
+  const s = $('claudeTabStatus');
+  if (s){
+    s.textContent = on ? 'Linked: Claude Desktop can draw on this paper right now.'
+      : 'Not linked. Install the extension and keep Claude Desktop open, then this page links automatically.';
+    s.classList.toggle('on', on);
+  }
+}
+
+function claudeColor(v, keys, fallback){
+  if (typeof v !== 'string') return fallback;
+  if (/^#[0-9a-fA-F]{3,8}$/.test(v)) return v;
+  const k = v.toLowerCase().replace('black', 'ink');
+  return keys.includes(k) ? k : fallback;
+}
+function claudeBuildElement(spec, idMap){
+  const kind = ['rect', 'diamond', 'ellipse', 'chip', 'text', 'arrow', 'line'].includes(spec.type)
+    ? spec.type : 'rect';
+  const style = {
+    stroke: claudeColor(spec.stroke, STROKE_KEYS, 'ink'),
+    fill: claudeColor(spec.fill, FILL_KEYS,
+      kind === 'text' || kind === 'arrow' || kind === 'line' ? 'none' : defaults.fillByType[kind] || 'none'),
+    fillStyle: ['solid', 'hachure', 'dense', 'cross', 'dots', 'waves'].includes(spec.fillStyle) ? spec.fillStyle : 'solid',
+    dash: ['solid', 'dotted', 'dashed'].includes(spec.dash) ? spec.dash : 'solid',
+    sw: widths.medium, sketch: spec.sketch === 0 ? 0 : 1, round: 1, opacity: 100,
+    font: (typeof spec.font === 'string' && FONTS[spec.font]) ? spec.font : 'sans',
+    size: Number(spec.size) > 0 ? clamp(Number(spec.size), 8, 160)
+      : (kind === 'chip' || kind === 'arrow' || kind === 'line' ? 16 : 21),
+    align: ['left', 'center', 'right'].includes(spec.align) ? spec.align : (kind === 'text' ? 'left' : 'center'),
+    lh: typo.lh, pgap: typo.pgap, lspace: typo.lspace, valign: 'middle',
+  };
+  const x = Number(spec.x) || 0, y = Number(spec.y) || 0;
+  const el = newElement(kind, x, y, style);
+  el.x = x; el.y = y;
+  if (kind === 'arrow' || kind === 'line'){
+    el.curve = 0;
+    el.elbow = !!spec.elbow;
+    el.startHead = 'none';
+    el.endHead = kind === 'arrow' ? 'arrow' : 'none';
+    const fromId = spec.from && idMap.get(String(spec.from));
+    const toId = spec.to && idMap.get(String(spec.to));
+    if (fromId && toId && fromId !== toId){
+      el.startBind = fromId; el.endBind = toId;
+      el.points = [[0, 0], [10, 0]];
+    } else {
+      const x2 = Number(spec.x2), y2 = Number(spec.y2);
+      el.points = [[0, 0], [isNaN(x2) ? 160 : x2 - x, isNaN(y2) ? 0 : y2 - y]];
+    }
+    el.text = typeof spec.text === 'string' ? spec.text : '';
+  } else {
+    const defSize = { rect: [190, 92], diamond: [170, 120], ellipse: [160, 110], chip: [140, 40] }[kind];
+    el.w = Number(spec.w) > 0 ? Number(spec.w) : (defSize ? defSize[0] : 120);
+    el.h = Number(spec.h) > 0 ? Number(spec.h) : (defSize ? defSize[1] : 60);
+    el.text = typeof spec.text === 'string' ? spec.text : '';
+    if (kind === 'text') autosizeText(el);
+  }
+  if (spec.id) idMap.set(String(spec.id), el.id);
+  return el;
+}
+function claudeCompact(el){
+  const c = { id: el.id, type: el.type, x: Math.round(el.x), y: Math.round(el.y),
+    w: Math.round(el.w), h: Math.round(el.h) };
+  if (el.text) c.text = el.text;
+  if (el.stroke && el.stroke !== 'ink') c.stroke = el.stroke;
+  if (el.fill && el.fill !== 'none') c.fill = el.fill;
+  if (el.type === 'arrow' || el.type === 'line'){
+    if (el.startBind) c.from = el.startBind;
+    if (el.endBind) c.to = el.endBind;
+  }
+  if (el.type === 'icon') c.icon = el.kind;
+  return c;
+}
+
+async function claudeExecute(action, args){
+  if (action === 'read_document'){
+    syncPageRef();
+    return {
+      board: state.board ? { w: state.board.w, h: state.board.h, name: state.board.name } : null,
+      theme: state.theme,
+      pages: state.pages.map((p, i) => ({
+        name: p.name, current: i === state.pageIndex,
+        elements: p.elements.map(claudeCompact),
+      })),
+    };
+  }
+  if (action === 'create_page'){
+    const specs = Array.isArray(args.elements) ? args.elements : [];
+    if (!specs.length) return { error: 'No elements given.' };
+    syncPageRef();
+    const idMap = new Map();
+    const shapes = specs.filter(s => s.type !== 'arrow' && s.type !== 'line');
+    const linears = specs.filter(s => s.type === 'arrow' || s.type === 'line');
+    const els = shapes.map(s => claudeBuildElement(s, idMap))
+      .concat(linears.map(s => claudeBuildElement(s, idMap)));
+    state.pages.push(makePage(els, typeof args.name === 'string' && args.name.trim() ? args.name.trim() : 'Claude page'));
+    state.pageIndex = state.pages.length - 1;
+    state.elements = state.pages[state.pageIndex].elements;
+    state.selection = new Set();
+    if (args.board && Number(args.board.w) > 0 && Number(args.board.h) > 0){
+      state.board = { name: args.board.name || 'Custom', w: Number(args.board.w), h: Number(args.board.h), x: 0, y: 0 };
+    }
+    if (typeof args.paper === 'string' && args.paper[0] === '#') state.bgColor = args.paper;
+    updateBoundArrows(state.elements);
+    preloadDocFonts();
+    syncToggles(); syncBoardBtn(); buildBoardMenuSel(); syncPaperUI();
+    commit(); buildPageStrip(); zoomToFit(); syncPanel();
+    showHint('Claude drew a new page — every element is fully editable');
+    return { ok: true, page: state.pages[state.pageIndex].name,
+      ids: Object.fromEntries(idMap), elements: state.elements.length };
+  }
+  if (action === 'add_elements'){
+    const specs = Array.isArray(args.elements) ? args.elements : [];
+    if (!specs.length) return { error: 'No elements given.' };
+    const idMap = new Map();
+    for (const el of state.elements) idMap.set(el.id, el.id); // arrows may bind existing shapes
+    const shapes = specs.filter(s => s.type !== 'arrow' && s.type !== 'line');
+    const linears = specs.filter(s => s.type === 'arrow' || s.type === 'line');
+    for (const s of shapes) state.elements.push(claudeBuildElement(s, idMap));
+    for (const s of linears) state.elements.push(claudeBuildElement(s, idMap));
+    updateBoundArrows(state.elements);
+    preloadDocFonts();
+    commit(); requestRender(); syncPanel();
+    showHint('Claude added to this page');
+    return { ok: true, ids: Object.fromEntries(idMap), elements: state.elements.length };
+  }
+  if (action === 'update_elements'){
+    const ups = Array.isArray(args.updates) ? args.updates : [];
+    let touched = 0;
+    for (const u of ups){
+      const el = byId(String(u.id));
+      if (!el) continue;
+      touched++;
+      if (u.x !== undefined) el.x = Number(u.x) || el.x;
+      if (u.y !== undefined) el.y = Number(u.y) || el.y;
+      if (u.w !== undefined && Number(u.w) > 0) el.w = Number(u.w);
+      if (u.h !== undefined && Number(u.h) > 0) el.h = Number(u.h);
+      if (u.text !== undefined){ el.text = String(u.text); delete el.runs; }
+      if (u.stroke !== undefined) el.stroke = claudeColor(u.stroke, STROKE_KEYS, el.stroke);
+      if (u.fill !== undefined) el.fill = claudeColor(u.fill, FILL_KEYS, el.fill);
+      if (u.fillStyle !== undefined && ['solid','hachure','dense','cross','dots','waves'].includes(u.fillStyle)) el.fillStyle = u.fillStyle;
+      if (u.dash !== undefined && ['solid','dotted','dashed'].includes(u.dash)) el.dash = u.dash;
+      if (u.size !== undefined && Number(u.size) > 0) el.size = clamp(Number(u.size), 8, 160);
+      if (u.font !== undefined && FONTS[u.font]) el.font = u.font;
+      if (u.align !== undefined && ['left','center','right'].includes(u.align)) el.align = u.align;
+      if (u.sketch !== undefined) el.sketch = u.sketch === 0 ? 0 : 1;
+      if (el.type === 'text') autosizeText(el);
+      delete el._prims; delete el._pkey;
+    }
+    if (!touched) return { error: 'No matching element ids on the current page.' };
+    updateBoundArrows(state.elements);
+    preloadDocFonts();
+    commit(); requestRender(); syncPanel();
+    return { ok: true, updated: touched };
+  }
+  if (action === 'delete_elements'){
+    const ids = new Set((Array.isArray(args.ids) ? args.ids : []).map(String));
+    const before = state.elements.length;
+    state.elements = state.elements.filter(e => !ids.has(e.id));
+    state.pages[state.pageIndex].elements = state.elements;
+    state.selection = new Set();
+    updateBoundArrows(state.elements);
+    commit(); requestRender(); syncPanel();
+    return { ok: true, deleted: before - state.elements.length };
+  }
+  if (action === 'render_page'){
+    const blob = await renderPagePNGBlob(state.elements, false);
+    if (!blob) return { error: 'The current page is empty.' };
+    // downscale for the eye check — Claude needs layout, not print quality
+    const img = await createImageBitmap(blob);
+    const scale = Math.min(1, 1100 / img.width);
+    const off = document.createElement('canvas');
+    off.width = Math.round(img.width * scale);
+    off.height = Math.round(img.height * scale);
+    off.getContext('2d').drawImage(img, 0, 0, off.width, off.height);
+    const dataUrl = off.toDataURL('image/png');
+    return { png: dataUrl.slice(dataUrl.indexOf(',') + 1),
+      note: `Current page "${state.pages[state.pageIndex].name}", ${state.elements.length} elements.` };
+  }
+  return { error: 'Unknown action: ' + action };
+}
+
+async function claudePollLoop(){
+  for (;;){
+    try {
+      // quick status ping first: the long-poll below holds ~25s, and the
+      // ✳ indicator should light up within a second of the bridge appearing
+      const s = await fetch(CLAUDE_BRIDGE + '/status');
+      if (!s.ok) throw new Error('bridge');
+      setClaudeLinked(true);
+      const r = await fetch(CLAUDE_BRIDGE + '/poll');
+      if (!r.ok) throw new Error('bridge');
+      const cmds = await r.json();
+      for (const c of cmds){
+        let result;
+        try { result = await claudeExecute(c.action, c.args); }
+        catch (e){ result = { error: String(e && e.message || e) }; }
+        await fetch(CLAUDE_BRIDGE + '/result', {
+          method: 'POST', headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ id: c.id, result }),
+        });
+      }
+    } catch (e){
+      setClaudeLinked(false);
+      await new Promise(res => setTimeout(res, 4000));
+    }
+  }
+}
+claudePollLoop();
 
 /* ── share as a self-contained web page ─────────────
    One .html file, zero dependencies: every page becomes an inline SVG

@@ -1,0 +1,22 @@
+{
+  "manifest_version": "0.2",
+  "name": "koralpaper",
+  "display_name": "KoralPaper",
+  "version": "1.0.0",
+  "description": "Let Claude design diagrams directly on your KoralPaper paper.",
+  "long_description": "Connects Claude Desktop to the KoralPaper app running in your browser. Describe a diagram in plain words and Claude draws it as fully editable hand-drawn-style elements: flowcharts, carousels, decision trees. Claude can also read the current page, look at a rendered picture of it, and tidy or restyle what is already there. Nothing leaves your machine except your conversation with Claude.",
+  "author": {
+    "name": "Stefanos Karagos, CAIO Group",
+    "url": "https://wearecaio.com"
+  },
+  "homepage": "https://github.com/karagos/koralpaper",
+  "license": "MIT",
+  "server": {
+    "type": "node",
+    "entry_point": "server.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server.js"]
+    }
+  }
+}

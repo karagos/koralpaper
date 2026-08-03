@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.25.0)
+# KoralPaper — *Draw your thinking* (v3.26.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -68,6 +68,21 @@ your first element lands. Press **?** inside the app for the full shortcuts card
   Playwrite NZ Guides, Unkempt, Kaushan Script), and Pixel & dot
   (Bitcount ×3, Tiny5, Doto) — need internet once; system fallbacks
   offline
+- **Design with Claude (MCP):** install the one-click **koralpaper.mcpb**
+  extension (in the `mcp/` folder) into the free
+  [Claude Desktop](https://claude.ai/download) app, keep KoralPaper open,
+  and just talk: *"draw a customer onboarding flowchart on a 1920×1080
+  board"* — Claude draws it live on your paper as ordinary hand-drawn
+  elements you can edit, restyle and undo (one ⌘Z per Claude step).
+  Claude can also **read the page** and **look at a rendered picture of
+  it**, so *"tidy this layout"* or *"make the third box green"* work on
+  whatever is on the paper, including what you drew by hand. The ✳ in the
+  top bar glows while the link is alive; the **Claude tab in the ? panel**
+  has the one-minute setup. No API key, no extra billing, nothing leaves
+  your machine except your conversation with Claude. Without Claude
+  Desktop there is a fallback: the same tab copies a **design prompt** you
+  can paste into any Claude — the .json it answers with opens straight in
+  the app
 - **Tab-to-create flows:** select a shape and press **Tab** — a connected
   twin appears to the right (⇧Tab: below), same style, glued arrow, text
   editor already open. It works mid-typing too, so "type, Tab, type, Tab"
@@ -221,6 +236,7 @@ your first element lands. Press **?** inside the app for the full shortcuts card
 | `js/core.js` | Engine: element model, geometry, seeded hand-drawn renderer, arrow routing, exports |
 | `js/app.js` | Interactions: selection, snapping, history, text editing, templates, autosave |
 | `js/material-icons.js` | Generated catalog of Google Material icon names + search tags |
+| `mcp/` | Claude Desktop extension: `koralpaper.mcpb` (one-click install) + the dependency-free bridge |
 | `examples/` | Ready-to-open documents (the KoralPaper tour) |
 | `docs/` | README assets |
 

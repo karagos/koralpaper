@@ -1,5 +1,26 @@
 # KoralPaper — Changelog
 
+## v3.26.0 — 2026-08-04
+- **Design with Claude.** KoralPaper now ships an MCP extension for the
+  free Claude Desktop app: double-click `mcp/koralpaper.mcpb` to install
+  (no API key, no terminal, no extra billing), keep KoralPaper open in
+  the browser, and describe what you want in Claude Desktop. Claude
+  draws live on your paper — pages, glued flowcharts, labeled arrows,
+  artboards, colors — as ordinary editable elements, one undo step per
+  Claude action. Seven tools: status, read the document, create a page,
+  add / update / delete elements, and **render the page as an image so
+  Claude checks its own layout with its own eyes** before saying done.
+  A pulsing ✳ appears in the top bar while the link is alive.
+- **Claude tab.** The ? panel grew a third tab with the live link
+  status, the one-minute setup, example prompts — and the no-Desktop
+  fallback: "Copy the design prompt" teaches any Claude (claude.ai
+  included) the KoralPaper file format; save its .json answer and open
+  it with ☰ → Open sketch.
+- Under the hood: the bridge is one dependency-free Node file speaking
+  MCP over stdio plus a localhost long-poll the app listens to; every
+  element Claude sends is validated and normalized before it touches
+  the paper.
+
 ## v3.25.0 — 2026-08-03
 - **Share as a web page.** ☰ / ⬇ → "Share as web page (.html)": the
   whole document becomes ONE self-contained HTML file — every page an

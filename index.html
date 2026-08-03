@@ -165,6 +165,9 @@
       <hr>
       <button data-act="save">Save sketch (.json)</button>
     </div>
+    <button class="iconbtn claudelink hidden" id="claudeLinkBtn" title="Claude is linked and can draw on this paper, click for details">
+      <svg viewBox="0 0 20 20" class="filled"><g><path d="M10 2 L11.1 8.3 L8.9 8.3 Z"/><path d="M10 18 L8.9 11.7 L11.1 11.7 Z"/><path d="M18 10 L11.7 11.1 L11.7 8.9 Z"/><path d="M2 10 L8.3 8.9 L8.3 11.1 Z"/><path d="M15.7 4.3 L11.3 8.9 L10.3 7.2 Z"/><path d="M4.3 15.7 L8.7 11.1 L9.7 12.8 Z"/><path d="M15.7 15.7 L10.3 12.8 L11.3 11.1 Z"/><path d="M4.3 4.3 L9.7 7.2 L8.7 8.9 Z"/></g></svg>
+    </button>
     <button class="iconbtn" id="helpBtn" title="Shortcuts — ?">
       <svg viewBox="0 0 20 20"><path d="M6.8 7 Q7 4.2 10 4.2 Q13 4.2 13.1 6.8 Q13.2 8.6 11.4 9.6 Q10 10.4 10 12.2 M10 15.2 L10 15.5"/></svg>
     </button>
@@ -438,7 +441,37 @@
   <div class="island shortcuts hidden" id="shortcutsCard">
     <div class="paneltabs">
       <button id="tabHelp" class="sel">Help</button>
+      <button id="tabClaude">Claude</button>
       <button id="tabSettings">Settings</button>
+    </div>
+    <div id="claudePane" class="hidden">
+      <h3>Design with Claude</h3>
+      <p class="claudestatus" id="claudeTabStatus">Not linked. Install the extension and keep
+        Claude Desktop open, then this page links automatically.</p>
+      <p>Claude can draw directly on this paper: describe the diagram you want in
+        Claude Desktop and watch it appear here as normal KoralPaper elements you can
+        edit, restyle, and undo (one ⌘Z per step Claude takes). Claude can also read
+        the page and look at a picture of it, so "make the third box green" or
+        "clean up this layout" work on whatever is on the paper, even things you
+        drew by hand.</p>
+      <table>
+        <tr><td class="sect">Set up once (about a minute)</td></tr>
+        <tr><td><b>1.</b> Install the free <a href="https://claude.ai/download" target="_blank" rel="noopener">Claude Desktop</a> app and sign in.</td></tr>
+        <tr><td><b>2.</b> Double-click <b>koralpaper.mcpb</b> (it ships in the <code>mcp</code> folder of this app, or grab it from the
+          <a href="https://github.com/karagos/koralpaper" target="_blank" rel="noopener">GitHub page</a>) and confirm the install inside Claude Desktop.</td></tr>
+        <tr><td><b>3.</b> Keep KoralPaper open in your browser. The ✳ appears in the top bar when the link is alive.</td></tr>
+        <tr><td class="sect">Then just talk to Claude</td></tr>
+        <tr><td>"Draw a customer onboarding flowchart with five steps on a 1920×1080 board."</td></tr>
+        <tr><td>"Read my KoralPaper page and tidy the layout, keep my colors."</td></tr>
+        <tr><td>"Turn these meeting notes into a decision tree on a LinkedIn carousel board."</td></tr>
+        <tr><td class="sect">No Claude Desktop?</td></tr>
+        <tr><td>Copy the design prompt below, paste it into any Claude (claude.ai works fine)
+          together with what you want, then save Claude's .json answer as a file and open it
+          here with ☰ → Open sketch.</td></tr>
+      </table>
+      <div class="setactions">
+        <button class="minipill" id="copyPromptBtn">Copy the design prompt</button>
+      </div>
     </div>
     <div id="helpPane">
     <h3>Shortcuts &amp; tips</h3>
