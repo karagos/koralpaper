@@ -268,7 +268,7 @@ function drawOverlay(){
   // empty-canvas guidance: only on a completely blank document, gone forever
   // the moment the first element lands
   if (state.pages.length === 1 && state.elements.length === 0 &&
-      !interaction && !editing && state.tool === 'select'){
+      !interaction && !editing && !presenting && state.tool === 'select'){
     const w = canvas.clientWidth, h = canvas.clientHeight;
     ctx.save();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -721,6 +721,14 @@ function pinchState(){
 }
 
 function onPointerDown(ev){
+  if (presenting){
+    // tap turns the page, drag draws the laser
+    try { canvas.setPointerCapture(ev.pointerId); } catch (e){}
+    presTapStart = { x: ev.clientX, y: ev.clientY, t: performance.now(), laser: false };
+    laserLive = { pts: [{ x: ev.clientX, y: ev.clientY, t: performance.now() }] };
+    laserStrokes.push(laserLive);
+    return;
+  }
   setRouteContext(state.elements); // thumbnails may have re-pointed the router
   hitScale = ev.pointerType === 'touch' ? 1.8 : 1;
   if (ev.pointerType === 'touch'){
@@ -951,6 +959,15 @@ function makeResize(sel, sb, handle, shiftKey){
 }
 
 function onPointerMove(ev){
+  if (presenting){
+    if (laserLive){
+      laserLive.pts.push({ x: ev.clientX, y: ev.clientY, t: performance.now() });
+      if (presTapStart && !presTapStart.laser &&
+          Math.hypot(ev.clientX - presTapStart.x, ev.clientY - presTapStart.y) > 6)
+        presTapStart.laser = true;
+    }
+    return;
+  }
   if (ev.pointerType === 'touch' && touchPts.has(ev.pointerId)){
     touchPts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     if (interaction && interaction.kind === 'pinch'){
@@ -1190,6 +1207,17 @@ function resizeTo(it, sx, sy, shiftKey){
 }
 
 function onPointerUp(ev){
+  if (presenting){
+    if (laserLive){
+      const wasTap = presTapStart && !presTapStart.laser &&
+        performance.now() - presTapStart.t < 400;
+      if (wasTap) laserStrokes.pop();   // a click is a page turn, not a dot
+      laserLive = null;
+      if (wasTap) presentGo(1);
+    }
+    presTapStart = null;
+    return;
+  }
   if (ev.pointerType === 'touch'){
     touchPts.delete(ev.pointerId);
     if (interaction && interaction.kind === 'pinch'){
@@ -1307,6 +1335,7 @@ function updateCursor(sx, sy){
 }
 
 function onDblClick(ev){
+  if (presenting) return;
   const [sx, sy] = toScene(ev.clientX, ev.clientY);
   const hit = topElementAt(sx, sy);
   if (hit && canHaveText(hit)){
@@ -1328,6 +1357,7 @@ function onDblClick(ev){
 /* ── wheel: pan / zoom ─────────────────────────────── */
 canvas.addEventListener('wheel', ev => {
   ev.preventDefault();
+  if (presenting) return;
   if (ev.ctrlKey || ev.metaKey){
     zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * 0.012));
   } else {
@@ -1723,6 +1753,7 @@ function openCtxMenu(ev){
   menu.style.top = clamp(ev.clientY, 8, window.innerHeight - mh - 8) + 'px';
 }
 canvas.addEventListener('contextmenu', ev => {
+  if (presenting){ ev.preventDefault(); return; }
   ev.preventDefault();
   if (editing) return;
   openCtxMenu(ev);
@@ -3243,6 +3274,7 @@ function runFileAction(act){
   if (act === 'pngAll') exportAllPages();
   if (act === 'copyPng') copyAsPNG();
   if (act === 'copySvg') copyAsSVG();
+  if (act === 'present') enterPresent();
   if (act === 'demo') loadDemo();
   if (act === 'paperReset'){
     state.bgColor = null;
@@ -4225,6 +4257,17 @@ const TOOL_KEYS = { v:'select', h:'hand', r:'rect', d:'diamond', o:'ellipse',
   c:'chip', s:'icon', a:'arrow', l:'line', p:'draw', t:'text' };
 
 window.addEventListener('keydown', ev => {
+  if (presenting){
+    const kk = ev.key;
+    if (kk === 'Escape'){ ev.preventDefault(); exitPresent(); return; }
+    if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(kk)){
+      ev.preventDefault(); presentGo(1); return; }
+    if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(kk)){
+      ev.preventDefault(); presentGo(-1); return; }
+    if (kk === 'Home'){ ev.preventDefault(); switchPage(0); presentFit(); syncPresentBar(); return; }
+    if (kk === 'End'){ ev.preventDefault(); switchPage(state.pages.length - 1); presentFit(); syncPresentBar(); return; }
+    return; // the show swallows every other key
+  }
   if (editing || ev.target === editorEl || ev.target.tagName === 'INPUT') {
     if (ev.key === ' ') return;
     return;
@@ -4240,6 +4283,7 @@ window.addEventListener('keydown', ev => {
   if (mod && ev.altKey && k === 'c'){ ev.preventDefault(); copyStyle(); return; }
   if (mod && ev.altKey && k === 'v'){ ev.preventDefault(); pasteStyle(); return; }
   if (mod && ev.altKey && k === 'n'){ ev.preventDefault(); newDocument(); return; }
+  if (mod && ev.shiftKey && k === 'p'){ ev.preventDefault(); enterPresent(); return; }
   if (mod && ev.shiftKey && k === 'c'){ ev.preventDefault(); copyAsPNG(); return; }
   if (mod && k === 'c'){ ev.preventDefault(); copySelection(); return; }
   if (mod && k === 'x'){ ev.preventDefault(); copySelection(); deleteSelection(); return; }
@@ -4385,6 +4429,126 @@ document.addEventListener('pointerout', ev => {
 document.addEventListener('pointerdown', hideTip, true);
 window.addEventListener('blur', hideTip);
 document.addEventListener('wheel', hideTip, { passive: true, capture: true });
+
+/* ── presentation mode + laser pen ──────────────────
+   ⇧⌘P (or ☰ → Present). All chrome hides, the page fits the screen,
+   ←/→/click turn pages, dragging draws a fading coral laser stroke,
+   Esc ends the show. The control bar wakes on mouse move. */
+let presenting = false;
+let presentSaved = null;          // camera + tool to restore on exit
+let presentFS = false;            // did we actually get fullscreen?
+let presentIdle = null;
+let laserEl = null, laserCtx2 = null, laserStrokes = [], laserRAF = null;
+let laserLive = null;             // stroke being drawn right now
+let presTapStart = null;          // to tell a click (next page) from a drag (laser)
+
+function presentFit(){
+  zoomToFit();
+}
+function syncPresentBar(){
+  $('presPage').textContent = `${state.pageIndex + 1} / ${state.pages.length}`;
+  $('presPrev').disabled = state.pageIndex === 0;
+  $('presNext').disabled = state.pageIndex === state.pages.length - 1;
+}
+function presentWake(){
+  $('presentBar').classList.add('awake');
+  clearTimeout(presentIdle);
+  presentIdle = setTimeout(() => $('presentBar').classList.remove('awake'), 2500);
+}
+function presentGo(delta){
+  const i = clamp(state.pageIndex + delta, 0, state.pages.length - 1);
+  if (i !== state.pageIndex){ switchPage(i); presentFit(); }
+  syncPresentBar();
+}
+function drawLaser(){
+  if (!presenting){ laserRAF = null; return; }
+  const now = performance.now();
+  const dpr = window.devicePixelRatio || 1;
+  laserCtx2.clearRect(0, 0, laserEl.width, laserEl.height);
+  laserCtx2.save();
+  laserCtx2.scale(dpr, dpr);
+  laserCtx2.lineCap = 'round'; laserCtx2.lineJoin = 'round';
+  for (const s of laserStrokes){
+    // each point fades out ~1s after it was drawn — the tail evaporates
+    s.pts = s === laserLive ? s.pts : s.pts.filter(p => now - p.t < 1000);
+    for (let i = 1; i < s.pts.length; i++){
+      const p = s.pts[i], q = s.pts[i - 1];
+      const age = now - p.t;
+      const a = s === laserLive && i === s.pts.length - 1 ? 1 : Math.max(0, 1 - age / 1000);
+      if (a <= 0) continue;
+      laserCtx2.strokeStyle = `rgba(228, 87, 46, ${0.9 * a})`;
+      laserCtx2.lineWidth = 3.5;
+      laserCtx2.shadowColor = `rgba(228, 87, 46, ${0.55 * a})`;
+      laserCtx2.shadowBlur = 7;
+      laserCtx2.beginPath();
+      laserCtx2.moveTo(q.x, q.y);
+      laserCtx2.lineTo(p.x, p.y);
+      laserCtx2.stroke();
+    }
+  }
+  laserCtx2.restore();
+  laserStrokes = laserStrokes.filter(s => s === laserLive || s.pts.length > 1);
+  laserRAF = requestAnimationFrame(drawLaser);
+}
+function sizeLaser(){
+  if (!laserEl) return;
+  const dpr = window.devicePixelRatio || 1;
+  laserEl.width = window.innerWidth * dpr;
+  laserEl.height = window.innerHeight * dpr;
+}
+function enterPresent(){
+  if (presenting) return;
+  if (editing) commitTextEdit();
+  closeMenus();
+  presenting = true;
+  presentSaved = { camera: { ...state.camera }, tool: state.tool };
+  setSelection(new Set());
+  setTool('select');
+  document.body.classList.add('presenting');
+  laserEl = document.createElement('canvas');
+  laserEl.id = 'laser';
+  document.body.appendChild(laserEl);
+  laserCtx2 = laserEl.getContext('2d');
+  sizeLaser();
+  laserStrokes = []; laserLive = null;
+  laserRAF = requestAnimationFrame(drawLaser);
+  presentFit(); syncPresentBar(); presentWake();
+  try {
+    const p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+    if (p && p.then) p.then(() => { presentFS = true; presentFit(); }, () => {});
+  } catch (e){}
+}
+function exitPresent(){
+  if (!presenting) return;
+  presenting = false;
+  document.body.classList.remove('presenting');
+  $('presentBar').classList.remove('awake');
+  clearTimeout(presentIdle);
+  if (laserRAF) cancelAnimationFrame(laserRAF);
+  laserRAF = null;
+  if (laserEl){ laserEl.remove(); laserEl = null; laserCtx2 = null; }
+  laserStrokes = []; laserLive = null;
+  if (presentSaved){
+    state.camera = presentSaved.camera;
+    setTool(presentSaved.tool);
+    presentSaved = null;
+  }
+  if (presentFS && document.fullscreenElement){
+    try { document.exitFullscreen(); } catch (e){}
+  }
+  presentFS = false;
+  syncZoomLabel(); requestRender();
+}
+document.addEventListener('fullscreenchange', () => {
+  // the user pressed Esc inside real fullscreen — that keypress never
+  // reaches our keydown handler, so leaving fullscreen ends the show
+  if (presentFS && !document.fullscreenElement && presenting) exitPresent();
+});
+window.addEventListener('resize', () => { if (presenting){ sizeLaser(); presentFit(); } });
+document.addEventListener('mousemove', () => { if (presenting) presentWake(); });
+$('presPrev').addEventListener('click', () => presentGo(-1));
+$('presNext').addEventListener('click', () => presentGo(1));
+$('presExit').addEventListener('click', exitPresent);
 
 /* ── first-run welcome ─────────────────────────────── */
 const WELCOME_KEY = 'koralpaper.welcomed';

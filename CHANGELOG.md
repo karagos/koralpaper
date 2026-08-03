@@ -1,5 +1,16 @@
 # KoralPaper — Changelog
 
+## v3.22.0 — 2026-08-03
+- **Presentation mode + laser pen.** ⇧⌘P or ☰ → Present: all chrome
+  disappears, the page fits the screen (fullscreen when the browser
+  allows it), and the document becomes a slide show — arrow keys, space,
+  or a click turn pages. Dragging the mouse draws a glowing coral laser
+  stroke whose tail evaporates after a second, so you can point at
+  things live without ever marking the document. A minimal page bar
+  (‹ 2/5 › ✕) wakes on mouse move and fades away; every editing key is
+  disabled during the show; Esc exits and restores camera, tool and
+  chrome exactly as they were.
+
 ## v3.21.0 — 2026-08-03
 - **Tooltips everywhere.** Every button in the app — tools, top-bar
   toggles, style panel controls, zoom bar, art styles, templates — now

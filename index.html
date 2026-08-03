@@ -51,6 +51,7 @@
       <button data-act="copyPng">Copy as PNG &nbsp;<span class="menukey">⇧⌘C</span></button>
       <button data-act="copySvg">Copy as SVG</button>
       <hr>
+      <button data-act="present">Present &nbsp;<span class="menukey">⇧⌘P</span></button>
       <button data-act="demo">Load the KoralPaper tour</button>
       <button data-act="paperReset">Reset paper color</button>
       <button data-act="clear" class="danger">Clear page…</button>
@@ -364,6 +365,15 @@
   </div>
 
   <div class="hint" id="hint"></div>
+
+  <!-- ── presentation controls ─────────────────────── -->
+  <div class="presentbar hidden" id="presentBar">
+    <button id="presPrev" title="Previous page — ←">‹</button>
+    <span id="presPage">1 / 1</span>
+    <button id="presNext" title="Next page — →">›</button>
+    <span class="presdiv"></span>
+    <button id="presExit" title="End the show — Esc">✕</button>
+  </div>
 
   <!-- ── first-run welcome ─────────────────────────── -->
   <div class="welcomewrap hidden" id="welcomeWrap">

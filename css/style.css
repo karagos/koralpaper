@@ -400,6 +400,29 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 
 .menukey{float:right; font-size:11px; color:var(--ink-soft); letter-spacing:.4px;}
 
+/* ── presentation mode ── */
+body.presenting .island,
+body.presenting .hint,
+body.presenting #tooltip{display:none !important;}
+body.presenting #board{cursor:crosshair;}
+.presentbar{
+  position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+  z-index:70; display:flex; align-items:center; gap:4px;
+  background:var(--ink); color:var(--paper);
+  padding:6px 10px; border-radius:99px;
+  box-shadow:0 6px 20px -6px rgba(0,0,0,.4);
+  opacity:0; transition:opacity .25s; pointer-events:none;
+}
+.presentbar.awake{opacity:1; pointer-events:auto;}
+.presentbar button{
+  background:none; border:none; color:var(--paper); cursor:pointer;
+  font-size:17px; line-height:1; padding:4px 9px; border-radius:99px;
+}
+.presentbar button:hover{background:color-mix(in srgb, var(--paper) 18%, transparent);}
+.presentbar #presPage{font-size:12.5px; letter-spacing:.4px; padding:0 4px; user-select:none;}
+.presentbar .presdiv{width:1px; height:16px; background:color-mix(in srgb, var(--paper) 25%, transparent); margin:0 4px;}
+#laser{position:fixed; inset:0; z-index:60; pointer-events:none;}
+
 #tooltip{
   position:fixed; z-index:99; pointer-events:none;
   background:var(--ink); color:var(--paper);

@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.21.0)
+# KoralPaper — *Draw your thinking* (v3.22.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -113,6 +113,12 @@ your first element lands. Press **?** inside the app for the full shortcuts card
   fully editable pages
 - **Multi-page documents:** page strip at the bottom — click to switch, + to
   add, right-click a tab to rename/duplicate/move/delete. Undo spans pages
+- **Presentation mode + laser pen:** ⇧⌘P (or ☰ → Present) hides every
+  control, fits the page (or artboard) to the screen and goes fullscreen.
+  Arrow keys, space or a click turn the pages; **dragging draws a glowing
+  coral laser stroke whose tail evaporates in a second** — point at things
+  live without marking the document. A minimal page bar wakes on mouse
+  move; Esc ends the show and puts everything back exactly as it was
 - **PDF export:** ☰ or ⬇ → Export PDF. Multi-page documents open a page
   picker; with an artboard every page exports at the exact preset size with
   the grid included. Zero dependencies — works fully offline
