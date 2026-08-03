@@ -2722,14 +2722,23 @@ for (const [k, id] of TYPO_KEYS){
     syncSettingsUI(); saveSettings();
   });
 }
-$('setWidthsReset').addEventListener('click', () => {
+$('setResetWidths').addEventListener('click', () => {
   Object.assign(widths, DEFAULT_WIDTHS);
-  Object.assign(sizes, DEFAULT_SIZES);
-  Object.assign(typo, DEFAULT_TYPO);
   defaults.sw = widths.medium;
-  defaults.size = sizes.m;
-  defaults.lh = typo.lh; defaults.pgap = typo.pgap; defaults.lspace = typo.lspace;
   syncSettingsUI(); applyWidthPresets(); saveSettings();
+  showHint('Line-width presets reset (1.7 / 3.3 / 5)');
+});
+$('setResetSizes').addEventListener('click', () => {
+  Object.assign(sizes, DEFAULT_SIZES);
+  defaults.size = sizes.m;
+  syncSettingsUI(); applyWidthPresets(); saveSettings();
+  showHint('Text-size presets reset (16 / 21 / 29 / 42)');
+});
+$('setResetTypo').addEventListener('click', () => {
+  Object.assign(typo, DEFAULT_TYPO);
+  defaults.lh = typo.lh; defaults.pgap = typo.pgap; defaults.lspace = typo.lspace;
+  syncSettingsUI(); saveSettings();
+  showHint('Text-spacing defaults reset (×1.3 / 0px / 0px)');
 });
 function zoomFocusPoint(){
   // zoom toward the selection's center when something is selected

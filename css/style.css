@@ -395,7 +395,8 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 .setrow label{width:58px; font-size:12.5px; font-weight:600;}
 .setrow input[type=range]{flex:1;}
 .setrow b{width:30px; text-align:right; font-size:12.5px; font-variant-numeric:tabular-nums;}
-.setactions{margin-top:12px;}
+.setactions{margin-top:8px;}
+.setreset{padding:5px 11px; font-size:11px;}
 .shortcuts td.sect{
   font-family:var(--serif); font-style:italic; font-weight:600; font-size:13px;
   color:var(--ink); padding-top:9px;

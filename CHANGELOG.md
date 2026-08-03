@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.11.1 — 2026-08-02
+- **Per-category resets in Settings**: the single "Reset to defaults"
+  button is replaced by three — "Reset line widths", "Reset text sizes",
+  and "Reset text spacing" — each restoring only its own section, so
+  tuning one category never wipes the others.
+
 ## v3.11.0 — 2026-08-02
 - **Spacing defaults live in Settings**: three new sliders (Lines /
   Paragraph / Letters) define your default text spacing — every new text
