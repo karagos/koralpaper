@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.24.0)
+# KoralPaper — *Draw your thinking* (v3.25.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -140,6 +140,11 @@ your first element lands. Press **?** inside the app for the full shortcuts card
   packs them into a single .zip — the whole LinkedIn/Instagram carousel in
   one click. The ZIP is written by hand in ~50 lines; still zero
   dependencies
+- **Share as a web page:** ☰ or ⬇ → "Share as web page (.html)" writes
+  one self-contained HTML file — every page as an inline vector SVG plus
+  a tiny dark-themed viewer with page navigation and keyboard arrows.
+  Send it to anyone: it opens in any browser with no app, no server, no
+  account, works offline, and images ride along inside the file
 - **Copy as PNG / SVG:** ⇧⌘C (or the menus) puts the selection — or the
   whole page when nothing is selected — on the clipboard as a real PNG
   image, ready to paste into Slack, Notion, Keynote or a chat. "Copy as

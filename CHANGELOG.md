@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.25.0 — 2026-08-03
+- **Share as a web page.** ☰ / ⬇ → "Share as web page (.html)": the
+  whole document becomes ONE self-contained HTML file — every page an
+  inline vector SVG (images embedded as data URLs, Google fonts arrive
+  via each SVG's own import when online, system fallbacks offline) plus
+  a tiny built-in dark viewer: page navigation buttons, keyboard arrows,
+  page names, and a "Made with KoralPaper" credit linking to
+  wearecaio.com and the repository. No app, no server, no account
+  needed to view it — double-click and present.
+
 ## v3.24.0 — 2026-08-03
 - **Tab-to-create.** Select a shape, press Tab: a connected twin appears
   to the right (⇧Tab: below) — same type, same style, glued arrow with

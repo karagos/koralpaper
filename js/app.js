@@ -3286,6 +3286,7 @@ function runFileAction(act){
   if (act === 'pngAll') exportAllPages();
   if (act === 'copyPng') copyAsPNG();
   if (act === 'copySvg') copyAsSVG();
+  if (act === 'shareHtml') shareHTML();
   if (act === 'present') enterPresent();
   if (act === 'replay') startReplay(false);
   if (act === 'replayVid') startReplay(true);
@@ -4449,6 +4450,86 @@ document.addEventListener('pointerout', ev => {
 document.addEventListener('pointerdown', hideTip, true);
 window.addEventListener('blur', hideTip);
 document.addEventListener('wheel', hideTip, { passive: true, capture: true });
+
+/* ── share as a self-contained web page ─────────────
+   One .html file, zero dependencies: every page becomes an inline SVG
+   (images ride along as data URLs, Google fonts arrive via each SVG's
+   own @import when online, system fallbacks offline) plus a tiny
+   built-in viewer with page navigation. Send it to anyone — it opens
+   in any browser with no app, no server, no account. */
+function shareHTML(){
+  syncPageRef();
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const docname = (localStorage.getItem('asterisk.docname') || 'koralpaper-sketch');
+  const pages = [];
+  for (const p of state.pages){
+    const svg = renderSceneSVG(p.elements, {
+      pal: pal(), transparent: false, bg: effectiveBg(),
+      board: state.board, grid: state.board ? state.grid : false,
+      gridColor: effectiveGridColor(), gridSize: gsize(),
+    });
+    if (svg) pages.push({ name: p.name || 'Page', svg });
+  }
+  if (!pages.length){ alert('Nothing to share yet — draw something first.'); return; }
+  const sections = pages.map((p, i) =>
+    `<section class="pg${i === 0 ? ' cur' : ''}" data-name="${esc(p.name)}">${p.svg}</section>`).join('\n');
+  const html = `<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(docname)} · KoralPaper</title>
+<style>
+  :root{color-scheme:dark}
+  *{margin:0;box-sizing:border-box}
+  body{min-height:100vh;background:#24221E;color:#ECE7DA;
+    font:14px/1.5 -apple-system,'Segoe UI',Roboto,sans-serif;
+    display:flex;flex-direction:column;align-items:center}
+  header{width:100%;display:flex;justify-content:space-between;align-items:baseline;
+    padding:16px 22px 6px;opacity:.85}
+  header .t{font-size:15px;font-weight:600}
+  header .n{font-size:12.5px;opacity:.75}
+  main{flex:1;width:100%;display:flex;align-items:center;justify-content:center;padding:10px 20px}
+  .pg{display:none}
+  .pg.cur{display:block}
+  .pg svg{max-width:min(1400px,94vw);max-height:80vh;width:auto;height:auto;
+    border-radius:10px;box-shadow:0 24px 60px -20px rgba(0,0,0,.7)}
+  nav{display:flex;align-items:center;gap:8px;padding:10px 0 6px}
+  nav button{background:#3A362F;border:none;color:#ECE7DA;font-size:17px;line-height:1;
+    padding:7px 14px;border-radius:99px;cursor:pointer}
+  nav button:disabled{opacity:.3;cursor:default}
+  nav .c{font-size:12.5px;letter-spacing:.4px;min-width:52px;text-align:center;opacity:.85}
+  footer{padding:8px 0 18px;font-size:12px;opacity:.6;text-align:center}
+  footer a{color:#E4906F;text-decoration:none}
+</style>
+<header><span class="t">${esc(docname)}</span><span class="n" id="pn"></span></header>
+<main>
+${sections}
+</main>
+<nav id="nav"><button id="pv">‹</button><span class="c" id="ct"></span><button id="nx">›</button></nav>
+<footer>Made with <b>KoralPaper</b> · a creation by Stefanos Karagos, CAIO Group ·
+  <a href="https://wearecaio.com">wearecaio.com</a> ·
+  <a href="https://github.com/karagos/koralpaper">get the app</a></footer>
+<script>
+var pgs=[].slice.call(document.querySelectorAll('.pg')),i=0;
+function show(n){i=Math.max(0,Math.min(n,pgs.length-1));
+  pgs.forEach(function(p,j){p.classList.toggle('cur',j===i)});
+  document.getElementById('ct').textContent=(i+1)+' / '+pgs.length;
+  document.getElementById('pn').textContent=pgs[i].dataset.name;
+  document.getElementById('pv').disabled=i===0;
+  document.getElementById('nx').disabled=i===pgs.length-1;}
+document.getElementById('pv').onclick=function(){show(i-1)};
+document.getElementById('nx').onclick=function(){show(i+1)};
+addEventListener('keydown',function(e){
+  if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown')show(i+1);
+  if(e.key==='ArrowLeft'||e.key==='PageUp')show(i-1);
+  if(e.key==='Home')show(0); if(e.key==='End')show(pgs.length-1);});
+if(pgs.length<2)document.getElementById('nav').style.display='none';
+show(0);
+</script>`;
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const safe = docname.replace(/[\/\\:*?"<>|]/g, '-');
+  download(`${safe}.html`, URL.createObjectURL(blob));
+  showHint(`Shared ${pages.length} page${pages.length > 1 ? 's' : ''} as one self-contained .html — send it to anyone`);
+}
 
 /* ── Tab-to-create flow diagramming ─────────────────
    With one shape selected, Tab drops a connected twin to the right
