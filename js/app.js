@@ -3220,6 +3220,9 @@ function runFileAction(act){
   if (act === 'svg') exportSVG(false);
   if (act === 'svgT') exportSVG(true);
   if (act === 'pdf') exportPDFFlow();
+  if (act === 'pngAll') exportAllPages();
+  if (act === 'copyPng') copyAsPNG();
+  if (act === 'copySvg') copyAsSVG();
   if (act === 'demo') loadDemo();
   if (act === 'paperReset'){
     state.bgColor = null;
@@ -4047,6 +4050,143 @@ $('pdfExportBtn').addEventListener('click', () => {
 });
 $('pdfCancelBtn').addEventListener('click', () => $('pdfDialog').classList.add('hidden'));
 
+/* ── carousel export: every page as a numbered PNG in one .zip ──
+   Zero dependencies: the ZIP is written by hand (store method, no
+   compression — PNGs are already compressed). */
+function crc32(data){
+  if (!crc32.table){
+    crc32.table = new Int32Array(256);
+    for (let n = 0; n < 256; n++){
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      crc32.table[n] = c;
+    }
+  }
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) c = crc32.table[(c ^ data[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function buildZip(files){ // files: [{name, data: Uint8Array}]
+  const enc = new TextEncoder();
+  const chunks = [], central = [];
+  let offset = 0;
+  const d = new Date();
+  const dosTime = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const dosDate = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  const u16 = v => [v & 255, (v >> 8) & 255];
+  const u32 = v => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255];
+  for (const f of files){
+    const name = enc.encode(f.name);
+    const crc = crc32(f.data);
+    const head = new Uint8Array([
+      0x50, 0x4B, 0x03, 0x04, ...u16(20), ...u16(0x0800), ...u16(0),
+      ...u16(dosTime), ...u16(dosDate), ...u32(crc),
+      ...u32(f.data.length), ...u32(f.data.length),
+      ...u16(name.length), ...u16(0)]);
+    chunks.push(head, name, f.data);
+    central.push(new Uint8Array([
+      0x50, 0x4B, 0x01, 0x02, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0),
+      ...u16(dosTime), ...u16(dosDate), ...u32(crc),
+      ...u32(f.data.length), ...u32(f.data.length),
+      ...u16(name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(0), ...u32(offset)]), name);
+    offset += head.length + name.length + f.data.length;
+  }
+  let cdSize = 0;
+  for (const c of central) cdSize += c.length;
+  const eocd = new Uint8Array([
+    0x50, 0x4B, 0x05, 0x06, ...u16(0), ...u16(0),
+    ...u16(files.length), ...u16(files.length),
+    ...u32(cdSize), ...u32(offset), ...u16(0)]);
+  return new Blob([...chunks, ...central, eocd], { type: 'application/zip' });
+}
+function renderPagePNGBlob(elements, transparent){
+  return new Promise(resolve => {
+    const off = document.createElement('canvas');
+    const octx = off.getContext('2d');
+    const board = state.board;
+    if (board){
+      off.width = board.w; off.height = board.h;
+      renderScene(octx, elements, {
+        width: board.w, height: board.h,
+        camera: { x: -board.x, y: -board.y, z: 1 },
+        pal: pal(), transparent, bg: effectiveBg(),
+        grid: transparent ? false : state.grid, gridSize: gsize(),
+        gridColor: effectiveGridColor(),
+      });
+    } else {
+      const b = sceneBounds(elements);
+      if (!b){ resolve(null); return; }
+      const pad = 72, maxDim = 8000;
+      const scale = Math.min(2, maxDim / (b.w + pad*2), maxDim / (b.h + pad*2));
+      off.width = Math.ceil((b.w + pad*2) * scale);
+      off.height = Math.ceil((b.h + pad*2) * scale);
+      renderScene(octx, elements, {
+        width: off.width, height: off.height,
+        camera: { x: (pad - b.x) * scale, y: (pad - b.y) * scale, z: scale },
+        pal: pal(), grid: false, transparent, bg: effectiveBg(),
+      });
+    }
+    off.toBlob(resolve, 'image/png');
+  });
+}
+async function exportAllPages(){
+  syncPageRef();
+  const docname = (localStorage.getItem('asterisk.docname') || 'koralpaper')
+    .replace(/[\/\\:*?"<>|]/g, '-');
+  const files = [];
+  const pad = state.pages.length > 9 ? 2 : 1;
+  for (let i = 0; i < state.pages.length; i++){
+    const blob = await renderPagePNGBlob(state.pages[i].elements, false);
+    if (!blob) continue; // empty page — skipped
+    files.push({
+      name: `${String(i + 1).padStart(pad, '0')}-${(state.pages[i].name || 'page').replace(/[\/\\:*?"<>|]/g, '-')}.png`,
+      data: new Uint8Array(await blob.arrayBuffer()),
+    });
+  }
+  if (!files.length){ alert('Nothing to export yet — draw something first.'); return; }
+  download(`${docname}-pages.zip`, URL.createObjectURL(buildZip(files)));
+  showHint(`Exported ${files.length} page${files.length > 1 ? 's' : ''} as PNGs${state.board ? ` at ${state.board.w}×${state.board.h}` : ''}`);
+}
+
+/* ── copy to clipboard: selection (or page) as PNG / SVG ── */
+async function copyAsPNG(){
+  const els = state.selection.size ? selected() : state.elements;
+  if (!els.length){ showHint('Nothing to copy — the page is empty'); return; }
+  try {
+    const b = sceneBounds(els);
+    const pad = 24, maxDim = 8000;
+    const scale = Math.min(2, maxDim / (b.w + pad*2), maxDim / (b.h + pad*2));
+    const off = document.createElement('canvas');
+    off.width = Math.ceil((b.w + pad*2) * scale);
+    off.height = Math.ceil((b.h + pad*2) * scale);
+    renderScene(off.getContext('2d'), els, {
+      width: off.width, height: off.height,
+      camera: { x: (pad - b.x) * scale, y: (pad - b.y) * scale, z: scale },
+      pal: pal(), grid: false, transparent: false, bg: effectiveBg(),
+    });
+    const blob = await new Promise(res => off.toBlob(res, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    showHint(state.selection.size ? 'Selection copied as PNG — paste it anywhere' : 'Page copied as PNG — paste it anywhere');
+  } catch (e){
+    showHint('Clipboard image copy is not available in this browser');
+  }
+}
+async function copyAsSVG(){
+  const els = state.selection.size ? selected() : state.elements;
+  if (!els.length){ showHint('Nothing to copy — the page is empty'); return; }
+  const svg = renderSceneSVG(els, {
+    pal: pal(), transparent: true, bg: effectiveBg(), board: null, grid: false,
+  });
+  if (!svg){ showHint('Nothing to copy — the page is empty'); return; }
+  try {
+    await navigator.clipboard.writeText(svg);
+    showHint('Copied as SVG markup — paste into Figma, a code editor, or a .svg file');
+  } catch (e){
+    showHint('Clipboard copy is not available in this browser');
+  }
+}
+
 function exportSVG(transparent){
   const board = state.board;
   const svg = renderSceneSVG(state.elements, {
@@ -4080,6 +4220,7 @@ window.addEventListener('keydown', ev => {
   if (mod && ev.altKey && k === 'c'){ ev.preventDefault(); copyStyle(); return; }
   if (mod && ev.altKey && k === 'v'){ ev.preventDefault(); pasteStyle(); return; }
   if (mod && ev.altKey && k === 'n'){ ev.preventDefault(); newDocument(); return; }
+  if (mod && ev.shiftKey && k === 'c'){ ev.preventDefault(); copyAsPNG(); return; }
   if (mod && k === 'c'){ ev.preventDefault(); copySelection(); return; }
   if (mod && k === 'x'){ ev.preventDefault(); copySelection(); deleteSelection(); return; }
   if (mod && k === 'v'){ return; } // handled by the 'paste' event (supports images)

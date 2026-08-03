@@ -1,5 +1,16 @@
 # KoralPaper — Changelog
 
+## v3.19.0 — 2026-08-03
+- **Carousel export.** ☰ / ⬇ → "Export all pages as PNGs (.zip)": every
+  page renders to a numbered PNG (named `01-PageName.png`…, exact artboard
+  pixels when a canvas size is set) and lands in one .zip. The ZIP writer
+  is hand-rolled (store method, ~50 lines) — dependencies stay at zero,
+  and the archive passes `unzip -t` with correct CRCs.
+- **Copy as PNG (⇧⌘C) and Copy as SVG.** The selection — or the whole
+  page when nothing is selected — goes to the system clipboard as a real
+  PNG image (paste into Slack, Notion, Keynote…) or as SVG markup (paste
+  into Figma or a code editor). Both also live in the ☰ and ⬇ menus.
+
 ## v3.18.0 — 2026-08-03
 - **Touch & iPad support.** Pinch to zoom around the fingers' centroid,
   which gives two-finger panning for free. A second finger landing

@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.18.0)
+# KoralPaper — *Draw your thinking* (v3.19.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -115,6 +115,16 @@ element lands. Press **?** inside the app for the full shortcuts card.
 - **PDF export:** ☰ or ⬇ → Export PDF. Multi-page documents open a page
   picker; with an artboard every page exports at the exact preset size with
   the grid included. Zero dependencies — works fully offline
+- **Carousel export:** ☰ or ⬇ → "Export all pages as PNGs (.zip)" renders
+  every page as a numbered PNG (exact artboard pixels when one is set) and
+  packs them into a single .zip — the whole LinkedIn/Instagram carousel in
+  one click. The ZIP is written by hand in ~50 lines; still zero
+  dependencies
+- **Copy as PNG / SVG:** ⇧⌘C (or the menus) puts the selection — or the
+  whole page when nothing is selected — on the clipboard as a real PNG
+  image, ready to paste into Slack, Notion, Keynote or a chat. "Copy as
+  SVG" copies vector markup that pastes straight into Figma or a code
+  editor
 - **Your gallery:** a toolbar library for reusable SVG logos (pure vector,
   crisp at any zoom, vector in exports) and transparent PNG marks — click
   to place, right-click to remove, persisted in the browser

@@ -398,6 +398,8 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 .tplrow .tpldel{padding:7px 10px;}
 .tpldialog .actions{flex-wrap:wrap; gap:6px;}
 
+.menukey{float:right; font-size:11px; color:var(--ink-soft); letter-spacing:.4px;}
+
 .menuver{
   font-size:11px; color:var(--ink-soft); text-align:center;
   padding:7px 0 3px; border-top:1.5px solid var(--line-soft); margin-top:4px;
