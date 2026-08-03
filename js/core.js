@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.14.1';
+const APP_VERSION = '3.15.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -1636,7 +1636,7 @@ function artPrims(el, entry){
       }
       return out;
     };
-    L = blur(blur(L));
+    L = d === 3 ? blur(L) : blur(blur(L)); // Fine keeps eyes & nostrils crisp
     const at = (x, y) => L[clamp(y, 0, H2 - 1) * W2 + clamp(x, 0, W2 - 1)];
     const mag = new Float32Array(N);
     const horiz = new Uint8Array(N); // 1 → edge runs horizontally (walk in x)
@@ -1653,7 +1653,7 @@ function artPrims(el, entry){
     for (let i = 0; i < N; i += 3) if (mag[i] > 0.02) sample.push(mag[i]);
     sample.sort((a, b2) => a - b2);
     const q = p => sample.length ? sample[Math.floor(p * (sample.length - 1))] : 0.1;
-    const hiT = q([0.93, 0.9, 0.82][d-1]);
+    const hiT = q([0.93, 0.88, 0.80][d-1]);
     const loT = Math.max(q(0.55), hiT * 0.32);
     // anchors: maxima across the gradient direction
     const anchors = [];
@@ -1693,7 +1693,7 @@ function artPrims(el, entry){
       return pts;
     };
     const chains = [];
-    const minLen = Math.max(6, Math.min(W2, H2) * [0.09, 0.09, 0.065][d-1]);
+    const minLen = Math.max(5, Math.min(W2, H2) * [0.09, 0.07, 0.045][d-1]);
     for (const a of anchors){
       if (visited[a]) continue;
       const ax = a % W2, ay = (a / W2) | 0;
@@ -1701,15 +1701,46 @@ function artPrims(el, entry){
       if (back.length) visited[a] = 0; // let the forward walk restart at the seed
       const fwd = walk(ax, ay, 1);
       const chain = back.reverse().concat(fwd.length ? fwd.slice(back.length ? 1 : 0) : []);
-      if (chain.length >= minLen) chains.push(chain);
+      if (chain.length >= minLen){
+        let sc = 0;
+        for (const [qx, qy] of chain) sc += mag[qy * W2 + qx];
+        chains.push({ pts: chain, sc });
+      }
     }
-    chains.sort((A, B) => B.length - A.length);
-    const kept = chains.slice(0, [8, 14, 30][d-1]);
+    /* coverage-aware greedy pick: strongest chains first, but chains that
+       revisit already-covered regions are discounted — so the budget spreads
+       across the whole face instead of clustering in the hair */
+    const want = [12, 26, 50][d-1];
+    const cellsN = 12;
+    const covered = new Uint8Array(cellsN * cellsN);
+    const cellOf = (x, y) =>
+      Math.min(cellsN - 1, (y / H2 * cellsN) | 0) * cellsN +
+      Math.min(cellsN - 1, (x / W2 * cellsN) | 0);
+    const pool = chains.slice();
+    const kept = [];
+    while (kept.length < want && pool.length){
+      let bi = 0, bs = -Infinity;
+      for (let ci = 0; ci < pool.length; ci++){
+        const c = pool[ci];
+        let cov = 0, nS = 0;
+        for (let qi = 0; qi < c.pts.length; qi += 5){
+          nS++;
+          if (covered[cellOf(c.pts[qi][0], c.pts[qi][1])]) cov++;
+        }
+        const eff = c.sc * (1 - 0.65 * (nS ? cov / nS : 0));
+        if (eff > bs){ bs = eff; bi = ci; }
+      }
+      const pick = pool.splice(bi, 1)[0];
+      kept.push(pick.pts);
+      for (let qi = 0; qi < pick.pts.length; qi += 3)
+        covered[cellOf(pick.pts[qi][0], pick.pts[qi][1])] = 1;
+    }
+    const step = d === 3 ? 2 : 3;
     const paths = kept.map(ch => {
       const pts = [];
-      for (let i = 0; i < ch.length; i += 3) pts.push([ch[i][0], ch[i][1]]);
-      if ((ch.length - 1) % 3) pts.push([ch[ch.length-1][0], ch[ch.length-1][1]]);
-      for (let pass = 0; pass < 3; pass++)
+      for (let i = 0; i < ch.length; i += step) pts.push([ch[i][0], ch[i][1]]);
+      if ((ch.length - 1) % step) pts.push([ch[ch.length-1][0], ch[ch.length-1][1]]);
+      for (let pass = 0; pass < (d === 3 ? 2 : 3); pass++)
         for (let i = 1; i < pts.length - 1; i++)
           pts[i] = [(pts[i-1][0] + pts[i][0] * 2 + pts[i+1][0]) / 4,
                     (pts[i-1][1] + pts[i][1] * 2 + pts[i+1][1]) / 4];
@@ -1738,26 +1769,42 @@ function artPrims(el, entry){
         const m = Math.hypot(dx, dy) || 1;
         return [dx / m * scale, dy / m * scale];
       };
-      const line = paths.shift().slice();
+      /* grow the line from BOTH ends — each step attaches the globally
+         nearest remaining chain to whichever end is closer, roughly halving
+         total pen travel vs one-ended growth; connectors stay tight */
+      let line = paths.shift().slice();
       while (paths.length){
-        const end = line[line.length - 1];
-        let bi = 0, brev = false, bd = Infinity;
+        const head = line[0], tail = line[line.length - 1];
+        let bi = 0, brev = false, bd = Infinity, atHead = false;
         for (let i2 = 0; i2 < paths.length; i2++){
           const p = paths[i2];
-          const d0 = dist(end[0], end[1], p[0][0], p[0][1]);
-          const d1 = dist(end[0], end[1], p[p.length-1][0], p[p.length-1][1]);
-          if (d0 < bd){ bd = d0; bi = i2; brev = false; }
-          if (d1 < bd){ bd = d1; bi = i2; brev = true; }
+          const a0 = p[0], a1 = p[p.length - 1];
+          const dt0 = dist(tail[0], tail[1], a0[0], a0[1]);
+          const dt1 = dist(tail[0], tail[1], a1[0], a1[1]);
+          const dh0 = dist(head[0], head[1], a0[0], a0[1]);
+          const dh1 = dist(head[0], head[1], a1[0], a1[1]);
+          if (dt0 < bd){ bd = dt0; bi = i2; brev = false; atHead = false; }
+          if (dt1 < bd){ bd = dt1; bi = i2; brev = true;  atHead = false; }
+          if (dh0 < bd){ bd = dh0; bi = i2; brev = true;  atHead = true; }
+          if (dh1 < bd){ bd = dh1; bi = i2; brev = false; atHead = true; }
         }
         const nxt = paths.splice(bi, 1)[0];
         if (brev) nxt.reverse();
-        const prev = line[line.length - 2] || end;
-        const start = nxt[0], second = nxt[1] || start;
-        const sc = clamp(bd * 0.9, 10, 70);
-        line.push(
-          ...hermite(end, tangent(prev, end, sc), start, tangent(start, second, sc),
-            clamp(Math.round(bd / 5) + 3, 4, 16)),
-          ...nxt);
+        const sc = clamp(bd * 0.45, 4, 26);
+        const nPts = clamp(Math.round(bd / 6) + 3, 4, 12);
+        if (atHead){
+          const end2 = nxt[nxt.length - 1], prev2 = nxt[nxt.length - 2] || end2;
+          const second2 = line[1] || head;
+          line = nxt.concat(
+            hermite(end2, tangent(prev2, end2, sc), head, tangent(head, second2, sc), nPts),
+            line);
+        } else {
+          const prev = line[line.length - 2] || tail;
+          const start = nxt[0], second = nxt[1] || start;
+          line.push(
+            ...hermite(tail, tangent(prev, tail, sc), start, tangent(start, second, sc), nPts),
+            ...nxt);
+        }
       }
       prims.paths.push(line);
     }

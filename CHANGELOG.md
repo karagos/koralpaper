@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.15.0 — 2026-08-03
+- **"One line" rebuilt for faces.** Four compounding fixes make the single
+  continuous line actually read as a portrait:
+  - Contour chains are now ranked by **total edge strength**, not length —
+    short-but-strong features (eyes, glasses, lips, nostrils) finally beat
+    long hair edges for a place in the drawing.
+  - **Coverage-aware selection** spreads the line budget across the whole
+    face instead of clustering where edges happen to be longest.
+  - The line now grows from **both ends** with much tighter connector
+    curves, roughly halving the wandering pen travel between contours.
+  - Fine detail level keeps its detail: lighter blur, denser sampling,
+    gentler smoothing, more and shorter chains (12 / 26 / 50).
+
 ## v3.14.0 — 2026-08-03
 - **Your gallery** — a new toolbar button holds your reusable assets:
   upload **SVG logos** (kept as pure vector — crisp at any size and
