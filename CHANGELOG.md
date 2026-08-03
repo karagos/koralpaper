@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.24.0 — 2026-08-03
+- **Tab-to-create.** Select a shape, press Tab: a connected twin appears
+  to the right (⇧Tab: below) — same type, same style, glued arrow with
+  your default arrowheads, text editor already open. Tab also works
+  while typing inside a shape, so "type, Tab, type, Tab" builds a whole
+  flowchart without touching the mouse. New shapes dodge whatever is
+  already on the canvas.
+- **Tidy.** The new Arrange button (or right-click → "Tidy the flow")
+  lays out every shape connected by glued arrows as a clean
+  left-to-right layered graph: columns by flow depth, rows centered,
+  arrows re-aimed east-to-west, elbow routes recalculated. Standalone
+  elements never move. Works on the selection (2+) or the whole page.
+
 ## v3.23.0 — 2026-08-03
 - **Draw-on replay.** ☰ → "Replay the drawing": the current page redraws
   itself as if a hand were sketching it — freehand strokes reveal point

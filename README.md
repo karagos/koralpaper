@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.23.0)
+# KoralPaper — *Draw your thinking* (v3.24.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -68,6 +68,12 @@ your first element lands. Press **?** inside the app for the full shortcuts card
   Playwrite NZ Guides, Unkempt, Kaushan Script), and Pixel & dot
   (Bitcount ×3, Tiny5, Doto) — need internet once; system fallbacks
   offline
+- **Tab-to-create flows:** select a shape and press **Tab** — a connected
+  twin appears to the right (⇧Tab: below), same style, glued arrow, text
+  editor already open. It works mid-typing too, so "type, Tab, type, Tab"
+  builds a flowchart in seconds. **Tidy** (the Arrange button or
+  right-click → "Tidy the flow") then arranges everything connected by
+  glued arrows into neat left-to-right columns
 - **Glued arrows:** draw an arrow from one shape to another — it binds to both
   borders and follows when shapes move, resize, or rotate. Aim for the four
   side dots (N/E/S/W) to pin the arrow to a specific side; drop in the middle

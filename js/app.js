@@ -1475,6 +1475,14 @@ editorEl.addEventListener('keydown', ev => {
   if (mod && ev.shiftKey && k === 'h'){ ev.preventDefault(); applyTextFormat('hl', defaults.hlColor); return; }
   if (ev.key === 'Escape'){ ev.preventDefault(); commitTextEdit(); }
   if (ev.key === 'Enter' && mod){ ev.preventDefault(); commitTextEdit(); }
+  if (ev.key === 'Tab' && editing && editing.el.type !== 'text'){
+    // type, Tab, type, Tab — the flow keeps flowing
+    ev.preventDefault();
+    const src = editing.el;
+    commitTextEdit();
+    setSelection(new Set([src.id]));
+    tabCreate(ev.shiftKey);
+  }
 });
 editorEl.addEventListener('blur', () => commitTextEdit());
 
@@ -1700,6 +1708,7 @@ $('distH').addEventListener('click', () => distributeSel('h'));
 $('distV').addEventListener('click', () => distributeSel('v'));
 $('matchW').addEventListener('click', () => matchSize('w'));
 $('matchH').addEventListener('click', () => matchSize('h'));
+$('tidyBtn').addEventListener('click', tidyLayout);
 
 /* ── right-click context menu ──────────────────────── */
 function openCtxMenu(ev){
@@ -1747,6 +1756,7 @@ function openCtxMenu(ev){
     add('Paste', paste, !clipboard);
     add('Select all', () => { setSelection(new Set(state.elements.map(e => e.id))); setTool('select'); });
     add('Zoom to fit', zoomToFit);
+    add('Tidy the flow', tidyLayout);
   }
   closeMenus();
   menu.classList.remove('hidden');
@@ -4302,6 +4312,11 @@ window.addEventListener('keydown', ev => {
   if (mod && k === 'o'){ ev.preventDefault(); fileInput.click(); return; }
   if (mod) return;
 
+  if (ev.key === 'Tab'){
+    ev.preventDefault();               // the canvas never gives up focus
+    tabCreate(ev.shiftKey);
+    return;
+  }
   if (ev.key === 'Delete' || ev.key === 'Backspace'){ ev.preventDefault(); deleteSelection(); return; }
   if (ev.key === 'Escape'){
     if (cropTarget){ endCropMode(); showHint('Crop cancelled'); return; }
@@ -4434,6 +4449,129 @@ document.addEventListener('pointerout', ev => {
 document.addEventListener('pointerdown', hideTip, true);
 window.addEventListener('blur', hideTip);
 document.addEventListener('wheel', hideTip, { passive: true, capture: true });
+
+/* ── Tab-to-create flow diagramming ─────────────────
+   With one shape selected, Tab drops a connected twin to the right
+   (⇧Tab: below) — same type, same style, glued arrow, editor open and
+   ready to type. Type, Tab, type, Tab: a flowchart in seconds. */
+function tabOverlaps(a, b){
+  const M = 24;
+  return a.x < b.x + b.w + M && a.x + a.w + M > b.x &&
+         a.y < b.y + b.h + M && a.y + a.h + M > b.y;
+}
+function tabCreate(below){
+  const sel = selected();
+  if (sel.length !== 1) return false;
+  const src = sel[0];
+  if (!['rect', 'diamond', 'ellipse', 'chip', 'icon', 'image'].includes(src.type)) return false;
+  const nu = JSON.parse(JSON.stringify(src));
+  nu.id = uid();
+  nu.seed = Math.floor(Math.random() * 2 ** 31);
+  nu.groupId = null;
+  nu.text = src.type === 'image' ? (src.text || '') : '';
+  delete nu._prims; delete nu._pkey;
+  if (below){ nu.x = src.x; nu.y = src.y + src.h + 90; }
+  else { nu.x = src.x + src.w + 110; nu.y = src.y; }
+  let guard = 0;
+  while (guard++ < 30 &&
+         state.elements.some(e => e !== src && !isLinear(e) && tabOverlaps(nu, e))){
+    if (below) nu.x += src.w + 40;
+    else nu.y += src.h + 40;
+  }
+  state.elements.push(nu);
+  const arrow = newElement('arrow', 0, 0, {
+    stroke: defaults.stroke === 'none' ? 'ink' : defaults.stroke,
+    sw: defaults.sw, sketch: defaults.sketch, round: defaults.round,
+    opacity: 100, fillStyle: 'solid', dash: defaults.dash,
+    font: defaults.font, size: 16, align: 'center',
+    lh: defaults.lh, pgap: defaults.pgap, lspace: defaults.lspace, valign: defaults.valign,
+  });
+  arrow.curve = defaults.curve;
+  arrow.elbow = !!defaults.elbow;
+  arrow.startHead = 'none';
+  arrow.endHead = defaults.endHead === 'none' ? 'arrow' : defaults.endHead;
+  arrow.points = [[0, 0], [10, 0]];
+  arrow.startBind = src.id; arrow.startAnchor = below ? 's' : 'e';
+  arrow.endBind = nu.id;    arrow.endAnchor = below ? 'n' : 'w';
+  state.elements.push(arrow);
+  updateBoundArrows(state.elements);
+  setSelection(new Set([nu.id]));
+  commit(); requestRender();
+  if (canHaveText(nu)) openTextEditor(nu, false);
+  return true;
+}
+
+/* ── Tidy: auto-arrange the connected flow ──────────
+   Shapes joined by glued arrows become a left-to-right layered graph:
+   depth = longest path from the roots, one column per depth, rows
+   ordered by current vertical position. Standalone elements stay put. */
+function tidyLayout(){
+  const pool = (state.selection.size >= 2 ? selected() : state.elements);
+  const shapes = pool.filter(e => !isLinear(e) && e.type !== 'text');
+  const ids = new Set(shapes.map(s => s.id));
+  const edges = state.elements.filter(e => e.type === 'arrow' &&
+    e.startBind && e.endBind && ids.has(e.startBind) && ids.has(e.endBind) &&
+    e.startBind !== e.endBind);
+  if (!edges.length){
+    showHint('Tidy arranges shapes connected with glued arrows — none found');
+    return;
+  }
+  const inFlow = new Set();
+  for (const a of edges){ inFlow.add(a.startBind); inFlow.add(a.endBind); }
+  const nodes = shapes.filter(s => inFlow.has(s.id));
+  // depth = longest path from any root; bounded relaxation survives cycles
+  const depth = new Map(nodes.map(n => [n.id, 0]));
+  for (let pass = 0; pass < nodes.length + 1; pass++){
+    let changed = false;
+    for (const a of edges){
+      const d = depth.get(a.startBind) + 1;
+      if (d > depth.get(a.endBind) && d <= nodes.length){
+        depth.set(a.endBind, d); changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  const cols = new Map();
+  for (const n of nodes){
+    const d = depth.get(n.id);
+    if (!cols.has(d)) cols.set(d, []);
+    cols.get(d).push(n);
+  }
+  const box = sceneBounds(nodes);
+  const GX = 120, GY = 56;
+  const colW = new Map(), colH = new Map();
+  for (const [d, list] of cols){
+    list.sort((a, b) => a.y - b.y || a.x - b.x);
+    colW.set(d, Math.max(...list.map(n => n.w)));
+    colH.set(d, list.reduce((h, n) => h + n.h, 0) + GY * (list.length - 1));
+  }
+  const maxH = Math.max(...[...colH.values()]);
+  let x = box.x;
+  const depths = [...cols.keys()].sort((a, b) => a - b);
+  for (const d of depths){
+    const list = cols.get(d);
+    let y = box.y + (maxH - colH.get(d)) / 2;
+    for (const n of list){
+      n.x = Math.round(x + (colW.get(d) - n.w) / 2);
+      n.y = Math.round(y);
+      y += n.h + GY;
+    }
+    x += colW.get(d) + GX;
+  }
+  // stale manual elbow corners would fight the new geometry, and the
+  // columns flow left-to-right now — re-aim every edge east → west
+  for (const a of edges){
+    if (a.elbow) a.elbowPts = null;
+    a.startAnchor = 'e'; a.endAnchor = 'w';
+    if (depth.get(a.startBind) > depth.get(a.endBind)){
+      // back-edge in a cycle: flip sides so it leaves west, returns east
+      a.startAnchor = 'w'; a.endAnchor = 'e';
+    }
+  }
+  updateBoundArrows(state.elements);
+  commit(); requestRender(); syncPanel();
+  showHint(`Tidied ${nodes.length} shapes into ${depths.length} columns`);
+}
 
 /* ── draw-on replay + animated export ───────────────
    Replays the current page as if a hand were drawing it: freehand
