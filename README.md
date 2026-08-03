@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.10.3)
+# KoralPaper — *Draw your thinking* (v3.11.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -145,8 +145,10 @@ a one-page showcase of every feature). Press **?** inside the app for the full s
 - **Themes:** light (cream) and dark (ink) paper — palette colors are stored
   as tokens and re-resolve per theme; custom hex colors stay fixed
 - **Settings panel:** the ? button opens a Help / Settings side panel —
-  Settings holds sliders for the three **line-width presets** and the four
-  **S/M/L/XL text sizes**, applied live and persisted in the browser
+  Settings holds sliders for the three **line-width presets**, the four
+  **S/M/L/XL text sizes**, and the **text spacing defaults** (lines,
+  paragraph, letters — used by new texts and the Reset-spacing button),
+  applied live and persisted in the browser
 - **Files:** New document (⌥⌘N, with a save-first warning — undoable),
   Save/Open `.json` sketches — Save asks for a file name and remembers it,
   Open replaces the whole document and adopts the file's name — export

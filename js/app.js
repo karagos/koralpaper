@@ -28,24 +28,31 @@ const state = {
 const SETTINGS_KEY = 'koralpaper.settings';
 const DEFAULT_WIDTHS = { fine: 1.7, medium: 3.3, thick: 5 };
 const DEFAULT_SIZES = { s: 16, m: 21, l: 29, xl: 42 };
+const DEFAULT_TYPO = { lh: 1.3, pgap: 0, lspace: 0 };
 const widths = { ...DEFAULT_WIDTHS };
 const sizes = { ...DEFAULT_SIZES };
+const typo = { ...DEFAULT_TYPO };
 try {
   const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
   if (s.widths) for (const k of Object.keys(DEFAULT_WIDTHS))
     if (typeof s.widths[k] === 'number') widths[k] = clamp(s.widths[k], 0.5, 14);
   if (s.sizes) for (const k of Object.keys(DEFAULT_SIZES))
     if (typeof s.sizes[k] === 'number') sizes[k] = clamp(Math.round(s.sizes[k]), 8, 160);
+  if (s.typo){
+    if (typeof s.typo.lh === 'number') typo.lh = clamp(s.typo.lh, 0.5, 2.5);
+    if (typeof s.typo.pgap === 'number') typo.pgap = clamp(s.typo.pgap, 0, 48);
+    if (typeof s.typo.lspace === 'number') typo.lspace = clamp(s.typo.lspace, -7, 15);
+  }
 } catch (e){ /* fresh settings */ }
 function saveSettings(){
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ widths, sizes })); } catch (e){}
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ widths, sizes, typo })); } catch (e){}
 }
 
 const defaults = {
   stroke:'ink', fill:'cream', fillStyle:'solid', dash:'solid', sw:widths.medium, sketch:1, round:1,
   opacity:100, font:'sans', size:sizes.m, align:'center',
   curve:0, elbow:false, startHead:'none', endHead:'arrow',
-  lh:1.3, pgap:0, lspace:0, valign:'middle',
+  lh:typo.lh, pgap:typo.pgap, lspace:typo.lspace, valign:'middle',
   fillByType: { rect:'cream', diamond:'cream', ellipse:'cream', chip:'periwinkle', icon:'none' },
 };
 let iconKind = 'asterisk'; // last-picked stamp from the icon menu
@@ -716,6 +723,7 @@ function onPointerDown(ev){
     const el = newElement('text', sx, sy, {
       stroke: defaults.stroke === 'paper' ? 'ink' : defaults.stroke,
       font: defaults.font, size: defaults.size, align: 'left', opacity: defaults.opacity,
+      lh: defaults.lh, pgap: defaults.pgap, lspace: defaults.lspace,
     });
     autosizeText(el);
     state.elements.push(el);
@@ -731,6 +739,7 @@ function onPointerDown(ev){
     sketch: defaults.sketch, round: defaults.round, opacity: defaults.opacity,
     font: defaults.font, size: state.tool === 'chip' ? Math.min(defaults.size, 16) : defaults.size,
     align: defaults.align,
+    lh: defaults.lh, pgap: defaults.pgap, lspace: defaults.lspace, valign: defaults.valign,
   };
   if (['rect','diamond','ellipse','chip','icon'].includes(state.tool)){
     style.fill = defaults.fillByType[state.tool] || defaults.fill;
@@ -1868,10 +1877,11 @@ for (const [id, prop, parse, fmt] of TYPO_SLIDERS){
   });
 }
 $('tyReset').addEventListener('click', () => {
-  applyStyle({ lh: 1.3, pgap: 0, lspace: 0, valign: 'middle' });
+  // resets to YOUR defaults — adjustable in Settings, not hardcoded values
+  applyStyle({ lh: typo.lh, pgap: typo.pgap, lspace: typo.lspace, valign: 'middle' });
   for (const el of selected()) if (el.type === 'text') autosizeText(el);
   requestRender();
-  showHint('Spacing reset to defaults');
+  showHint(`Spacing reset to your defaults (×${typo.lh} · ${typo.pgap}px · ${typo.lspace}px)`);
 });
 $('adjResetBtn').addEventListener('click', () => {
   let touched = false;
@@ -2658,6 +2668,7 @@ $('tabSettings').addEventListener('click', () => setPanelTab('settings'));
 const WIDTH_KEYS = ['fine', 'medium', 'thick'];
 const SIZE_KEYS = ['s', 'm', 'l', 'xl'];
 const sizeInputId = k => 'setSize' + k[0].toUpperCase() + k.slice(1);
+const TYPO_KEYS = [['lh', 'setTypoLh', v => '×' + v], ['pgap', 'setTypoPgap', v => v + 'px'], ['lspace', 'setTypoLs', v => v + 'px']];
 function syncSettingsUI(){
   for (const k of WIDTH_KEYS){
     const id = 'set' + k[0].toUpperCase() + k.slice(1);
@@ -2667,6 +2678,10 @@ function syncSettingsUI(){
   for (const k of SIZE_KEYS){
     $(sizeInputId(k)).value = sizes[k];
     $(sizeInputId(k) + 'Val').textContent = String(sizes[k]);
+  }
+  for (const [k, id, fmt] of TYPO_KEYS){
+    $(id).value = typo[k];
+    $(id + 'Val').textContent = fmt(typo[k]);
   }
 }
 function applyWidthPresets(){
@@ -2699,11 +2714,21 @@ SIZE_KEYS.forEach(k => {
     syncSettingsUI(); applyWidthPresets(); saveSettings();
   });
 });
+for (const [k, id] of TYPO_KEYS){
+  $(id).addEventListener('input', () => {
+    const old = typo[k];
+    typo[k] = Number($(id).value);
+    if (defaults[k] === old) defaults[k] = typo[k]; // new elements follow immediately
+    syncSettingsUI(); saveSettings();
+  });
+}
 $('setWidthsReset').addEventListener('click', () => {
   Object.assign(widths, DEFAULT_WIDTHS);
   Object.assign(sizes, DEFAULT_SIZES);
+  Object.assign(typo, DEFAULT_TYPO);
   defaults.sw = widths.medium;
   defaults.size = sizes.m;
+  defaults.lh = typo.lh; defaults.pgap = typo.pgap; defaults.lspace = typo.lspace;
   syncSettingsUI(); applyWidthPresets(); saveSettings();
 });
 function zoomFocusPoint(){

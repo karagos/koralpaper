@@ -1,5 +1,17 @@
 # KoralPaper — Changelog
 
+## v3.11.0 — 2026-08-02
+- **Spacing defaults live in Settings**: three new sliders (Lines /
+  Paragraph / Letters) define your default text spacing — every new text
+  uses them, they persist across sessions, and Settings' "Reset to
+  defaults" restores the factory values.
+- **"Reset spacing" resets to *your* defaults** (from Settings), and the
+  hint shows the exact values it applied.
+- **Fixed the audit finding behind "reset not working"**: newly created
+  elements ignored the current spacing defaults, so new and existing
+  texts could disagree even after a reset. New elements now inherit line
+  spacing, paragraph gap, letter spacing, and vertical alignment.
+
 ## v3.10.2 — 2026-08-02
 - **Paragraph spacing works on a single Enter**: every hard line break now
   receives the paragraph gap, while soft-wrapped lines inside shapes keep
