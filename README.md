@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.19.0)
+# KoralPaper — *Draw your thinking* (v3.20.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -153,8 +153,10 @@ element lands. Press **?** inside the app for the full shortcuts card.
   other elements' edges and centers (⇧G toggles)
 - **Selection:** click, shift-click, marquee, ⌘A, move, 8-handle resize,
   rotate handle, arrow-key nudge, ⌘G group / ⇧⌘G ungroup
-- **Editing:** undo/redo (⌘Z / ⇧⌘Z), copy/paste/cut, ⌘D duplicate, ⌥-drag
-  duplicate, layer order (front/back/forward/backward), opacity
+- **Editing:** undo/redo (⌘Z / ⇧⌘Z) with intention-sized steps — a run of
+  arrow-key nudges or slider wiggles undoes as one — copy/paste/cut, ⌘D
+  duplicate, ⌥-drag duplicate, layer order (front/back/forward/backward),
+  opacity
 - **Styling:** Anthropic palette (ink, coral, periwinkle, sage, terracotta,
   butter…) **plus a black→greys→white neutral ramp** opening both stroke and fill, a
   **custom color picker** (rainbow swatch) with a hex field, a **no-stroke

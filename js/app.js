@@ -500,6 +500,7 @@ function serialize(){
     (k, v) => k.startsWith('_') ? undefined : v);
 }
 function commit(){
+  lastCoalesce.key = null; // an unrelated commit breaks any coalescing run
   history = history.slice(0, histIndex + 1);
   history.push(serialize());
   if (history.length > 120) history.shift();
@@ -508,6 +509,25 @@ function commit(){
   scheduleAutosave();
   scheduleThumbRefresh();
   preloadDocFonts(); // any newly-referenced Google font starts downloading
+}
+
+/* ── coalesced commits ──────────────────────────────
+   Rapid repeats of the same micro-operation (arrow-key nudges, wiggling
+   the same slider) fold into ONE undo step: within the time window the
+   top history entry is replaced instead of pushing a new one, so ⌘Z
+   jumps back to before the whole run. */
+const lastCoalesce = { key: null, at: 0 };
+function commitCoalesced(key, windowMs = 900){
+  const now = performance.now();
+  const canFold = lastCoalesce.key === key && (now - lastCoalesce.at) < windowMs &&
+    histIndex === history.length - 1 && histIndex > 0;
+  if (canFold){
+    history[histIndex] = serialize();
+    syncHistoryButtons(); scheduleAutosave(); scheduleThumbRefresh();
+  } else {
+    commit();
+  }
+  lastCoalesce.key = key; lastCoalesce.at = now;
 }
 function restore(json){
   const doc = JSON.parse(json);
@@ -520,8 +540,8 @@ function restore(json){
   buildPageStrip();
   syncPanel(); requestRender(); scheduleAutosave();
 }
-function undo(){ if (histIndex > 0){ histIndex--; restore(history[histIndex]); syncHistoryButtons(); } }
-function redo(){ if (histIndex < history.length - 1){ histIndex++; restore(history[histIndex]); syncHistoryButtons(); } }
+function undo(){ if (histIndex > 0){ lastCoalesce.key = null; histIndex--; restore(history[histIndex]); syncHistoryButtons(); } }
+function redo(){ if (histIndex < history.length - 1){ lastCoalesce.key = null; histIndex++; restore(history[histIndex]); syncHistoryButtons(); } }
 function syncHistoryButtons(){
   $('undoBtn').disabled = histIndex <= 0;
   $('redoBtn').disabled = histIndex >= history.length - 1;
@@ -1995,7 +2015,7 @@ $('opacityRange').addEventListener('input', ev => {
   defaults.opacity = v;
   requestRender();
 });
-$('opacityRange').addEventListener('change', () => { if (state.selection.size) commit(); });
+$('opacityRange').addEventListener('change', () => { if (state.selection.size) commitCoalesced('opacity', 1500); });
 $('toFrontBtn').addEventListener('click', () => reorder('front'));
 $('toBackBtn').addEventListener('click', () => reorder('back'));
 $('forwardBtn').addEventListener('click', () => reorder('forward'));
@@ -2033,7 +2053,7 @@ for (const [id, prop, parse] of ADJ_SLIDERS){
     clearTimeout(adjTimer);
     adjTimer = setTimeout(requestRender, 90);
   });
-  $(id).addEventListener('change', () => { if (state.selection.size) commit(); });
+  $(id).addEventListener('change', () => { if (state.selection.size) commitCoalesced('adj:' + id, 1500); });
 }
 
 /* typography sliders — line spacing, paragraph gap, letter spacing */
@@ -4260,7 +4280,7 @@ window.addEventListener('keydown', ev => {
       ev.preventDefault();
       for (const el of selected()){ el.x += dx; el.y += dy; }
       updateBoundArrows(state.elements);
-      commit(); requestRender();
+      commitCoalesced('nudge'); requestRender();
     }
     return;
   }

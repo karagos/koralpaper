@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.20.0 — 2026-08-03
+- **Undo that matches intention.** Rapid repeats of the same
+  micro-operation now fold into one history step: ten arrow-key nudges
+  undo with a single ⌘Z (instead of ten), and quick successive wiggles of
+  the opacity or photo-adjustment sliders merge too. Any unrelated edit,
+  or an undo/redo, cleanly ends the run so nothing ever merges across
+  different operations. Slider drags were already one step per gesture.
+
 ## v3.19.0 — 2026-08-03
 - **Carousel export.** ☰ / ⬇ → "Export all pages as PNGs (.zip)": every
   page renders to a numbered PNG (named `01-PageName.png`…, exact artboard
