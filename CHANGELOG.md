@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.55.0
+
+The three completing features.
+
+- Heat map: the eighth chart type. Rows and columns become a colored grid where deeper color means a higher value, with column headers, row labels, a 1-to-max gradient legend, and optional value numbers with automatic light-on-dark contrast. Uses your first brand accent as the heat color when a kit is active.
+- Prompt recipes: the Claude tab now has five click-to-copy prompts for the moves that work: Tidy this page, Rebuild it clean, Turn into a mind map, Make a carousel of it, Summarize the document. Click, paste into Claude Desktop, done.
+- Snapshots: ☰ → Snapshots saves a named checkpoint of the entire document (pages, images, board, paper) in your browser. Restore any checkpoint at any time; one undo brings the pre-restore version back. Up to 8 snapshots, with honest messages when storage runs low.
+
 ## v3.54.1
 
 - Brand kit polish: six accent colors instead of four, every color swatch shows its hex value underneath (updating live while you pick), and the Settings buttons are tidy auto-width rows instead of stretched pills. Older four-color kits keep working as they are.

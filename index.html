@@ -45,6 +45,7 @@
       <button data-act="save">Save sketch… &nbsp;<span class="menukey">⌘S</span></button>
       <button data-act="image">Import image… &nbsp;<span class="menukey">I</span></button>
       <button data-act="templates">Templates…</button>
+      <button data-act="snapshots">Snapshots…</button>
       <hr>
       <button data-act="present">Present &nbsp;<span class="menukey">⇧⌘P</span></button>
       <button data-act="replay">Replay the drawing</button>
@@ -474,6 +475,7 @@
       <button data-ct="spider">Spider</button>
       <button data-ct="pie">Pie</button>
       <button data-ct="donut">Donut</button>
+      <button data-ct="heat">Heat map</button>
       <button data-ct="table">Table</button>
     </div>
     <p class="chartintro" id="chartIntro">Paste rows straight from Excel or Numbers, or type them:
@@ -537,6 +539,26 @@
     </div>
   </div>
 
+  <!-- ── Snapshots dialog ─────────────────────────── -->
+  <div class="island pdfdialog snapdialog hidden" id="snapDialog">
+    <h3>Snapshots</h3>
+    <p>Named checkpoints of the whole document, kept in this browser. Restore one at any
+      time; a single undo brings the current version back.</p>
+    <div id="snapList"></div>
+    <div class="tplsave">
+      <div class="menuhead">Save a snapshot of right now</div>
+      <div class="tplsaverow">
+        <input type="text" id="snapName" placeholder="e.g. Before the big change" autocomplete="off">
+      </div>
+      <div class="row actions">
+        <button class="pill" id="snapSaveBtn">Save snapshot</button>
+      </div>
+    </div>
+    <div class="row actions tplfoot">
+      <button class="minipill" id="snapCloseBtn">Close</button>
+    </div>
+  </div>
+
   <!-- ── PDF page picker ───────────────────────────── -->
   <div class="island pdfdialog hidden" id="pdfDialog">
     <h3>Export PDF</h3>
@@ -571,6 +593,14 @@
         <tr><td><b>2.</b> Double-click <b>koralpaper.mcpb</b> (it ships in the <code>mcp</code> folder of this app, or grab it from the
           <a href="https://github.com/karagos/koralpaper" target="_blank" rel="noopener">GitHub page</a>) and confirm the install inside Claude Desktop.</td></tr>
         <tr><td><b>3.</b> Keep KoralPaper open in your browser. The ✳ appears in the top bar when the link is alive.</td></tr>
+        <tr><td class="sect">Prompt recipes (click to copy, paste into Claude Desktop)</td></tr>
+        <tr><td><div class="reciperow">
+          <button class="minipill" data-recipe="tidy">Tidy this page</button>
+          <button class="minipill" data-recipe="clean">Rebuild it clean</button>
+          <button class="minipill" data-recipe="mindmap">Turn into a mind map</button>
+          <button class="minipill" data-recipe="carousel">Make a carousel of it</button>
+          <button class="minipill" data-recipe="summary">Summarize the document</button>
+        </div></td></tr>
         <tr><td class="sect">Then just talk to Claude</td></tr>
         <tr><td>"Draw a customer onboarding flowchart with five steps on a 1920×1080 board."</td></tr>
         <tr><td>"Read my KoralPaper page and tidy the layout, keep my colors."</td></tr>
@@ -608,6 +638,8 @@
         becomes the shape's own label</td></tr>
       <tr><td><b>Resizing with text:</b> side handles stretch a shape and keep its
         font size; corner handles scale the text along with it</td></tr>
+      <tr><td><b>Snapshots:</b> ☰ → Snapshots saves a named checkpoint of the whole
+        document and restores it anytime</td></tr>
       <tr><td><b>Color single letters:</b> while typing, select the characters and pick a
         Text color in the left panel. Works with the custom color wheel too; the
         <b>auto</b> dot puts them back</td></tr>

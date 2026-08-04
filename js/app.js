@@ -4157,6 +4157,7 @@ function runFileAction(act){
   if (act === 'new') newDocument();
   if (act === 'open') fileInput.click();
   if (act === 'save') saveJSON();
+  if (act === 'snapshots') openSnapDialog();
   if (act === 'image') $('imgInput').click();
   if (act === 'excal') exportExcalidraw();
   if (act === 'templates'){ buildTplList(); $('tplDialog').classList.remove('hidden'); }
@@ -4192,6 +4193,114 @@ function download(name, url){
   const a = document.createElement('a');
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
+}
+/* ── named snapshots: whole-document checkpoints in local storage ── */
+const SNAP_KEY = 'koralpaper.snapshots';
+const SNAP_MAX = 8;
+function snapList(){
+  try { const v = JSON.parse(localStorage.getItem(SNAP_KEY)); return Array.isArray(v) ? v : []; }
+  catch (e){ return []; }
+}
+function snapStore(list){
+  try { localStorage.setItem(SNAP_KEY, JSON.stringify(list)); return true; }
+  catch (e){
+    alert('Not enough browser storage for this snapshot. Delete an older snapshot, or use Save sketch (.json) for big documents.');
+    return false;
+  }
+}
+function snapSaveCurrent(){
+  const name = ($('snapName').value || '').trim() || ('Snapshot ' + (snapList().length + 1));
+  syncPageRef();
+  const doc = JSON.parse(serialize());
+  const list = snapList();
+  if (list.length >= SNAP_MAX){
+    alert('Snapshot limit reached (' + SNAP_MAX + '). Delete one first.');
+    return;
+  }
+  list.push({
+    id: uid(), name, at: new Date().toISOString(),
+    doc: { pages: doc.pages, pageIndex: doc.pageIndex, images: usedImages(),
+      bgColor: state.bgColor, board: state.board },
+  });
+  if (!snapStore(list)) return;
+  $('snapName').value = '';
+  buildSnapList();
+  showHint('Snapshot \u201C' + name + '\u201D saved');
+}
+function snapRestore(id){
+  const snap = snapList().find(x => x.id === id);
+  if (!snap) return;
+  if (!confirm('Restore \u201C' + snap.name + '\u201D?\n\nThe current document is replaced (one undo brings it back).')) return;
+  const d = snap.doc;
+  state.pages = (d.pages || []).map(p => ({
+    id: p.id || uid(), name: p.name || 'Page',
+    bg: (typeof p.bg === 'string' && p.bg[0] === '#') ? p.bg : null,
+    elements: Array.isArray(p.elements) ? p.elements : [],
+  }));
+  if (!state.pages.length) state.pages = [{ id: uid(), name: 'Page 1', elements: [] }];
+  state.pageIndex = clamp(Number(d.pageIndex) || 0, 0, state.pages.length - 1);
+  state.elements = state.pages[state.pageIndex].elements;
+  state.images = d.images || {};
+  for (const p of state.pages) adoptImages(p.elements);
+  state.bgColor = (typeof d.bgColor === 'string' && d.bgColor[0] === '#') ? d.bgColor : null;
+  state.board = (d.board && d.board.w > 0 && d.board.h > 0) ? d.board : null;
+  state.selection = new Set();
+  updateBoundArrows(state.elements);
+  commit();
+  buildPageStrip(); syncPaperUI(); syncPanel(); preloadDocFonts();
+  requestRender(); scheduleAutosave();
+  $('snapDialog').classList.add('hidden');
+  showHint('Snapshot restored: \u2318Z brings the previous document back');
+}
+function snapDelete(id){
+  const list = snapList().filter(x => x.id !== id);
+  snapStore(list);
+  buildSnapList();
+}
+function buildSnapList(){
+  const box = $('snapList');
+  box.replaceChildren();
+  const list = snapList();
+  if (!list.length){
+    const p2 = document.createElement('p');
+    p2.className = 'snapempty';
+    p2.textContent = 'No snapshots yet. Save one below: it keeps the whole document as it is right now.';
+    box.appendChild(p2);
+    return;
+  }
+  for (const snap of list){
+    const row = document.createElement('div');
+    row.className = 'tplrow';
+    const info = document.createElement('div');
+    info.className = 'tplinfo';
+    const nm = document.createElement('b'); nm.textContent = snap.name;
+    const meta = document.createElement('span');
+    const dt = new Date(snap.at);
+    meta.textContent = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      + ' \u00B7 ' + (snap.doc.pages || []).length + ' page' + ((snap.doc.pages || []).length > 1 ? 's' : '');
+    info.append(nm, meta);
+    row.appendChild(info);
+    const rBtn = document.createElement('button');
+    rBtn.className = 'minipill tplmini';
+    rBtn.textContent = 'Restore';
+    rBtn.addEventListener('click', () => snapRestore(snap.id));
+    const dBtn = document.createElement('button');
+    dBtn.className = 'minipill tplmini danger tpldel';
+    dBtn.textContent = '\u2715';
+    dBtn.title = 'Delete this snapshot';
+    dBtn.addEventListener('click', () => snapDelete(snap.id));
+    row.append(rBtn, dBtn);
+    box.appendChild(row);
+  }
+}
+$('snapSaveBtn').addEventListener('click', snapSaveCurrent);
+$('snapCloseBtn').addEventListener('click', () => $('snapDialog').classList.add('hidden'));
+function openSnapDialog(){
+  closeMenus();
+  buildSnapList();
+  $('snapName').value = '';
+  $('snapName').placeholder = (localStorage.getItem('asterisk.docname') || 'Before the big change');
+  $('snapDialog').classList.remove('hidden');
 }
 function saveJSON(){
   const doc = JSON.parse(serialize());
@@ -5298,6 +5407,66 @@ function chartBuildSpider(d, spec){
   });
   return els;
 }
+function heatCellColor(t, hue){
+  const n = parseInt(hue.slice(1), 16);
+  const hr = (n >> 16) & 255, hg = (n >> 8) & 255, hb = n & 255;
+  const mix = c => clamp(Math.round(250 + (c - 250) * t), 0, 255);
+  const to2 = c => c.toString(16).padStart(2, '0');
+  return '#' + to2(mix(hr)) + to2(mix(hg)) + to2(mix(hb));
+}
+function chartBuildHeat(d, spec){
+  const nS = d.series.length, nC = d.cats.length;
+  if (nS > 20 || nC > 20) throw 'Keep heat maps under 20 columns and 20 rows';
+  let vmin = Infinity, vmax = -Infinity;
+  for (const row of d.vals) for (const v of row){ vmin = Math.min(vmin, v); vmax = Math.max(vmax, v); }
+  if (vmin === vmax) vmax = vmin + 1;
+  const hue = brandActive() ? brand.accents[0] : '#d97757';
+  const cw = clamp(Math.round(560 / nS), 52, 120), ch = 46;
+  const els = [];
+  d.series.forEach((name, j) => {
+    const t = chartText(name, 13, 'gdark');
+    t.x = j * cw + (cw - 3) / 2 - t.w / 2; t.y = -t.h - 10;
+    els.push(t);
+  });
+  d.cats.forEach((cat, i) => {
+    const lt = chartText(cat, 13, 'gdark');
+    lt.x = -12 - lt.w; lt.y = i * ch + (ch - 3) / 2 - lt.h / 2;
+    els.push(lt);
+    d.vals[i].forEach((v, j) => {
+      const t = (v - vmin) / (vmax - vmin);
+      const fillHex = heatCellColor(0.08 + t * 0.92, hue);
+      const cell = newElement('rect', j * cw, i * ch, {
+        fill: fillHex, stroke: 'ink', sw: 1.4, round: 0, sketch: 1,
+      });
+      cell.w = cw - 3; cell.h = ch - 3;
+      els.push(cell);
+      if (spec.showVals){
+        const fn = parseInt(fillHex.slice(1), 16);
+        const lum = (0.299 * ((fn >> 16) & 255) + 0.587 * ((fn >> 8) & 255) + 0.114 * (fn & 255)) / 255;
+        const vt = chartText(chartFmt(v), 12, lum > 0.55 ? 'ink' : 'white');
+        vt.x = cell.x + cell.w / 2 - vt.w / 2;
+        vt.y = cell.y + cell.h / 2 - vt.h / 2;
+        els.push(vt);
+      }
+    });
+  });
+  // gradient strip legend: low → high
+  const ly = nC * ch + 18, steps = 6, sw2 = 26;
+  const lo = chartText(chartFmt(vmin), 12, 'gmid');
+  lo.x = -8 - lo.w; lo.y = ly + 10 - lo.h / 2;
+  els.push(lo);
+  for (let k = 0; k < steps; k++){
+    const sq = newElement('rect', k * (sw2 + 2), ly, {
+      fill: heatCellColor(0.08 + (k / (steps - 1)) * 0.92, hue), stroke: 'ink', sw: 1.2, round: 0, sketch: 1,
+    });
+    sq.w = sw2; sq.h = 20;
+    els.push(sq);
+  }
+  const hi = chartText(chartFmt(vmax), 12, 'gmid');
+  hi.x = steps * (sw2 + 2) + 8; hi.y = ly + 10 - hi.h / 2;
+  els.push(hi);
+  return els;
+}
 function chartBuildTable(spec){
   const rows = chartRows(spec.data);
   if (rows.length < 2) throw 'A table needs a header row plus at least one data row';
@@ -5364,10 +5533,11 @@ function chartBuild(spec){
     else if (spec.type === 'hbars') els = chartBuildBars(d, spec, true);
     else if (spec.type === 'line') els = chartBuildLine(d, spec);
     else if (spec.type === 'spider') els = chartBuildSpider(d, spec);
+    else if (spec.type === 'heat') els = chartBuildHeat(d, spec);
     else els = chartBuildPie(d, spec, spec.type === 'donut');
   }
   /* legend, placed on the chosen side of the finished chart */
-  if (d && d.series.length > 1 && spec.type !== 'pie' && spec.type !== 'donut'){
+  if (d && d.series.length > 1 && !['pie', 'donut', 'heat'].includes(spec.type)){
     const pos = spec.legend || 'top';
     const vertical = pos === 'left' || pos === 'right';
     const items = chartLegendEls(d, spec.type === 'line', vertical);
@@ -5403,12 +5573,14 @@ const CHART_SAMPLES = {
   spider: 'Skill\tYou\tTeam\nStrategy\t8\t6\nCommunication\t7\t8\nAI tools\t9\t5\nDesign\t6\t7\nDelivery\t8\t8',
   pie: 'Consulting\t45\nTraining\t30\nProducts\t15\nOther\t10',
   donut: 'Consulting\t45\nTraining\t30\nProducts\t15\nOther\t10',
+  heat: 'Day\tMon\tTue\tWed\tThu\tFri\nMorning\t2\t5\t8\t4\t1\nMidday\t6\t9\t7\t8\t3\nEvening\t4\t6\t5\t9\t7',
   table: 'Product\tQ1\tQ2\tGrowth\nAlpha\t120\t135\t+12%\nBeta\t80\t95\t+19%\nGamma\t45\t60\t+33%',
 };
 const CHART_INTROS = {
   chart: 'Paste rows straight from Excel or Numbers, or type them: one row per line, columns split by Tab, comma or semicolon. First column: labels. First row: series names (optional). Negative numbers work.',
   pie: 'One row per slice: a label, then its value. Percentages are computed for you.',
   spider: 'Each row is one spoke of the web: a label, then a value per series (zero or positive). At least 3 rows.',
+  heat: 'Rows and columns become a colored grid: the higher the value, the deeper the color. First row: column names. Tick Values to write the numbers in the cells.',
   table: 'Every cell becomes a table cell. The first row is the header; numbers align right on their own.',
 };
 function chartSpecFromUI(){
@@ -5436,12 +5608,13 @@ function chartSyncTypeUI(){
   document.querySelectorAll('#chartTypeSeg button').forEach(b => b.classList.toggle('sel', b.dataset.ct === chartType));
   $('chartAxisRow').classList.toggle('hidden', ['pie', 'donut', 'table', 'spider'].includes(chartType));
   $('chartLineOpts').classList.toggle('hidden', chartType !== 'line' && chartType !== 'spider');
-  $('chartGridOpts').classList.toggle('hidden', ['pie', 'donut', 'table'].includes(chartType));
+  $('chartGridOpts').classList.toggle('hidden', ['pie', 'donut', 'table', 'heat'].includes(chartType));
   $('chartValOpts').classList.toggle('hidden', chartType === 'table');
   $('chartPctWrap').classList.toggle('hidden', chartType !== 'pie' && chartType !== 'donut');
-  $('chartLegendOpts').classList.toggle('hidden', ['pie', 'donut', 'table'].includes(chartType));
+  $('chartLegendOpts').classList.toggle('hidden', ['pie', 'donut', 'table', 'heat'].includes(chartType));
   $('chartIntro').textContent = chartType === 'table' ? CHART_INTROS.table
     : chartType === 'spider' ? CHART_INTROS.spider
+    : chartType === 'heat' ? CHART_INTROS.heat
     : (chartType === 'pie' || chartType === 'donut') ? CHART_INTROS.pie : CHART_INTROS.chart;
 }
 function chartSetType(t){
@@ -5572,6 +5745,22 @@ document.querySelectorAll('#chartGridDash button, #chartGridW button, #chartLege
 $('chartAddBtn').addEventListener('click', chartApply);
 $('chartCloseBtn').addEventListener('click', () => { $('chartDialog').classList.add('hidden'); chartEditCtx = null; });
 $('chartToolBtn').addEventListener('click', () => chartOpen(null));
+
+/* ── prompt recipes: proven Claude moves, one click to copy ── */
+const CLAUDE_RECIPES = {
+  tidy: 'Read my KoralPaper document and tidy the current page: align the shapes, even out the spacing, straighten the arrows. Keep every text and every color exactly as it is. Render the page to check yourself, and fix what looks off.',
+  clean: 'Read my KoralPaper document and rebuild the current page as a clean professional version on a NEW page: same content and colors, sketch 0 on everything, aligned to a tidy grid. Render to compare, then fix differences.',
+  mindmap: 'Read my KoralPaper document and reorganize the current page into a mind map: the main idea in the middle, grouped branches around it, connected with arrows. Keep my exact wording.',
+  carousel: 'Read my KoralPaper document and turn the current page content into a 5-page LinkedIn carousel (1080x1350 boards): a strong hook page, three content pages, a call-to-action page. Use the brand kit from the document if one is active.',
+  summary: 'Read my KoralPaper document and write me a concise summary of what it contains, page by page, ending with any gaps or open questions you notice in the thinking.',
+};
+document.querySelectorAll('button[data-recipe]').forEach(b =>
+  b.addEventListener('click', async () => {
+    const txt = CLAUDE_RECIPES[b.dataset.recipe];
+    if (!txt) return;
+    try { await navigator.clipboard.writeText(txt); showHint('Recipe copied. Paste it into Claude Desktop'); }
+    catch (e){ prompt('Copy this prompt:', txt); }
+  }));
 
 /* ── Excalidraw interop ────────────────────────────── */
 function excalFont(font){
@@ -6075,6 +6264,7 @@ window.addEventListener('keydown', ev => {
     $('tplDialog').classList.add('hidden');
     $('pdfDialog').classList.add('hidden');
     $('chartDialog').classList.add('hidden');
+    $('snapDialog').classList.add('hidden');
     return; }
   if (ev.key === 'Enter'){
     const sel = selected();

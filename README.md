@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.54.1)
+# KoralPaper — *Draw your thinking* (v3.55.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -119,11 +119,16 @@ and Settings.
   the kit as .json and your whole team sketches in the same look.
 - **Charts & tables (B):** paste numbers straight from a spreadsheet and get
   hand-drawn bars (vertical or sideways, multi-series, negatives welcome),
-  line charts, spider charts, pies, donuts, or an elegant striped table — with title, axis
+  line charts, spider charts, pies, donuts, heat maps, or an elegant striped table — with title, axis
   labels, legend, value labels, a movable legend, and a live preview, in two looks:
   hand-drawn Sketchy or crisp professional Clean. Everything lands as normal sketchy
   elements in one group: recolor any bar or slice with the usual controls,
   and right-click the chart to **edit its data** and rebuild it in place.
+- **Snapshots (☰):** named checkpoints of the whole document, kept locally;
+  restore any of them at any time, one undo brings the current version back.
+- **Prompt recipes (Claude tab):** one-click copies of the Claude moves that
+  work: tidy this page, rebuild it clean, turn into a mind map, make a
+  carousel, summarize the document.
 - **Mind-map folding:** right-click a shape → "Mark as mind-map root"
   and branches become foldable — **−** badges fold, coral **+N** badges
   unfold and show how many nodes are hidden. Cross-links behave

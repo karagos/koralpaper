@@ -3,7 +3,7 @@
    Strategy: network-first with cache fallback, so updates arrive the
    moment they are online and the app still opens with no connection.
    The cache name carries the app version; bump it with APP_VERSION. */
-const CACHE = 'koralpaper-v3.54.1';
+const CACHE = 'koralpaper-v3.55.0';
 const SHELL = [
   './',
   './index.html',
