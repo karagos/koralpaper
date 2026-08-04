@@ -3556,6 +3556,7 @@ const BOARD_GROUPS = [
     ['IG Post square', 1080, 1080],
     ['IG Portrait', 1080, 1350],
     ['LinkedIn image', 1200, 627],
+    ['LinkedIn portrait', 1080, 1350],
     ['LinkedIn square', 1080, 1080],
     ['X / Twitter post', 1600, 900],
     ['YouTube thumbnail', 1280, 720],
@@ -3572,6 +3573,7 @@ const BOARD_GROUPS = [
     ['16 : 9', 1600, 900],
     ['9 : 16', 900, 1600],
     ['4 : 3', 1600, 1200],
+    ['4 : 5', 1200, 1500],
     ['3 : 2', 1500, 1000],
   ]},
 ];

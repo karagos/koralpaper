@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.51.1
+
+- New canvas presets: "LinkedIn portrait" (1080 × 1350) in the Social group and "4 : 5" (1200 × 1500) in the Ratios group.
+
 ## v3.51.0
 
 - Page colors now tint only the canvas itself: with an artboard set, a page-only paper color fills exactly the artboard, and the workspace around it keeps the neutral document tone. Coloring the whole view still works via "All pages".
