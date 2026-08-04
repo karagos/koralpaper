@@ -2567,7 +2567,7 @@ function miTogglePin(name){
   try { localStorage.setItem('koralpaper.mi.pinned', JSON.stringify(next)); } catch (e){}
   showHint(next.includes(name) ? `“${name.replace(/_/g,' ')}” pinned — it now leads the icon grid`
                                : `“${name.replace(/_/g,' ')}” unpinned`);
-  miRenderGrid(miSearchList($('miSearch').value));
+  miRefresh(false);
 }
 function miRemember(name){
   try {
@@ -2584,24 +2584,42 @@ function miSearchList(q){
     });
   q = q.trim().toLowerCase();
   if (!q){
+    // browse mode: pins, then recents, then the popular nine, then the
+    // WHOLE catalog — the pager arrows walk through all 3,000
     const pin = miPinned();
     const rec = miRecent().filter(n => !pin.includes(n));
-    const merged = [...pin, ...rec,
+    const lead = [...pin, ...rec,
       ...MATERIAL_POPULAR.filter(n => !pin.includes(n) && !rec.includes(n))];
-    // grid grows (up to 18) when the user has pinned more than fits in 9
-    return merged.slice(0, Math.max(9, Math.min(18, pin.length)));
+    const seen = new Set(lead);
+    const rest = [];
+    for (const it of miCatalog) if (!seen.has(it.name)) rest.push(it.name);
+    return [...lead, ...rest];
   }
   const out = [];
-  for (const it of miCatalog){
-    if (it.name.startsWith(q)){ out.push(it.name); if (out.length >= 9) return out; }
-  }
-  for (const it of miCatalog){
-    if (!out.includes(it.name) && it.hay.includes(q)){
-      out.push(it.name);
-      if (out.length >= 9) break;
-    }
-  }
+  const inOut = new Set();
+  for (const it of miCatalog)
+    if (it.name.startsWith(q)){ out.push(it.name); inOut.add(it.name); }
+  for (const it of miCatalog)
+    if (!inOut.has(it.name) && it.hay.includes(q)) out.push(it.name);
   return out;
+}
+
+/* pager state: 9 icons per page over the full list */
+let miPage = 0;
+let miList = [];
+function miRefresh(resetPage){
+  if (resetPage) miPage = 0;
+  miList = miSearchList($('miSearch') ? $('miSearch').value : '');
+  const pages = Math.max(1, Math.ceil(miList.length / 9));
+  miPage = clamp(miPage, 0, pages - 1);
+  miRenderGrid(miList.slice(miPage * 9, miPage * 9 + 9));
+  const pager = $('miPager');
+  if (pager){
+    pager.classList.toggle('hidden', pages <= 1);
+    $('miPageLabel').textContent = (miPage + 1) + ' / ' + pages;
+    $('miPrev').disabled = miPage === 0;
+    $('miNext').disabled = miPage >= pages - 1;
+  }
 }
 function pickMaterial(name){
   materialName = name;
@@ -2692,7 +2710,7 @@ function buildIconMenu(){
   search.placeholder = 'Search 3,000 icons…';
   search.spellcheck = false;
   search.addEventListener('click', ev => ev.stopPropagation());
-  search.addEventListener('input', () => miRenderGrid(miSearchList(search.value)));
+  search.addEventListener('input', () => miRefresh(true));
   search.addEventListener('keydown', ev => {
     ev.stopPropagation();
     if (ev.key === 'Enter'){
@@ -2705,7 +2723,20 @@ function buildIconMenu(){
   const grid = document.createElement('div');
   grid.id = 'miGrid';
   menu.appendChild(grid);
-  miRenderGrid(miSearchList(''));
+  const pager = document.createElement('div');
+  pager.id = 'miPager';
+  pager.className = 'mipager hidden';
+  const prev = document.createElement('button');
+  prev.id = 'miPrev'; prev.textContent = '‹'; prev.title = 'Previous icons';
+  const lbl = document.createElement('span');
+  lbl.id = 'miPageLabel';
+  const next = document.createElement('button');
+  next.id = 'miNext'; next.textContent = '›'; next.title = 'More icons';
+  prev.addEventListener('click', ev => { ev.stopPropagation(); miPage--; miRefresh(false); });
+  next.addEventListener('click', ev => { ev.stopPropagation(); miPage++; miRefresh(false); });
+  pager.append(prev, lbl, next);
+  menu.appendChild(pager);
+  miRefresh(true);
   markIconMenu();
 }
 function markIconMenu(){

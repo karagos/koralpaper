@@ -1,5 +1,14 @@
 # KoralPaper — Changelog
 
+## v3.38.0 — 2026-08-04
+- **Page through all 3,000 Material icons.** The icon popup's grid was
+  stuck at nine icons; it now has ‹ › arrows with a page counter.
+  Browsing walks the whole catalog (pins and recents first), searching
+  pages through every match instead of silently truncating at nine,
+  and the pager hides itself when one page is enough.
+- The "Google Material icons" header now wears the same coral section-
+  title style as every other menu header in the app.
+
 ## v3.37.0 — 2026-08-04
 - **Frames for images.** Select a photo → the new **Frame** row (Off /
   On): a hand-drawn border hugs the image, using the same Outline
