@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.42.2
+
+- Fix: line charts now pass exactly through their data points. The freehand smoothing was treating the few chart points as loose curve guides, so lines drifted far from the markers (very visible with negative values). Chart lines are now built from a dense point path, keeping the hand-drawn feel while honoring every value. Existing charts pick up the fix the next time you use "Edit chart data" and Update.
+
 ## v3.42.1
 
 - Fix: pressing Tab inside the chart data box now types a column separator instead of jumping to the next field, so you can type any number of columns by hand. Shift+Tab still moves focus away for keyboard navigation.

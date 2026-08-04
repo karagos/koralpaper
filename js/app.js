@@ -4484,11 +4484,20 @@ function chartBuildLine(d, spec){
   const px = i => plotX + slot * i + slot / 2;
   d.series.forEach((name, j) => {
     const abs = d.vals.map((row, i) => [px(i), y(row[j])]);
+    /* densify each segment: freehand smoothing treats sparse points as curve
+       controls and would miss the real values, so give it a tight polyline
+       that passes through every data point */
+    const dense = [abs[0]];
+    for (let i = 1; i < abs.length; i++){
+      const [ax, ay] = abs[i - 1], [bx, by] = abs[i];
+      const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 12));
+      for (let k = 1; k <= n; k++) dense.push([ax + (bx - ax) * k / n, ay + (by - ay) * k / n]);
+    }
     const minX = Math.min(...abs.map(p => p[0])), minY = Math.min(...abs.map(p => p[1]));
     const ln = newElement('draw', minX, minY, {
       stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 3, sketch: 1, fill: 'none',
     });
-    ln.points = abs.map(p => [p[0] - minX, p[1] - minY]);
+    ln.points = dense.map(p => [p[0] - minX, p[1] - minY]);
     ln.w = Math.max(...ln.points.map(p => p[0]));
     ln.h = Math.max(...ln.points.map(p => p[1]));
     els.push(ln);
