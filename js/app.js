@@ -4770,6 +4770,20 @@ function chartApply(){
 document.querySelectorAll('#chartTypeSeg button').forEach(b =>
   b.addEventListener('click', () => chartSetType(b.dataset.ct)));
 $('chartData').addEventListener('input', () => { chartDirty = true; chartPreviewRefresh(); });
+/* Tab types a column separator instead of leaving the field
+   (Shift+Tab still moves focus away for keyboard users) */
+$('chartData').addEventListener('keydown', ev => {
+  ev.stopPropagation();
+  if (ev.key !== 'Tab' || ev.shiftKey) return;
+  ev.preventDefault();
+  const ta = ev.target;
+  if (!document.execCommand || !document.execCommand('insertText', false, '\t')){
+    const a = ta.selectionStart, b = ta.selectionEnd;
+    ta.value = ta.value.slice(0, a) + '\t' + ta.value.slice(b);
+    ta.selectionStart = ta.selectionEnd = a + 1;
+    ta.dispatchEvent(new Event('input'));
+  }
+});
 ['chartTitle', 'chartXLabel', 'chartYLabel'].forEach(id =>
   $(id).addEventListener('input', chartPreviewRefresh));
 $('chartAddBtn').addEventListener('click', chartApply);

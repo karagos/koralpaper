@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.42.1
+
+- Fix: pressing Tab inside the chart data box now types a column separator instead of jumping to the next field, so you can type any number of columns by hand. Shift+Tab still moves focus away for keyboard navigation.
+
 ## v3.42.0
 
 - New: Charts & tables. Press B or click the new toolbar button, paste numbers straight from Excel or Numbers (or type them), pick a type, and it appears on the page: vertical or sideways bars (multi-series, negative numbers supported, zero line included), line charts with markers, pies, donuts, and elegant striped tables with a coral header. Title, X and Y axis labels, legend and value gridlines are generated for you, with a live preview in the dialog.
