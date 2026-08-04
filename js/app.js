@@ -88,8 +88,9 @@ function gridColorForBg(c){
 }
 function effectiveGridColor(){ return gridColorForBg(pageBg() || state.bgColor); }
 function outsideColor(){
-  // the dimmed area around an artboard, derived from the paper color
-  const bg = effectiveBg();
+  // the dimmed area around an artboard: always derived from the document
+  // paper, so a page-only color fills just the artboard itself
+  const bg = state.bgColor || pal().bg;
   const n = parseInt(bg.slice(1), 16);
   let r = (n>>16)&255, g = (n>>8)&255, b = n&255;
   const lum = (0.299*r + 0.587*g + 0.114*b) / 255;
@@ -1840,6 +1841,39 @@ $('frameOn').addEventListener('click', () => applyStyle({ frame: true }));
 $('frameOff').addEventListener('click', () => applyStyle({ frame: false }));
 
 /* ── right-click context menu ──────────────────────── */
+/* merge 2+ selected TEXT elements into one, ordered by selection order
+   (the Set keeps insertion order, i.e. the order they were clicked) */
+function mergeTexts(){
+  const ids = [...state.selection];
+  const parts = ids.map(byId).filter(e => e && e.type === 'text');
+  if (parts.length < 2) return;
+  const nu = JSON.parse(JSON.stringify(parts[0]));
+  nu.id = uid();
+  nu.seed = Math.floor(Math.random() * 2 ** 31);
+  nu.groupId = null;
+  delete nu._editing;
+  let text = '';
+  const runs = [];
+  let off = 0;
+  for (const e of parts){
+    if (text){ text += '\n'; off += 1; }
+    const t = String(e.text || '');
+    if (e.runs) for (const r of e.runs) runs.push({ ...r, s: r.s + off, e: r.e + off });
+    text += t; off += t.length;
+  }
+  nu.text = text;
+  nu.runs = runs.length ? runs : null;
+  nu.x = Math.min(...parts.map(e => e.x));
+  nu.y = Math.min(...parts.map(e => e.y));
+  autosizeText(nu);
+  const gone = new Set(parts.map(e => e.id));
+  state.elements = state.elements.filter(e => !gone.has(e.id));
+  state.elements.push(nu);
+  updateBoundArrows(state.elements);
+  setSelection(new Set([nu.id]));
+  commit(); syncPanel(); requestRender();
+  showHint('Merged into one text. The line order follows your selection order');
+}
 function openCtxMenu(ev){
   const [sx, sy] = toScene(ev.clientX, ev.clientY);
   const hit = topElementAt(sx, sy);
@@ -1861,6 +1895,8 @@ function openCtxMenu(ev){
       add('Edit text', () => openTextEditor(sel[0], false));
     if (sel[0].chart)
       add('Edit chart data…', () => chartOpen(sel[0]));
+    if (sel.length >= 2 && sel.every(e => e.type === 'text'))
+      add(`Merge ${sel.length} texts into one`, mergeTexts);
     if (sel.length === 1 && sel[0].type === 'image'){
       add('Crop image', () => startCrop(sel[0]));
       if (sel[0].crop) add('Uncrop', () => resetCrop(sel[0]));

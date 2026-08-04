@@ -1,5 +1,10 @@
 # KoralPaper — Changelog
 
+## v3.51.0
+
+- Page colors now tint only the canvas itself: with an artboard set, a page-only paper color fills exactly the artboard, and the workspace around it keeps the neutral document tone. Coloring the whole view still works via "All pages".
+- Merge texts: select two or more text elements (shift-click them in the order you want the lines) and right-click → "Merge N texts into one". The lines join in your selection order as one text element, keeping bold, italics, highlights and letter colors intact. Perfect for when Claude delivers a paragraph as separate lines. One undo splits it back.
+
 ## v3.50.0
 
 - Per-page paper color: the paper popover (round swatch, top right) now has an "All pages / This page" switch. "This page" colors only the page you are on, so one black page can live inside an otherwise white document. A page's own color always wins over the document color; "Reset paper color" clears both for the current page.
