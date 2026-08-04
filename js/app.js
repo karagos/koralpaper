@@ -2085,7 +2085,10 @@ function syncPanel(){
   const linear = has('arrow','line','draw');
   const textish = has('rect','diamond','ellipse','chip','text','arrow','line');
 
-  show('rowStroke', true);
+  const onlyText = sel.length > 0 && sel.every(e => e.type === 'text');
+  const onlyLinear = sel.length > 0 && sel.every(e => isLinear(e));
+  show('rowStroke', !onlyText);   // for text, "Text color" is the one truth
+  $('strokeLabel').textContent = onlyLinear ? 'Line color' : 'Outline';
   show('rowArt', has('image'));
   const imgDuo = sel.some(e => e.type === 'image' && e.artStyle === 'duotone');
   show('rowFill', (shapeish && !has('image')) || imgDuo);
@@ -2103,6 +2106,7 @@ function syncPanel(){
   show('rowTypo', textish);
   show('rowValign', has('rect','diamond','ellipse','chip'));
   show('rowOpacity', true);
+  $('opacityVal').textContent = ((sel.length ? sel[0].opacity : defaults.opacity) ?? 100) + '%';
   const nUnits = sel.length ? alignUnits().length : 0;
   show('rowArrange', nUnits >= 2);
   $('distH').disabled = $('distV').disabled = nUnits < 3;
@@ -2202,6 +2206,7 @@ $('opacityRange').addEventListener('input', ev => {
   const v = Number(ev.target.value);
   for (const el of selected()) el.opacity = v;
   defaults.opacity = v;
+  $('opacityVal').textContent = v + '%';
   requestRender();
 });
 $('opacityRange').addEventListener('change', () => { if (state.selection.size) commitCoalesced('opacity', 1500); });
@@ -5545,6 +5550,28 @@ document.addEventListener('mousemove', () => { if (presenting) presentWake(); })
 $('presPrev').addEventListener('click', () => presentGo(-1));
 $('presNext').addEventListener('click', () => presentGo(1));
 $('presExit').addEventListener('click', exitPresent);
+
+/* ── foldable panel sections ────────────────────────
+   Click any section title in the style panel to fold it; folds are
+   remembered per browser. Everything is open by default, so the
+   richness stays — each user compresses only what they never use. */
+const FOLD_KEY = 'koralpaper.panelfold';
+{
+  let folded = {};
+  try { folded = JSON.parse(localStorage.getItem(FOLD_KEY)) || {}; } catch (e){}
+  document.querySelectorAll('#stylePanel .row[id]').forEach(row => {
+    const label = row.querySelector(':scope > label');
+    if (!label || row.id === 'rowActions') return;
+    row.classList.add('foldable');
+    if (folded[row.id]) row.classList.add('foldedrow');
+    label.addEventListener('click', () => {
+      row.classList.toggle('foldedrow');
+      folded[row.id] = row.classList.contains('foldedrow');
+      if (!folded[row.id]) delete folded[row.id];
+      try { localStorage.setItem(FOLD_KEY, JSON.stringify(folded)); } catch (e){}
+    });
+  });
+}
 
 /* ── first-run welcome ─────────────────────────────── */
 const WELCOME_KEY = 'koralpaper.welcomed';

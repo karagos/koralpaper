@@ -1,5 +1,25 @@
 # KoralPaper — Changelog
 
+## v3.35.0 — 2026-08-04
+- **The style panel speaks human now.** Section titles renamed for
+  first-time users: Stroke → **Outline** (and **Line color** when an
+  arrow or line is selected — the label adapts), Fill style → **Fill
+  pattern**, Width → **Thickness**, Text → **Text color**, Format →
+  **Emphasis**, Vertical → **Text position**, Spacing → **Text
+  spacing**, Layer → **Order**, Art style → **Photo style**. Nothing
+  moved, nothing was removed.
+- **Fold what you never use.** Every panel section title is now
+  clickable: a small chevron folds the section to just its name, and
+  your folds are remembered per browser. Everything starts open, so
+  the full richness stays until YOU decide to compress.
+- **Duplicate / Delete / Group always in reach.** The action buttons
+  are pinned to the bottom edge of the panel — visible without
+  scrolling, however long the panel gets.
+- For plain text elements the Outline row is gone — Text color is the
+  single source of truth. Opacity shows its percentage next to the
+  title, and a subtle divider separates the shape, text, and arrange
+  zones.
+
 ## v3.34.0 — 2026-08-04
 - **Drag pages to reorder.** Grab any thumbnail in the page strip and
   drag it: a coral insertion mark shows where the page will land, and

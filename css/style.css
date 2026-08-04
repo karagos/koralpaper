@@ -409,6 +409,27 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 /* ── arrange row: one logic per line ── */
 .segstack{display:flex; flex-direction:column; gap:4px;}
 
+/* ── foldable panel sections ── */
+.stylePanel .row.foldable > label{cursor:pointer; user-select:none; display:flex; align-items:center;}
+.stylePanel .row.foldable > label::after{
+  content:'▾'; margin-left:auto; font-size:9px; opacity:.45;
+  transition:transform .15s;
+}
+.stylePanel .row.foldedrow > label::after{transform:rotate(-90deg);}
+.stylePanel .row.foldedrow > :not(label){display:none;}
+.stylePanel .row.foldedrow{gap:0;}
+.labelval{margin-left:auto; margin-right:14px; font-size:11px; font-weight:700; color:var(--ink); text-transform:none; letter-spacing:0;}
+.stylePanel .zonegap{margin-top:5px; padding-top:11px; border-top:1.5px solid var(--line-soft);}
+
+/* ── sticky quick actions: always reachable, no scrolling ── */
+.stylePanel .row.actions{
+  position:sticky; bottom:-11px; z-index:3;
+  flex-direction:row; flex-wrap:wrap; gap:5px;
+  background:var(--card);
+  margin:2px -13px -11px; padding:9px 13px 11px;
+  border-top:1.5px solid var(--line-soft);
+}
+
 /* ── page-thumb drag reorder ── */
 .pagethumb{cursor:grab; touch-action:none;}
 .pagethumb.dragsrc{opacity:.45; transform:scale(.94); cursor:grabbing;}
