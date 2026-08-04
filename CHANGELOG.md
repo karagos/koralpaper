@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.49.1
+
+- Fix: dragging a text block's corner handle stopped growing the text at 200 px. Text now scales up to 600 px by dragging, and Claude can set sizes up to 600 too. Poster headlines can be as big as the page.
+
 ## v3.49.0
 
 - Search all of Google Fonts: the font picker has a search field. It filters the built-in collection, suggests popular Google fonts, and any exact family name can be loaded on demand ("Load ... from Google Fonts"). Loaded fonts are remembered in a "Your Google fonts" group, and documents stay portable: the font travels inside the file and reloads automatically on any machine.

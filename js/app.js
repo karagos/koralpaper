@@ -1299,7 +1299,7 @@ function resizeTo(it, sx, sy, shiftKey){
     if (!el) continue;
     if (el.type === 'text'){
       const s = Math.max(kx, ky);
-      el.size = clamp(Math.round(o.size * s), 8, 200);
+      el.size = clamp(Math.round(o.size * s), 8, 600);
       el.x = fx + (o.x - b.x) * kx;
       el.y = fy + (o.y - b.y) * ky;
       autosizeText(el);
@@ -6074,7 +6074,7 @@ function claudeBuildElement(spec, idMap){
       : (typeof spec.font === 'string' && spec.font.startsWith('cg:') && ensureCustomFont(spec.font)) ? spec.font
       : (typeof spec.font === 'string' && /^[A-Z][A-Za-z0-9 ]{2,30}$/.test(spec.font) && ensureCustomFont('cg:' + spec.font)) ? 'cg:' + spec.font
       : 'sans',
-    size: Number(spec.size) > 0 ? clamp(Number(spec.size), 8, 300)
+    size: Number(spec.size) > 0 ? clamp(Number(spec.size), 8, 600)
       : (kind === 'chip' || kind === 'arrow' || kind === 'line' ? 16 : 21),
     align: ['left', 'center', 'right'].includes(spec.align) ? spec.align : (kind === 'text' ? 'left' : 'center'),
     lh: typo.lh, pgap: typo.pgap, lspace: typo.lspace, valign: 'middle',
@@ -6204,7 +6204,7 @@ async function claudeExecute(action, args){
       if (u.fill !== undefined) el.fill = claudeColor(u.fill, FILL_KEYS, el.fill);
       if (u.fillStyle !== undefined && ['solid','hachure','dense','cross','dots','waves'].includes(u.fillStyle)) el.fillStyle = u.fillStyle;
       if (u.dash !== undefined && ['solid','dotted','dashed'].includes(u.dash)) el.dash = u.dash;
-      if (u.size !== undefined && Number(u.size) > 0) el.size = clamp(Number(u.size), 8, 300);
+      if (u.size !== undefined && Number(u.size) > 0) el.size = clamp(Number(u.size), 8, 600);
       if (u.font !== undefined && FONTS[u.font]) el.font = u.font;
       if (u.align !== undefined && ['left','center','right'].includes(u.align)) el.align = u.align;
       if (u.textColor !== undefined) el.textColor = (!u.textColor || u.textColor === 'auto') ? null : claudeColor(u.textColor, STROKE_KEYS, el.textColor);
