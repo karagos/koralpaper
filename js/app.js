@@ -4619,6 +4619,105 @@ function chartBuildPie(d, spec, donut){
   }
   return els;
 }
+function chartBuildSpider(d, spec){
+  const n = d.cats.length;
+  if (n < 3) throw 'A spider chart needs at least 3 rows (one per axis)';
+  if (n > 12) throw 'Keep spider charts under 12 axes';
+  let vmax = 0;
+  for (const row of d.vals) for (const v of row){
+    if (v < 0) throw 'Spider charts need zero or positive numbers';
+    vmax = Math.max(vmax, v);
+  }
+  if (!vmax) vmax = 1;
+  const step = chartStep(vmax);
+  vmax = Math.ceil((vmax - 1e-9) / step) * step;
+  const els = [];
+  const R = 170, cx = 0, cy = 0;
+  const ang = i => -Math.PI / 2 + i * 2 * Math.PI / n;
+  const pt = (i, v) => [cx + Math.cos(ang(i)) * R * v / vmax, cy + Math.sin(ang(i)) * R * v / vmax];
+  const densify = closed => {
+    const out = [closed[0]];
+    for (let i = 1; i < closed.length; i++){
+      const [ax, ay] = closed[i - 1], [bx, by] = closed[i];
+      const k = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 12));
+      for (let q = 1; q <= k; q++) out.push([ax + (bx - ax) * q / k, ay + (by - ay) * q / k]);
+    }
+    return out;
+  };
+  const mkDraw = (dense, style) => {
+    const minX = Math.min(...dense.map(pp => pp[0])), minY = Math.min(...dense.map(pp => pp[1]));
+    const el = newElement('draw', minX, minY, style);
+    el.points = dense.map(pp => [pp[0] - minX, pp[1] - minY]);
+    el.w = Math.max(...el.points.map(pp => pp[0]));
+    el.h = Math.max(...el.points.map(pp => pp[1]));
+    return el;
+  };
+  // web: concentric rings + spokes
+  for (let v = step; v <= vmax + 1e-9; v += step){
+    const ring = [];
+    for (let i = 0; i < n; i++) ring.push(pt(i, v));
+    ring.push(ring[0].slice());
+    els.push(mkDraw(densify(ring), {
+      stroke: Math.abs(v - vmax) < 1e-9 ? 'gmid' : 'glight', sw: 1.3, sketch: 1, fill: 'none',
+    }));
+  }
+  for (let i = 0; i < n; i++){
+    const [sx2, sy2] = pt(i, vmax);
+    els.push(chartLine(cx, cy, sx2, sy2, 'glight', 1.3));
+  }
+  // scale labels up the top spoke
+  for (let v = step; v <= vmax + 1e-9; v += step){
+    const t = chartText(chartFmt(v), 11, 'gmid');
+    t.x = cx + 7; t.y = cy - R * v / vmax - t.h / 2;
+    els.push(t);
+  }
+  // axis labels around the web
+  for (let i = 0; i < n; i++){
+    const a = ang(i);
+    const lx = cx + Math.cos(a) * (R + 16), ly = cy + Math.sin(a) * (R + 16);
+    const t = chartText(d.cats[i], 14, 'gdark');
+    t.x = Math.cos(a) >= 0.25 ? lx : Math.cos(a) <= -0.25 ? lx - t.w : lx - t.w / 2;
+    t.y = Math.sin(a) <= -0.25 ? ly - t.h : Math.sin(a) >= 0.25 ? ly : ly - t.h / 2;
+    els.push(t);
+  }
+  // series: translucent fill underneath, crisp outline on top
+  d.series.forEach((name, j) => {
+    const verts = d.vals.map((row, i) => pt(i, row[j]));
+    const closed = [...verts, verts[0].slice()];
+    const dense = densify(closed);
+    els.push(mkDraw(dense, {
+      fill: CHART_FILLS[j % CHART_FILLS.length], stroke: 'none', sketch: 1, opacity: 30,
+    }));
+    const outline = mkDraw(dense, {
+      fill: 'none', stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 3, sketch: 1,
+    });
+    outline.chartDots = verts.map(pp => [pp[0] - outline.x, pp[1] - outline.y]);
+    els.push(outline);
+  });
+  // legend + title above the web
+  let topY = -(R + 46);
+  if (d.series.length > 1){
+    topY -= 24;
+    let lx = -R;
+    d.series.forEach((name, j) => {
+      const sw2 = newElement('rect', lx, topY, {
+        fill: CHART_FILLS[j % CHART_FILLS.length], stroke: 'ink', sw: 1.8, round: 0, sketch: 1,
+      });
+      sw2.w = 14; sw2.h = 14;
+      els.push(sw2);
+      const t = chartText(name, 13, 'ink');
+      t.x = lx + 20; t.y = topY + 7 - t.h / 2;
+      els.push(t);
+      lx += 20 + t.w + 20;
+    });
+  }
+  if (spec.title){
+    const t = chartText(spec.title, 26, 'ink', { font: 'serif' });
+    t.x = cx - t.w / 2; t.y = topY - 44;
+    els.push(t);
+  }
+  return els;
+}
 function chartBuildTable(spec){
   const rows = chartRows(spec.data);
   if (rows.length < 2) throw 'A table needs a header row plus at least one data row';
@@ -4689,6 +4788,7 @@ function chartBuild(spec){
     if (spec.type === 'bars') els = chartBuildBars(d, spec, false);
     else if (spec.type === 'hbars') els = chartBuildBars(d, spec, true);
     else if (spec.type === 'line') els = chartBuildLine(d, spec);
+    else if (spec.type === 'spider') els = chartBuildSpider(d, spec);
     else els = chartBuildPie(d, spec, spec.type === 'donut');
   }
   const b = sceneBounds(els);
@@ -4702,6 +4802,7 @@ const CHART_SAMPLES = {
   bars: 'Quarter\tSales\tCosts\nQ1\t42\t31\nQ2\t55\t40\nQ3\t38\t45\nQ4\t61\t52',
   hbars: 'Quarter\tSales\tCosts\nQ1\t42\t31\nQ2\t55\t40\nQ3\t38\t45\nQ4\t61\t52',
   line: 'Month\tVisitors\tSignups\nJan\t120\t30\nFeb\t180\t42\nMar\t150\t55\nApr\t210\t70\nMay\t260\t85',
+  spider: 'Skill\tYou\tTeam\nStrategy\t8\t6\nCommunication\t7\t8\nAI tools\t9\t5\nDesign\t6\t7\nDelivery\t8\t8',
   pie: 'Consulting\t45\nTraining\t30\nProducts\t15\nOther\t10',
   donut: 'Consulting\t45\nTraining\t30\nProducts\t15\nOther\t10',
   table: 'Product\tQ1\tQ2\tGrowth\nAlpha\t120\t135\t+12%\nBeta\t80\t95\t+19%\nGamma\t45\t60\t+33%',
@@ -4709,6 +4810,7 @@ const CHART_SAMPLES = {
 const CHART_INTROS = {
   chart: 'Paste rows straight from Excel or Numbers, or type them: one row per line, columns split by Tab, comma or semicolon. First column: labels. First row: series names (optional). Negative numbers work.',
   pie: 'One row per slice: a label, then its value. Percentages are computed for you.',
+  spider: 'Each row is one spoke of the web: a label, then a value per series (zero or positive). At least 3 rows.',
   table: 'Every cell becomes a table cell. The first row is the header; numbers align right on their own.',
 };
 function chartSpecFromUI(){
@@ -4724,9 +4826,10 @@ function chartSpecFromUI(){
 }
 function chartSyncTypeUI(){
   document.querySelectorAll('#chartTypeSeg button').forEach(b => b.classList.toggle('sel', b.dataset.ct === chartType));
-  $('chartAxisRow').classList.toggle('hidden', chartType === 'pie' || chartType === 'donut' || chartType === 'table');
+  $('chartAxisRow').classList.toggle('hidden', ['pie', 'donut', 'table', 'spider'].includes(chartType));
   $('chartLineOpts').classList.toggle('hidden', chartType !== 'line');
   $('chartIntro').textContent = chartType === 'table' ? CHART_INTROS.table
+    : chartType === 'spider' ? CHART_INTROS.spider
     : (chartType === 'pie' || chartType === 'donut') ? CHART_INTROS.pie : CHART_INTROS.chart;
 }
 function chartSetType(t){

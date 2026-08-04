@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.44.0
+
+- New chart type: Spider (radar). Each row is one spoke; each value column is one series drawn as a translucent filled shape with a crisp outline. The web grid, scale numbers, axis labels and legend are generated for you. Works with multiple series, keeps every value exactly on its spoke, and selecting an outline reveals its value rings, just like line charts.
+
 ## v3.43.0
 
 - Line charts are curved again, correctly this time: the new curves are interpolating splines, so they bend smoothly AND pass exactly through every value. A "Curved lines" checkbox in the dialog switches back to straight segments.

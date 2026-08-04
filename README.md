@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.43.0)
+# KoralPaper — *Draw your thinking* (v3.44.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -113,7 +113,7 @@ and Settings.
   the app
 - **Charts & tables (B):** paste numbers straight from a spreadsheet and get
   hand-drawn bars (vertical or sideways, multi-series, negatives welcome),
-  line charts, pies, donuts, or an elegant striped table — with title, axis
+  line charts, spider charts, pies, donuts, or an elegant striped table — with title, axis
   labels, legend, and a live preview. Everything lands as normal sketchy
   elements in one group: recolor any bar or slice with the usual controls,
   and right-click the chart to **edit its data** and rebuild it in place.
