@@ -1027,8 +1027,15 @@ function onPointerMove(ev){
   if (it.kind === 'move'){
     let dx = sx - it.startX, dy = sy - it.startY;
     if (Math.abs(dx) + Math.abs(dy) > 1.5 / state.camera.z) it.moved = true;
-    if (ev.shiftKey){ if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+    // ⇧ locks the drag to the dominant axis — and the lock must be
+    // re-asserted AFTER snapping, because grid/guide snapping would
+    // otherwise nudge the frozen axis onto the nearest line
+    const axisLock = ev.shiftKey ? (Math.abs(dx) > Math.abs(dy) ? 'y' : 'x') : null;
+    if (axisLock === 'y') dy = 0;
+    if (axisLock === 'x') dx = 0;
     [dx, dy] = snapMovingBounds(it.bbox, dx, dy, it.ids);
+    if (axisLock === 'y') dy = 0;
+    if (axisLock === 'x') dx = 0;
     for (const o of it.orig){
       const el = byId(o.id);
       if (!el) continue;

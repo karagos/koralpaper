@@ -1,5 +1,14 @@
 # KoralPaper — Changelog
 
+## v3.26.2 — 2026-08-04
+- **Fixed: ⇧-drag axis lock.** Holding Shift while dragging a selection
+  is supposed to lock the move to the horizontal or vertical axis, but
+  grid and alignment snapping ran afterwards and nudged the frozen axis
+  onto the nearest line — visible especially with multi-selections,
+  which are rarely grid-aligned. The lock is now re-asserted after
+  snapping, so a ⇧-drag stays perfectly straight while the free axis
+  still snaps. Also documented in the Help card.
+
 ## v3.26.1 — 2026-08-04
 - **Bridge 1.1.0: every Claude app works at once.** The connector can be
   installed in Claude Desktop, Claude Code and Cowork at the same time.
