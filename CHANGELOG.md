@@ -1,5 +1,12 @@
 # KoralPaper — Changelog
 
+## v3.45.0
+
+- Grid control for charts: a new Grid row in the dialog sets the style (Solid / Dash / Dots) and weight (Thin / Std / Bold) of the grey guide lines. It applies to the gridlines of bar and line charts and to the web rings and spokes of spider charts.
+- Curviness slider: the Lines row now has a 0 to 100 slider instead of the on/off checkbox. 0 is straight segments, 100 is fully curved, and anything between bends gently. Data points stay exact at every setting. Works on line charts (default 100) and spider charts (default 40 for new ones; existing spiders stay straight until you raise it).
+- Value dots are now available on spider charts too.
+- All of it is remembered per chart and preserved through "Edit chart data".
+
 ## v3.44.0
 
 - New chart type: Spider (radar). Each row is one spoke; each value column is one series drawn as a translucent filled shape with a crisp outline. The web grid, scale numbers, axis labels and legend are generated for you. Works with multiple series, keeps every value exactly on its spoke, and selecting an outline reveals its value rings, just like line charts.

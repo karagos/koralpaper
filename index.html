@@ -482,8 +482,23 @@
       <input type="text" id="chartXLabel" placeholder="X axis label (optional)" autocomplete="off">
       <input type="text" id="chartYLabel" placeholder="Y axis label (optional)" autocomplete="off">
     </div>
+    <div class="tplsaverow chartmeta chartopts hidden" id="chartGridOpts">
+      <span class="chartoptlabel">Grid</span>
+      <div class="segment chartminiseg" id="chartGridDash" title="Style of the grey guide lines">
+        <button data-gd="solid" class="sel">Solid</button>
+        <button data-gd="dashed">Dash</button>
+        <button data-gd="dotted">Dots</button>
+      </div>
+      <div class="segment chartminiseg" id="chartGridW" title="Weight of the grey guide lines">
+        <button data-gw="1">Thin</button>
+        <button data-gw="1.4" class="sel">Std</button>
+        <button data-gw="2.2">Bold</button>
+      </div>
+    </div>
     <div class="tplsaverow chartmeta chartopts hidden" id="chartLineOpts">
-      <label class="chartcheck" title="Smooth curves that still pass through every value"><input type="checkbox" id="chartCurved" checked> Curved lines</label>
+      <span class="chartoptlabel">Lines</span>
+      <label class="chartcheck chartslider" title="0 is straight segments, 100 is fully curved. Values always stay exact">Curviness
+        <input type="range" id="chartCurve" min="0" max="100" step="5" value="100"></label>
       <label class="chartcheck" title="Draw a small ring at every value. Off: selecting a line reveals its points"><input type="checkbox" id="chartDotsChk"> Value dots</label>
     </div>
     <div class="chartprevwrap">

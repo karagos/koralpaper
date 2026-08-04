@@ -4364,6 +4364,43 @@ function chartStep(range){
   const n = raw / mag;
   return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * mag;
 }
+/* dense path through every point. curve 0 = straight segments, 100 = full
+   Catmull-Rom; anything between is a cardinal spline (tangents scaled), so
+   the data vertices are ALWAYS interpolated exactly */
+function chartSpline(pts, curve, closed){
+  const k = clamp(curve == null ? 100 : curve, 0, 100) / 200; // 0.5 = Catmull-Rom
+  const straight = () => {
+    const loop = closed ? [...pts, pts[0].slice()] : pts;
+    const out = [loop[0].slice()];
+    for (let i = 1; i < loop.length; i++){
+      const [ax, ay] = loop[i - 1], [bx, by] = loop[i];
+      const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 12));
+      for (let q = 1; q <= n; q++) out.push([ax + (bx - ax) * q / n, ay + (by - ay) * q / n]);
+    }
+    return out;
+  };
+  if (pts.length < 3 || k === 0) return straight();
+  const P = i => closed ? pts[((i % pts.length) + pts.length) % pts.length]
+    : pts[Math.max(0, Math.min(pts.length - 1, i))];
+  const segs = closed ? pts.length : pts.length - 1;
+  const out = [P(0).slice()];
+  for (let i = 0; i < segs; i++){
+    const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
+    const m1 = [k * (p2[0] - p0[0]), k * (p2[1] - p0[1])];
+    const m2 = [k * (p3[0] - p1[0]), k * (p3[1] - p1[1])];
+    for (let q = 1; q <= 16; q++){
+      const t = q / 16, t2 = t * t, t3 = t2 * t;
+      const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+      out.push([
+        h00 * p1[0] + h10 * m1[0] + h01 * p2[0] + h11 * m2[0],
+        h00 * p1[1] + h10 * m1[1] + h01 * p2[1] + h11 * m2[1],
+      ]);
+    }
+  }
+  return out;
+}
+function chartGridDash(spec){ return spec.gridDash || 'solid'; }
+function chartGridW(spec){ return spec.gridW || 1.4; }
 /* title + legend header shared by bar and line charts; returns next free y */
 function chartHeader(els, spec, d, plotX, plotW, lineMode){
   let ty = 0;
@@ -4412,7 +4449,7 @@ function chartBuildBars(d, spec, horizontal){
     const y = v => plotY + plotH * (vmax - v) / (vmax - vmin);
     for (let v = vmin; v <= vmax + 1e-9; v += step){
       if (Math.abs(v) > 1e-9)
-        els.push(chartLine(plotX, y(v), plotX + plotW, y(v), 'glight', 1.3));
+        els.push(chartLine(plotX, y(v), plotX + plotW, y(v), 'glight', chartGridW(spec), chartGridDash(spec)));
       const t = chartText(chartFmt(v), 12, 'gmid');
       t.x = plotX - 10 - t.w; t.y = y(v) - t.h / 2;
       els.push(t);
@@ -4448,7 +4485,7 @@ function chartBuildBars(d, spec, horizontal){
     const x = v => plotX + plotW * (v - vmin) / (vmax - vmin);
     for (let v = vmin; v <= vmax + 1e-9; v += step){
       if (Math.abs(v) > 1e-9)
-        els.push(chartLine(x(v), plotY, x(v), plotY + plotH, 'glight', 1.3));
+        els.push(chartLine(x(v), plotY, x(v), plotY + plotH, 'glight', chartGridW(spec), chartGridDash(spec)));
       const t = chartText(chartFmt(v), 12, 'gmid');
       t.x = x(v) - t.w / 2; t.y = plotY + plotH + 8;
       els.push(t);
@@ -4493,40 +4530,16 @@ function chartBuildLine(d, spec){
   const y = v => plotY + plotH * (vmax - v) / (vmax - vmin);
   for (let v = vmin; v <= vmax + 1e-9; v += step){
     if (Math.abs(v) > 1e-9)
-      els.push(chartLine(plotX, y(v), plotX + plotW, y(v), 'glight', 1.3));
+      els.push(chartLine(plotX, y(v), plotX + plotW, y(v), 'glight', chartGridW(spec), chartGridDash(spec)));
     const t = chartText(chartFmt(v), 12, 'gmid');
     t.x = plotX - 10 - t.w; t.y = y(v) - t.h / 2;
     els.push(t);
   }
   const slot = plotW / nC;
   const px = i => plotX + slot * i + slot / 2;
-  const curved = spec.curved !== false;
   d.series.forEach((name, j) => {
     const abs = d.vals.map((row, i) => [px(i), y(row[j])]);
-    /* build a dense path THROUGH every data point: straight segments, or a
-       Catmull-Rom spline (which interpolates its vertices, unlike the
-       freehand smoothing that only grazes them) */
-    let dense;
-    if (curved && abs.length >= 3){
-      dense = [abs[0]];
-      for (let i = 0; i < abs.length - 1; i++){
-        const p0 = abs[i - 1] || abs[i], p1 = abs[i], p2 = abs[i + 1], p3 = abs[i + 2] || p2;
-        for (let k = 1; k <= 16; k++){
-          const t = k / 16, t2 = t * t, t3 = t2 * t;
-          dense.push([
-            0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
-            0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3),
-          ]);
-        }
-      }
-    } else {
-      dense = [abs[0]];
-      for (let i = 1; i < abs.length; i++){
-        const [ax, ay] = abs[i - 1], [bx, by] = abs[i];
-        const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 12));
-        for (let k = 1; k <= n; k++) dense.push([ax + (bx - ax) * k / n, ay + (by - ay) * k / n]);
-      }
-    }
+    const dense = chartSpline(abs, spec.curve, false);
     const minX = Math.min(...dense.map(p => p[0])), minY = Math.min(...dense.map(p => p[1]));
     const ln = newElement('draw', minX, minY, {
       stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 3, sketch: 1, fill: 'none',
@@ -4658,12 +4671,13 @@ function chartBuildSpider(d, spec){
     for (let i = 0; i < n; i++) ring.push(pt(i, v));
     ring.push(ring[0].slice());
     els.push(mkDraw(densify(ring), {
-      stroke: Math.abs(v - vmax) < 1e-9 ? 'gmid' : 'glight', sw: 1.3, sketch: 1, fill: 'none',
+      stroke: Math.abs(v - vmax) < 1e-9 ? 'gmid' : 'glight', sw: chartGridW(spec), sketch: 1, fill: 'none',
+      dash: chartGridDash(spec),
     }));
   }
   for (let i = 0; i < n; i++){
     const [sx2, sy2] = pt(i, vmax);
-    els.push(chartLine(cx, cy, sx2, sy2, 'glight', 1.3));
+    els.push(chartLine(cx, cy, sx2, sy2, 'glight', chartGridW(spec), chartGridDash(spec)));
   }
   // scale labels up the top spoke
   for (let v = step; v <= vmax + 1e-9; v += step){
@@ -4683,8 +4697,7 @@ function chartBuildSpider(d, spec){
   // series: translucent fill underneath, crisp outline on top
   d.series.forEach((name, j) => {
     const verts = d.vals.map((row, i) => pt(i, row[j]));
-    const closed = [...verts, verts[0].slice()];
-    const dense = densify(closed);
+    const dense = chartSpline(verts, spec.curve == null ? 0 : spec.curve, true);
     els.push(mkDraw(dense, {
       fill: CHART_FILLS[j % CHART_FILLS.length], stroke: 'none', sketch: 1, opacity: 30,
     }));
@@ -4693,6 +4706,13 @@ function chartBuildSpider(d, spec){
     });
     outline.chartDots = verts.map(pp => [pp[0] - outline.x, pp[1] - outline.y]);
     els.push(outline);
+    if (spec.dots) verts.forEach(pp => {
+      const dot = newElement('ellipse', pp[0] - 4.5, pp[1] - 4.5, {
+        fill: 'white', stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 2.4, sketch: 1,
+      });
+      dot.w = 9; dot.h = 9;
+      els.push(dot);
+    });
   });
   // legend + title above the web
   let topY = -(R + 46);
@@ -4820,14 +4840,21 @@ function chartSpecFromUI(){
     title: $('chartTitle').value.trim(),
     xl: $('chartXLabel').value.trim(),
     yl: $('chartYLabel').value.trim(),
-    curved: $('chartCurved').checked,
+    curve: Number($('chartCurve').value),
     dots: $('chartDotsChk').checked,
+    gridDash: (document.querySelector('#chartGridDash .sel') || {}).dataset?.gd || 'solid',
+    gridW: Number((document.querySelector('#chartGridW .sel') || {}).dataset?.gw || 1.4),
   };
+}
+function chartSetSeg(segId, attr, value){
+  document.querySelectorAll('#' + segId + ' button').forEach(b =>
+    b.classList.toggle('sel', b.dataset[attr] === String(value)));
 }
 function chartSyncTypeUI(){
   document.querySelectorAll('#chartTypeSeg button').forEach(b => b.classList.toggle('sel', b.dataset.ct === chartType));
   $('chartAxisRow').classList.toggle('hidden', ['pie', 'donut', 'table', 'spider'].includes(chartType));
-  $('chartLineOpts').classList.toggle('hidden', chartType !== 'line');
+  $('chartLineOpts').classList.toggle('hidden', chartType !== 'line' && chartType !== 'spider');
+  $('chartGridOpts').classList.toggle('hidden', ['pie', 'donut', 'table'].includes(chartType));
   $('chartIntro').textContent = chartType === 'table' ? CHART_INTROS.table
     : chartType === 'spider' ? CHART_INTROS.spider
     : (chartType === 'pie' || chartType === 'donut') ? CHART_INTROS.pie : CHART_INTROS.chart;
@@ -4835,6 +4862,7 @@ function chartSyncTypeUI(){
 function chartSetType(t){
   chartType = t;
   chartSyncTypeUI();
+  $('chartCurve').value = t === 'spider' ? 40 : 100;
   if (!chartDirty) $('chartData').value = CHART_SAMPLES[t];
   chartPreviewRefresh();
 }
@@ -4874,8 +4902,11 @@ function chartOpen(fromEl){
     $('chartTitle').value = c.title || '';
     $('chartXLabel').value = c.xl || '';
     $('chartYLabel').value = c.yl || '';
-    $('chartCurved').checked = c.curved !== false;
+    $('chartCurve').value = c.curve != null ? c.curve
+      : c.curved === false ? 0 : (c.type === 'spider' ? 0 : 100);
     $('chartDotsChk').checked = !!c.dots;
+    chartSetSeg('chartGridDash', 'gd', c.gridDash || 'solid');
+    chartSetSeg('chartGridW', 'gw', c.gridW || 1.4);
     chartDirty = true;
   } else if (!chartDirty && !$('chartData').value){
     $('chartData').value = CHART_SAMPLES[chartType];
@@ -4939,8 +4970,14 @@ $('chartData').addEventListener('keydown', ev => {
 });
 ['chartTitle', 'chartXLabel', 'chartYLabel'].forEach(id =>
   $(id).addEventListener('input', chartPreviewRefresh));
-['chartCurved', 'chartDotsChk'].forEach(id =>
-  $(id).addEventListener('change', chartPreviewRefresh));
+$('chartDotsChk').addEventListener('change', chartPreviewRefresh);
+$('chartCurve').addEventListener('input', chartPreviewRefresh);
+document.querySelectorAll('#chartGridDash button, #chartGridW button').forEach(b =>
+  b.addEventListener('click', () => {
+    const seg = b.closest('.segment');
+    seg.querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b));
+    chartPreviewRefresh();
+  }));
 $('chartAddBtn').addEventListener('click', chartApply);
 $('chartCloseBtn').addEventListener('click', () => { $('chartDialog').classList.add('hidden'); chartEditCtx = null; });
 $('chartToolBtn').addEventListener('click', () => chartOpen(null));
