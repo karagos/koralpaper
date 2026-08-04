@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.39.0 — 2026-08-04
+- **A real font picker.** The Font dropdown was a native browser
+  control, which is why its group labels could not match the app's
+  style. It is now a KoralPaper popover: coral group headers (Built-in,
+  Sans & display, Serif, Mono, Hand & script, Pixel & dot) — and every
+  font name is previewed **in its own typeface**, so you see what
+  Playfair, Caveat or JetBrains Mono actually look like before
+  choosing. The current font is highlighted and scrolled into view,
+  and the Font button itself shows the active font in its own face.
+
 ## v3.38.0 — 2026-08-04
 - **Page through all 3,000 Material icons.** The icon popup's grid was
   stuck at nine icons; it now has ‹ › arrows with a page counter.

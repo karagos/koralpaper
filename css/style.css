@@ -211,12 +211,21 @@ body.dark .menu button.danger{color:#F09070;}
 .swatch.custom input{position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;}
 .swatch.custom.picked{background:var(--picked, #D97757);}
 
-.fontselect{
+.fontbtn{
   font-family:var(--sans); font-size:13px; font-weight:500; color:var(--ink);
   background:var(--card-2); border:1.5px solid var(--line-soft); border-radius:8px;
-  padding:7px 8px; width:100%; cursor:pointer; outline:none;
+  padding:7px 9px; width:100%; cursor:pointer; outline:none;
+  display:flex; align-items:center; gap:6px; text-align:left;
 }
-.fontselect:focus{border-color:var(--coral);}
+.fontbtn:hover{border-color:var(--line);}
+.fontbtn #fontBtnLabel{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.fontcaret{font-size:9px; opacity:.5;}
+.fontmenu{
+  position:fixed; z-index:60; width:228px;
+  overflow-y:auto; overscroll-behavior:contain;
+}
+.fontmenu button{font-size:14.5px; padding:7px 11px;}
+.fontmenu button.sel{background:var(--coral-soft);}
 .headrow{display:flex; flex-direction:column; gap:5px;}
 .headrow select{width:100%;}
 

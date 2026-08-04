@@ -267,7 +267,10 @@
     </div>
     <div class="row zonegap" id="rowTextColor"><label>Text color</label><div class="swatches" id="textSwatches"></div></div>
     <div class="row" id="rowFont"><label>Font</label>
-      <select id="fontSelect" class="fontselect"></select>
+      <button class="fontbtn" id="fontBtn" title="Font family">
+        <span id="fontBtnLabel">Sans</span><span class="fontcaret">▾</span>
+      </button>
+      <div class="menu fontmenu hidden" id="fontMenu"></div>
     </div>
     <div class="row" id="rowSize"><label>Size</label>
       <div class="segment" id="sizeSeg">

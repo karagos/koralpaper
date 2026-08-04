@@ -2159,7 +2159,9 @@ function syncPanel(){
     ? !!val('elbow')
     : (!val('elbow') && Number(b.dataset.v) === val('curve')));
   const fontVal = val('font');
-  $('fontSelect').value = typeof fontVal === 'string' ? fontVal : '';
+  const fSel = (typeof fontVal === 'string' && FONTS[fontVal]) ? fontVal : null;
+  $('fontBtnLabel').textContent = fSel ? FONTS[fSel].label : '—';
+  $('fontBtnLabel').style.fontFamily = fSel ? FONTS[fSel].stack : '';
   markSel('#sizeSeg button', b => Number(b.dataset.v) === val('size'));
   markSel('#alignSeg button', b => b.dataset.v === val('align'));
   markSel('#valignSeg button', b => b.dataset.v === (val('valign') || 'middle'));
@@ -2354,28 +2356,52 @@ $('adjResetBtn').addEventListener('click', () => {
 
 /* ── font picker ───────────────────────────────────── */
 function buildFontSelect(){
-  const sel = $('fontSelect');
-  const hidden = document.createElement('option');
-  hidden.value = ''; hidden.hidden = true; hidden.textContent = '—';
-  sel.appendChild(hidden);
-  const groups = new Map(FONT_GROUPS.map(g => {
-    const og = document.createElement('optgroup');
-    og.label = g;
-    return [g, og];
-  }));
-  for (const [key, f] of Object.entries(FONTS)){
-    const o = document.createElement('option');
-    o.value = key; o.textContent = f.label;
-    o.style.fontFamily = f.stack;
-    (groups.get(f.group) || groups.get('Built-in')).appendChild(o);
+  const menu = $('fontMenu');
+  for (const g of FONT_GROUPS){
+    const head = document.createElement('div');
+    head.className = 'menuhead';
+    head.textContent = g;
+    menu.appendChild(head);
+    for (const [key, f] of Object.entries(FONTS)){
+      if ((f.group || 'Built-in') !== g) continue;
+      const b = document.createElement('button');
+      b.dataset.font = key;
+      b.textContent = f.label;
+      b.style.fontFamily = f.stack;   // each font previews itself
+      b.addEventListener('click', ev => {
+        ev.stopPropagation();
+        requestFontLoad(key); // fetch the file now — 'loadingdone' repaints
+        applyStyle({ font: key });
+        closeFontMenu();
+      });
+      menu.appendChild(b);
+    }
   }
-  for (const og of groups.values()) sel.appendChild(og);
-  sel.addEventListener('change', () => {
-    if (!sel.value) return;
-    requestFontLoad(sel.value); // fetch the file now — 'loadingdone' repaints
-    applyStyle({ font: sel.value });
+  $('fontBtn').addEventListener('click', ev => {
+    ev.stopPropagation();
+    if (menu.classList.contains('hidden')) openFontMenu(); else closeFontMenu();
+  });
+  document.addEventListener('pointerdown', ev => {
+    const t = ev.target;
+    if (!t || !t.closest || (!t.closest('#fontMenu') && !t.closest('#fontBtn'))) closeFontMenu();
   });
 }
+function openFontMenu(){
+  const m = $('fontMenu');
+  const r = $('fontBtn').getBoundingClientRect();
+  m.classList.remove('hidden');
+  m.style.left = Math.min(r.left, window.innerWidth - 244) + 'px';
+  const below = window.innerHeight - r.bottom - 20;
+  if (below > 220){ m.style.top = (r.bottom + 6) + 'px'; m.style.bottom = 'auto'; m.style.maxHeight = below + 'px'; }
+  else { m.style.top = '8px'; m.style.bottom = 'auto'; m.style.maxHeight = (r.top - 16) + 'px'; }
+  for (const k of Object.keys(FONTS)) requestFontLoad(k);  // names render in themselves
+  const sel = selected();
+  const cur = sel.length ? sel[0].font : defaults.font;
+  m.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.font === cur));
+  const curBtn = m.querySelector('button.sel');
+  if (curBtn) curBtn.scrollIntoView({ block: 'center' });
+}
+function closeFontMenu(){ $('fontMenu').classList.add('hidden'); }
 function loadGoogleFonts(){
   const link = document.createElement('link');
   link.rel = 'stylesheet';
