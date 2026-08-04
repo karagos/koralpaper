@@ -23,6 +23,7 @@ const state = {
   theme: 'light',
   bgColor: null,         // custom paper color (hex) or null = theme default
   board: null,           // {name,w,h,x,y} artboard, or null = unlimited canvas
+  images: {},            // shared image store: imgId → data URL (pixels live ONCE)
 };
 /* user-adjustable width + text-size presets (Settings panel), persisted separately */
 const SETTINGS_KEY = 'koralpaper.settings';
@@ -500,6 +501,42 @@ function serialize(){
   return JSON.stringify({ pages: state.pages, pageIndex: state.pageIndex },
     (k, v) => k.startsWith('_') ? undefined : v);
 }
+
+/* ── shared image store ─────────────────────────────
+   Image pixels are stored ONCE per unique image in state.images and
+   referenced by el.imgId; the element carries the pixels only at
+   runtime as el._src, which every serializer already strips. History
+   snapshots, the clipboard and autosave therefore stay small no matter
+   how many photos the document holds or how deep undo goes. */
+function imageHash(src){
+  let h = 5381;
+  for (let i = 0; i < src.length; i++) h = ((h << 5) + h + src.charCodeAt(i)) >>> 0;
+  return 'im' + h.toString(36) + src.length.toString(36);
+}
+function internImage(el){
+  const src = el._src || el.src;
+  delete el.src;                       // legacy field never survives in memory
+  if (!src){
+    if (el.imgId && state.images[el.imgId]) el._src = state.images[el.imgId];
+    return;
+  }
+  if (!el.imgId || state.images[el.imgId] !== src){
+    el.imgId = imageHash(src);
+    state.images[el.imgId] = src;      // identical images share one entry
+  }
+  el._src = src;
+}
+function adoptImages(els){
+  for (const el of els) if (el.type === 'image') internImage(el);
+}
+function usedImages(){
+  const used = {};
+  for (const p of state.pages)
+    for (const el of p.elements)
+      if (el.type === 'image' && el.imgId && state.images[el.imgId] !== undefined)
+        used[el.imgId] = state.images[el.imgId];
+  return used;
+}
 function commit(){
   lastCoalesce.key = null; // an unrelated commit breaks any coalescing run
   history = history.slice(0, histIndex + 1);
@@ -535,6 +572,7 @@ function restore(json){
   state.pages = doc.pages;
   state.pageIndex = clamp(doc.pageIndex, 0, doc.pages.length - 1);
   state.elements = state.pages[state.pageIndex].elements;
+  for (const p of state.pages) adoptImages(p.elements);
   const ids = new Set(state.elements.map(e => e.id));
   state.selection = new Set([...state.selection].filter(id => ids.has(id)));
   updateBoundArrows(state.elements);
@@ -561,8 +599,8 @@ function scheduleAutosave(){
     try {
       const doc = JSON.parse(serialize());
       localStorage.setItem(STORE_KEY, JSON.stringify({
-        v: 5, appVersion: APP_VERSION,
-        pages: doc.pages, pageIndex: doc.pageIndex,
+        v: 6, appVersion: APP_VERSION,
+        pages: doc.pages, pageIndex: doc.pageIndex, images: usedImages(),
         camera: state.camera, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
         theme: state.theme, bgColor: state.bgColor, board: state.board,
       }));
@@ -593,6 +631,8 @@ function loadSaved(){
       state.pageIndex = 0;
     } else return false;
     state.elements = state.pages[state.pageIndex].elements;
+    state.images = data.images || {};
+    for (const p of state.pages) adoptImages(p.elements);
     if (data.camera) state.camera = data.camera;
     state.grid = typeof data.grid === 'string' ? data.grid : (data.grid !== false ? 'grid' : 'off');
     state.gridSize = clamp(Number(data.gridSize) || GRID, 6, 120);
@@ -1561,6 +1601,7 @@ function duplicateElements(els, dx, dy){
     if (c.endBind) c.endBind = idMap.get(c.endBind) || null;
   }
   state.elements.push(...clones);
+  adoptImages(clones);
   return clones;
 }
 function copySelection(){
@@ -2376,7 +2417,8 @@ function insertAsset(a){
   const target = 240 / state.camera.z;
   const s = target / Math.max(a.w, a.h);
   const el = newElement('image', 0, 0, {});
-  el.src = a.src;
+  el._src = a.src;
+  internImage(el);
   el.w = Math.max(20, a.w * s);
   el.h = Math.max(20, a.h * s);
   el.x = cx - el.w / 2; el.y = cy - el.h / 2;
@@ -2797,7 +2839,7 @@ function applyCropRect(el, sx0, sy0, sx1, sy1){
 }
 function resetCrop(el){
   if (!el.crop) return;
-  const entry = getImageEntry(el.src);
+  const entry = getImageEntry(el._src);
   el.crop = null;
   if (entry.ready){
     const cx = el.x + el.w/2, cy = el.y + el.h/2;
@@ -2841,7 +2883,8 @@ function insertImageFiles(files, sx, sy){
           [cx, cy] = toScene(canvas.clientWidth / 2, canvas.clientHeight / 2);
         }
         const el = newElement('image', cx - w/2 + idx * 26, cy - h/2 + idx * 26, {});
-        el.src = dataURL; el.w = w; el.h = h;
+        el._src = dataURL; el.w = w; el.h = h;
+        internImage(el);
         state.elements.push(el);
         setTool('select');
         setSelection(new Set([el.id]));
@@ -3369,6 +3412,7 @@ function newDocument(){
   state.selection = new Set();
   state.board = null;
   state.bgColor = null;
+  state.images = {};
   state.camera = { x: 0, y: 0, z: 1 };
   try { localStorage.removeItem('asterisk.docname'); } catch (e){}
   buildPageStrip();
@@ -3418,8 +3462,8 @@ function download(name, url){
 function saveJSON(){
   const doc = JSON.parse(serialize());
   const data = {
-    app: 'koralpaper', version: 5, appVersion: APP_VERSION,
-    pages: doc.pages, pageIndex: doc.pageIndex,
+    app: 'koralpaper', version: 6, appVersion: APP_VERSION,
+    pages: doc.pages, pageIndex: doc.pageIndex, images: usedImages(),
     appState: { theme: state.theme, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
       bgColor: state.bgColor, board: state.board },
   };
@@ -3465,6 +3509,8 @@ fileInput.addEventListener('change', () => {
         state.pageIndex = 0;
       }
       state.elements = state.pages[state.pageIndex].elements;
+      state.images = data.images || {};
+      for (const pg of state.pages) adoptImages(pg.elements);
       buildPageStrip();
       if (data.appState){
         state.theme = data.appState.theme === 'dark' ? 'dark' : 'light';
@@ -3755,6 +3801,7 @@ function clonePageElements(els){
     if (c.startBind) c.startBind = idMap.get(c.startBind) || null;
     if (c.endBind) c.endBind = idMap.get(c.endBind) || null;
   }
+  adoptImages(clones);
   return clones;
 }
 function applyTemplate(def){
@@ -3797,7 +3844,13 @@ function loadUserTemplates(){ return tplStore().user; }
 /* snapshot the current document (or just the active page) as template data */
 function tplSnapshot(name, scope){
   syncPageRef();
-  const strip = els => JSON.parse(JSON.stringify(els, (k, v) => k.startsWith('_') ? undefined : v));
+  const strip = els => {
+    const out = JSON.parse(JSON.stringify(els, (k, v) => k.startsWith('_') ? undefined : v));
+    // templates outlive this document, so they carry their own pixels
+    for (const el of out)
+      if (el.type === 'image' && el.imgId && state.images[el.imgId]) el.src = state.images[el.imgId];
+    return out;
+  };
   const pages = scope === 'all'
     ? state.pages.map(p => ({ name: p.name, elements: strip(p.elements) }))
     : [{ name: state.pages[state.pageIndex].name || name, elements: strip(state.elements) }];
@@ -4028,11 +4081,11 @@ function exportExcalidraw(){
         fontFamily: excalFont(el.font), textAlign: el.align || 'left',
         verticalAlign: 'top', containerId: null, lineHeight: 1.3, autoResize: true,
       });
-    } else if (el.type === 'image' && el.src){
+    } else if (el.type === 'image' && el._src){
       const fileId = 'f' + el.id;
       files[fileId] = {
-        mimeType: el.src.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
-        id: fileId, dataURL: el.src, created: 1,
+        mimeType: el._src.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
+        id: fileId, dataURL: el._src, created: 1,
       };
       out.push({
         ...base(el), type: 'image', width: el.w, height: el.h,
@@ -4122,7 +4175,8 @@ function importExcalidraw(data){
         const f = files[ex.fileId];
         if (f && f.dataURL){
           el = newElement('image', ex.x, ex.y, {});
-          el.src = f.dataURL; el.w = ex.width; el.h = ex.height;
+          el._src = f.dataURL; el.w = ex.width; el.h = ex.height;
+          internImage(el);
           el.opacity = style.opacity;
         }
         break;

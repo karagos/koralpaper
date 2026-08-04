@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.29.0';
+const APP_VERSION = '3.30.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -249,7 +249,7 @@ function newElement(type, x, y, style){
   if (type === 'rect'){ el.fill = 'cream'; }
   if (type === 'icon'){ el.kind = 'asterisk'; el.stroke = 'none'; el.fill = 'coral'; }
   if (type === 'image'){
-    el.src = ''; el.artStyle = 'photo'; el.detail = 2;
+    el._src = ''; el.imgId = null; el.artStyle = 'photo'; el.detail = 2;
     el.bright = 0; el.contrast = 0; el.gamma = 1; el.sharp = 0;
   }
   if (type === 'text'){ el.align = 'left'; el.font = 'sans'; }
@@ -1377,7 +1377,7 @@ function buildAdjusted(base, el){
   return { canvas: c, entry };
 }
 function getAdjusted(el){
-  const base = getImageEntry(el.src);
+  const base = getImageEntry(el._src);
   if (!base.ready) return null;
   const key = adjKey(el);
   if (key === '0|0|1.00|0') return { canvas: base.img, entry: base };
@@ -2001,8 +2001,8 @@ function artPrims(el, entry){
 
 function drawImageEl(ctx, el, pal){
   const b = boundsOf(el);
-  if (!el.src) return;
-  const entry = getImageEntry(el.src);
+  if (!el._src) return;
+  const entry = getImageEntry(el._src);
   if (!entry.ready){
     ctx.strokeStyle = pal.grid;
     ctx.lineWidth = 1.5;
@@ -2481,11 +2481,11 @@ function renderSceneSVG(elements, opts){
     const parts = [];
 
     if (el.type === 'image'){
-      const baseEntry = getImageEntry(el.src);
+      const baseEntry = getImageEntry(el._src);
       const A = baseEntry.ready ? getAdjusted(el) : null;
       const photoHref = () => (A && A.canvas !== baseEntry.img)
-        ? A.canvas.toDataURL(el.src.startsWith('data:image/png') ? 'image/png' : 'image/jpeg', 0.9)
-        : el.src;
+        ? A.canvas.toDataURL(el._src.startsWith('data:image/png') ? 'image/png' : 'image/jpeg', 0.9)
+        : el._src;
       if (!el.artStyle || el.artStyle === 'photo' || !baseEntry.ready){
         if (el.crop){
           // scale the full image so the crop window fills the element, clipped

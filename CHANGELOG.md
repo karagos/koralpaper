@@ -1,5 +1,21 @@
 # KoralPaper — Changelog
 
+## v3.30.0 — 2026-08-04
+- **Shared image store (save format v6).** Image pixels are now stored
+  ONCE per unique image and referenced by id, instead of being embedded
+  in every element, every undo snapshot, and every autosave. The
+  numbers: with a photo on the page, each undo step used to carry the
+  full photo again (120 snapshots × every image); now snapshots are a
+  few KB regardless of photos, duplicated photos share one copy, and
+  .json files shrink accordingly. Undo depth, memory use and autosave
+  headroom all improve at once — this directly delays the "document too
+  big to autosave" ceiling.
+- Fully backward compatible: old .json files and old autosaves load
+  exactly as before (their embedded images are adopted into the store
+  on open). Templates remain self-contained and carry their own pixels;
+  crop, photo adjustments, all 13 art styles, Excalidraw round trips,
+  copy/paste and the Claude bridge are unaffected — all verified.
+
 ## v3.29.0 — 2026-08-04
 - **Autosave failure is loud now.** When the document outgrows the
   browser's storage, autosave used to fail silently — a reload would
