@@ -197,7 +197,8 @@ const ELEMENT_SCHEMA = {
     textColor: { type: 'string', description: 'Text color, independent of the outline — use a light color (white, glight) on dark fills. Values: ' + STROKES + '. Omit or "auto" = follows the stroke, auto-flips to light on dark fills.' },
     fillStyle: { type: 'string', enum: ['solid', 'hachure', 'dense', 'cross', 'dots', 'waves'] },
     dash: { type: 'string', enum: ['solid', 'dotted', 'dashed'] },
-    size: { type: 'number', description: 'Font size in px (default 21; 16 for chips and arrow labels).' },
+    size: { type: 'number', description: 'Font size in px (default 21; 16 for chips and arrow labels; up to 300 for poster headlines).' },
+    bold: { type: 'boolean', description: 'true = render the whole text bold (headlines, table headers).' },
     font: { type: 'string', description: 'serif, sans, hand, or a Google font key like playfair, spacegrotesk, caveat.' },
     align: { type: 'string', enum: ['left', 'center', 'right'] },
     sketch: { type: 'number', description: '1 = hand-drawn wobble (default), 0 = neat straight lines.' },
@@ -327,7 +328,7 @@ function onMessage(msg){
     reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'koralpaper', version: '1.2.0' },
+      serverInfo: { name: 'koralpaper', version: '1.3.0' },
       instructions: 'These tools draw directly in the KoralPaper app (hand-drawn diagram studio) running in the user\'s browser. Workflow: koralpaper_status → koralpaper_read_document (if editing) → create/add/update → koralpaper_render_page to visually check the result, and iterate until the layout is clean.',
     });
     return;

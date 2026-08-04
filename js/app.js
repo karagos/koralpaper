@@ -3414,6 +3414,33 @@ $('claudeLinkBtn').addEventListener('click', () => {
 });
 
 /* the fallback prompt: teaches any Claude the KoralPaper file format */
+const REPLICA_PROMPT = `You are a REPLICA engine for KoralPaper. I will give you one or more reference images (or PDF pages). Recreate each one as faithfully as possible as a KoralPaper page, using the KoralPaper MCP tools. You are COPYING, not designing: add nothing that is not in the reference, remove nothing, "improve" nothing.
+
+PROCESS, in this exact order:
+1. koralpaper_status once, to confirm the app is linked.
+2. For EACH reference image, in the order given, exactly one page:
+   a. Study the reference: aspect ratio, background color, layout grid, and every text block (exact wording, casing, line breaks, weight, color, alignment, size relative to the page width).
+   b. koralpaper_create_page with:
+      - board: 1080 wide, height matching the reference aspect (1080x1350 for 4:5, 1080x1440 for 3:4, 1080x1080 for square, 1080x1920 for 9:16)
+      - paper: the exact background color as #hex
+      - all elements of the design
+   c. koralpaper_render_page and compare your result with the reference.
+   d. Fix every difference you can see with koralpaper_update_elements / koralpaper_add_elements / koralpaper_delete_elements, then render again. Stop when it matches or after 3 correction rounds.
+
+RULES (these make you deterministic):
+- Text VERBATIM. Copy every string exactly: casing, punctuation, apostrophes. Never paraphrase, never translate, never add words.
+- One text element PER LINE of the reference. That reproduces line breaks exactly, and a word with a different color gets its own element on the same baseline.
+- Measure by proportion. Everything scales from the reference width to the 1080 board: a headline spanning 80% of the width is w=864. Font size = the letter height as a fraction of page width x 1080 (poster headlines often 90 to 160, size can go up to 300).
+- Colors as #hex sampled from the reference (paper, text, blocks). Do not swap brand colors for palette names.
+- "sketch":0 on every element (crisp poster look) unless the reference is clearly hand-drawn.
+- "bold":true for bold text. Fonts: sans for grotesk/Helvetica posters, spacegrotesk for geometric, playfair for editorial serif, jetbrains for mono.
+- Color blocks, stripes, footer bars = rect. Dots and circles = ellipse. Small logo marks: approximate with 1-3 tiny shapes or skip; photos: skip. Say what you skipped in one line.
+- Nothing extra: no decorations, captions, or watermarks that are not in the reference.
+
+When done, reply with one line per page: what matched and what was approximated.
+
+The reference image(s) follow.`;
+
 const DESIGN_PROMPT = `You are designing a diagram for KoralPaper, a hand-drawn-style sketch app. Answer ONLY with a JSON code block in exactly this format, nothing else:
 
 {"app":"koralpaper","version":5,
@@ -3434,11 +3461,20 @@ Rules:
 - fill colors: none, cream, white, coral, terracotta, blush, periwinkle, sage, butter, sky, glight, gmid, gdark, ink, or #hex
 - Coordinates: y grows downward, origin top-left of the board. Typical box 190×92, gaps 100 to 120 px, keep 60 px margins.
 - "sketch":1 = hand-drawn wobble (default look), 0 = neat.
+- optional "runs" on any text: [{"s":0,"e":5,"b":true}] makes characters s..e bold ("i":true italic, "co":"coral" colors them).
 - Multi-page is allowed: more entries in "pages". Omit "board" in appState for an unlimited canvas.
 
 The user saves your JSON as a .json file and opens it in KoralPaper. Now design what the user asks below, thinking about clear layout and generous spacing.
 
 MY REQUEST: `;
+$('copyReplicaBtn').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(REPLICA_PROMPT);
+    showHint('Replica prompt copied. Paste it into Claude Desktop together with the image(s)');
+  } catch (e){
+    prompt('Copy this prompt:', REPLICA_PROMPT);
+  }
+});
 $('copyPromptBtn').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(DESIGN_PROMPT);
@@ -5824,7 +5860,7 @@ function claudeBuildElement(spec, idMap){
     dash: ['solid', 'dotted', 'dashed'].includes(spec.dash) ? spec.dash : 'solid',
     sw: widths.medium, sketch: spec.sketch === 0 ? 0 : 1, round: 1, opacity: 100,
     font: (typeof spec.font === 'string' && FONTS[spec.font]) ? spec.font : 'sans',
-    size: Number(spec.size) > 0 ? clamp(Number(spec.size), 8, 160)
+    size: Number(spec.size) > 0 ? clamp(Number(spec.size), 8, 300)
       : (kind === 'chip' || kind === 'arrow' || kind === 'line' ? 16 : 21),
     align: ['left', 'center', 'right'].includes(spec.align) ? spec.align : (kind === 'text' ? 'left' : 'center'),
     lh: typo.lh, pgap: typo.pgap, lspace: typo.lspace, valign: 'middle',
@@ -5833,6 +5869,8 @@ function claudeBuildElement(spec, idMap){
   const x = Number(spec.x) || 0, y = Number(spec.y) || 0;
   const el = newElement(kind, x, y, style);
   el.x = x; el.y = y;
+  if (spec.bold && typeof spec.text === 'string' && spec.text.length)
+    el.runs = [{ s: 0, e: spec.text.length, b: true, i: false, hl: null, co: null }];
   if (kind === 'arrow' || kind === 'line'){
     el.curve = 0;
     el.elbow = !!spec.elbow;
@@ -5943,7 +5981,7 @@ async function claudeExecute(action, args){
       if (u.fill !== undefined) el.fill = claudeColor(u.fill, FILL_KEYS, el.fill);
       if (u.fillStyle !== undefined && ['solid','hachure','dense','cross','dots','waves'].includes(u.fillStyle)) el.fillStyle = u.fillStyle;
       if (u.dash !== undefined && ['solid','dotted','dashed'].includes(u.dash)) el.dash = u.dash;
-      if (u.size !== undefined && Number(u.size) > 0) el.size = clamp(Number(u.size), 8, 160);
+      if (u.size !== undefined && Number(u.size) > 0) el.size = clamp(Number(u.size), 8, 300);
       if (u.font !== undefined && FONTS[u.font]) el.font = u.font;
       if (u.align !== undefined && ['left','center','right'].includes(u.align)) el.align = u.align;
       if (u.textColor !== undefined) el.textColor = (!u.textColor || u.textColor === 'auto') ? null : claudeColor(u.textColor, STROKE_KEYS, el.textColor);

@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.48.0
+
+- Recreate a design from an image: the Claude tab in Help now has a "Copy the replica prompt" button. Paste the prompt into Claude Desktop together with a poster, slide or PDF page (several images = several pages) and Claude rebuilds it in KoralPaper: exact texts, sampled colors, proportional layout, one page per image, checking its own result with a rendered screenshot and correcting up to 3 rounds.
+- Claude bridge 1.3.0: elements accept "bold": true (bold headlines and labels) and font sizes up to 300 px for poster type. Update the extension by double-clicking the new mcp/koralpaper.mcpb; the replica prompt also documents the flag, so it works with the old extension too.
+- The design prompt (no-desktop route) now documents runs: bold, italic and per-letter colors in saved JSON files.
+
 ## v3.47.0
 
 - Two chart styles: a Style row in the dialog switches every chart and table between Sketchy (the hand-drawn wobble) and Clean (crisp, straight, professional). It applies to all types: tables, bars, pies, donuts, lines and spiders, including the legend and labels.
