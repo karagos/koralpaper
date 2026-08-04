@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' file:; style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com; font-src 'self' file: https://fonts.gstatic.com; img-src 'self' file: data: blob:; connect-src 'self' http://127.0.0.1:8137 http://localhost:8137 https://fonts.googleapis.com https://fonts.gstatic.com; object-src 'none'; base-uri 'none'; form-action 'none';">
 <title>KoralPaper — Draw your thinking</title>
 <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M30 10 Q56 6 82 10 Q85 36 82 62 Q56 66 29 62 Q26 36 30 10 Z" stroke="%231F1E1B" stroke-width="7"/><g stroke="%23D97757" stroke-width="8"><path d="M56 20 Q55 36 56 52"/><path d="M41 28 Q56 35 71 44"/><path d="M71 28 Q56 35 41 44"/></g><circle cx="24" cy="74" r="7" fill="%231F1E1B"/><circle cx="13" cy="86" r="5" fill="%231F1E1B"/></svg>'>
 <link rel="stylesheet" href="css/style.css">
@@ -103,7 +104,7 @@
     <div id="assetMenu" class="iconmenu assetmenu hidden">
       <div class="menuhead">Your gallery</div>
       <div id="assetGrid"></div>
-      <p class="assethint" id="assetHint">Logos &amp; marks you reuse — SVG stays pure vector,
+      <p class="assethint" id="assetHint">Logos &amp; marks you reuse. SVG stays pure vector,
         PNG keeps transparency. Click to place · right-click to remove.</p>
       <button class="minipill" id="assetAddBtn">Add SVG / PNG…</button>
     </div>
@@ -131,7 +132,7 @@
         <button data-g="dots">Dots</button>
         <button data-g="off">Off</button>
       </div>
-      <div class="menuhead">Grid size — <span id="gridSizeVal">22</span> px</div>
+      <div class="menuhead">Grid size: <span id="gridSizeVal">22</span> px</div>
       <input type="range" id="gridSizeRange" min="10" max="60" step="2" value="22">
     </div>
     <button class="iconbtn togglebtn" id="snapBtn" title="Snapping on/off — ⇧G">
@@ -542,8 +543,8 @@
     <p>Choose which pages to include:</p>
     <div id="pdfPageList"></div>
     <div class="row actions">
-      <button class="minipill" id="pdfCancelBtn">Cancel</button>
       <button class="pill" id="pdfExportBtn">Export PDF</button>
+      <button class="minipill" id="pdfCancelBtn">Cancel</button>
     </div>
   </div>
 
@@ -640,7 +641,7 @@
     </div>
     <div id="settingsPane" class="hidden">
       <h3>Settings</h3>
-      <p class="setdesc">Line width presets — these values power the Fine / Medium / Thick
+      <p class="setdesc">Line width presets: these values power the Fine / Medium / Thick
         buttons in the style panel and every new element you draw.</p>
       <div class="setrow"><label>Fine</label>
         <input type="range" id="setFine" min="0.5" max="8" step="0.1"><b id="setFineVal"></b></div>
@@ -649,7 +650,7 @@
       <div class="setrow"><label>Thick</label>
         <input type="range" id="setThick" min="0.5" max="14" step="0.1"><b id="setThickVal"></b></div>
       <div class="setactions"><button class="minipill setreset" id="setResetWidths">Reset line widths</button></div>
-      <p class="setdesc" style="margin-top:14px">Text size presets — the S / M / L / XL buttons.</p>
+      <p class="setdesc" style="margin-top:14px">Text size presets: the S / M / L / XL buttons.</p>
       <div class="setrow"><label>S</label>
         <input type="range" id="setSizeS" min="8" max="60" step="1"><b id="setSizeSVal"></b></div>
       <div class="setrow"><label>M</label>
@@ -659,7 +660,7 @@
       <div class="setrow"><label>XL</label>
         <input type="range" id="setSizeXl" min="12" max="160" step="1"><b id="setSizeXlVal"></b></div>
       <div class="setactions"><button class="minipill setreset" id="setResetSizes">Reset text sizes</button></div>
-      <p class="setdesc" style="margin-top:14px">Text spacing defaults — used by every new text
+      <p class="setdesc" style="margin-top:14px">Text spacing defaults: used by every new text
         and by the "Reset spacing" button in the style panel.</p>
       <div class="setrow"><label>Lines</label>
         <input type="range" id="setTypoLh" min="0.5" max="2.5" step="0.05"><b id="setTypoLhVal"></b></div>
@@ -668,7 +669,7 @@
       <div class="setrow"><label>Letters</label>
         <input type="range" id="setTypoLs" min="-7" max="15" step="0.5"><b id="setTypoLsVal"></b></div>
       <div class="setactions"><button class="minipill setreset" id="setResetTypo">Reset text spacing</button></div>
-      <p class="setdesc" style="margin-top:14px">Settings file — save every value above (plus your
+      <p class="setdesc" style="margin-top:14px">Settings file: save every value above (plus your
         pinned icons) to a .json you can reload anytime, or move to another machine.</p>
       <div class="setactions">
         <button class="minipill" id="setExportBtn">Export settings…</button>

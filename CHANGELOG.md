@@ -1,5 +1,17 @@
 # KoralPaper — Changelog
 
+## v3.52.0
+
+Security and consistency pass, following a full audit.
+
+- Content Security Policy: the app now ships a strict CSP. Scripts run only from the app itself, connections are limited to Google Fonts and the local Claude bridge, and plugins/objects are blocked entirely. Defense in depth on top of the existing no-injection architecture (the app builds all UI via safe text APIs, verified: zero innerHTML anywhere). Works on the web app, the installed PWA, and the double-clicked offline file.
+- Custom Google font names are now strictly validated (letters, digits and spaces only) before they reach any URL, closing a parameter-smuggling niche in crafted documents.
+- Opening a file now has honest safety limits: a friendly message instead of a frozen tab for files over 150 MB or documents beyond 50,000 elements.
+- The PDF export dialog now follows the standard dialog pattern (coral primary first, right-aligned row) like Templates and Charts.
+- One selection color everywhere: the grid popover now selects in coral like every other segment control.
+- Escape now also closes the Chart dialog and the font and weight menus.
+- Removed the last visible em dashes from the gallery hint, grid header and Settings texts.
+
 ## v3.51.1
 
 - New canvas presets: "LinkedIn portrait" (1080 × 1350) in the Social group and "4 : 5" (1200 × 1500) in the Ratios group.

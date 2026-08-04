@@ -4021,10 +4021,22 @@ $('imgInput').addEventListener('change', () => {
   insertImageFiles($('imgInput').files, null, null);
   $('imgInput').value = '';
 });
+const FILE_OPEN_MAX_MB = 150;
+const FILE_OPEN_MAX_ELS = 50000;
+function docTooBig(data){
+  let n = 0;
+  if (Array.isArray(data.pages)) for (const p of data.pages) n += Array.isArray(p.elements) ? p.elements.length : 0;
+  else if (Array.isArray(data.elements)) n = data.elements.length;
+  return n > FILE_OPEN_MAX_ELS;
+}
 fileInput.addEventListener('change', () => {
   const f = fileInput.files[0];
   fileInput.value = '';
   if (!f) return;
+  if (f.size > FILE_OPEN_MAX_MB * 1024 * 1024){
+    alert('This file is over ' + FILE_OPEN_MAX_MB + ' MB, which is more than KoralPaper can open safely in the browser.');
+    return;
+  }
   if (/\.json$/i.test(f.name)){
     try { localStorage.setItem('asterisk.docname', f.name.replace(/\.json$/i, '')); } catch (e){}
   }
@@ -4032,6 +4044,10 @@ fileInput.addEventListener('change', () => {
   reader.onload = () => {
     try {
       const data = JSON.parse(reader.result);
+      if (docTooBig(data)){
+        alert('This file holds more than ' + FILE_OPEN_MAX_ELS.toLocaleString() + ' elements, which is more than KoralPaper can handle smoothly.');
+        return;
+      }
       if (data.type === 'excalidraw'){
         importExcalidraw(data);
         return;
@@ -5821,9 +5837,11 @@ window.addEventListener('keydown', ev => {
   if (ev.key === 'Escape'){
     if (cropTarget){ endCropMode(); showHint('Crop cancelled'); return; }
     setSelection(new Set()); closeMenus(); closeColorPop(); closePaperPop();
+    closeFontMenu(); $('weightMenu').classList.add('hidden');
     $('shortcutsCard').classList.add('hidden');
     $('tplDialog').classList.add('hidden');
     $('pdfDialog').classList.add('hidden');
+    $('chartDialog').classList.add('hidden');
     return; }
   if (ev.key === 'Enter'){
     const sel = selected();

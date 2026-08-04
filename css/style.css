@@ -145,7 +145,7 @@ body.dark .menu button.danger{color:#F09070;}
   text-align:center;
 }
 #gridMenu .gridseg button:hover{background:var(--card-2);}
-#gridMenu .gridseg button.sel{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+#gridMenu .gridseg button.sel{background:var(--coral); color:#FBF6EE; border-color:var(--coral);}
 #gridSizeRange{width:calc(100% - 16px); margin:2px 8px 8px; accent-color:var(--coral);}
 
 #ctxMenu{z-index:50; min-width:190px;}
@@ -411,7 +411,6 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 }
 #pdfPageList label:hover{background:var(--card-2);}
 #pdfPageList input{accent-color:var(--coral); width:15px; height:15px;}
-.pdfdialog .pill{flex:1;}
 
 .tpldialog{width:390px;}
 #tplList{display:flex; flex-direction:column; gap:7px; max-height:46vh; overflow-y:auto;}
@@ -454,9 +453,9 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 .tplsaverow select{flex:0 0 auto; max-width:45%; cursor:pointer;}
 .tplsaverow input:focus, .tplsaverow select:focus{outline:none; border-color:var(--coral);}
 /* standard dialog action rows: auto-width buttons, right-aligned */
-.tpldialog .row.actions{display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; margin-top:2px;}
-.tpldialog .row.actions .minipill{flex:0 0 auto; padding:8px 14px;}
-.tpldialog .row.actions .pill{flex:0 0 auto; font-size:12.5px; padding:8px 16px; margin:0;}
+.tpldialog .row.actions, .pdfdialog .row.actions{display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; margin-top:2px;}
+.tpldialog .row.actions .minipill, .pdfdialog .row.actions .minipill{flex:0 0 auto; padding:8px 14px;}
+.tpldialog .row.actions .pill, .pdfdialog .row.actions .pill{flex:0 0 auto; font-size:12.5px; padding:8px 16px; margin:0;}
 .tplfoot{margin-top:8px; padding-top:9px; border-top:1.5px solid var(--line-soft);}
 
 /* ── chart & table dialog ───────────────────────── */

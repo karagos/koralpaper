@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.51.1';
+const APP_VERSION = '3.52.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -113,7 +113,8 @@ function ensureCustomFont(key){
   if (typeof key !== 'string' || !key.startsWith('cg:')) return null;
   if (FONTS[key]) return FONTS[key];
   const family = key.slice(3).trim();
-  if (!family) return null;
+  // strict allowlist: family names reach Google Fonts URLs and CSS stacks
+  if (!family || !/^[A-Za-z0-9][A-Za-z0-9 ]{0,40}$/.test(family)) return null;
   FONTS[key] = {
     label: family,
     stack: `"${family}","Helvetica Neue",sans-serif`,
