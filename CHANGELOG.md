@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.54.1
+
+- Brand kit polish: six accent colors instead of four, every color swatch shows its hex value underneath (updating live while you pick), and the Settings buttons are tidy auto-width rows instead of stretched pills. Older four-color kits keep working as they are.
+
 ## v3.54.0
 
 - Brand Kit: define your identity once in Settings: a name, four accent colors, a paper color, and a heading + body font (any Google font). When the kit is active:

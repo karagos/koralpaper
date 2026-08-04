@@ -2747,9 +2747,11 @@ function openFontMenu(){
 }
 function closeFontMenu(){ $('fontMenu').classList.add('hidden'); }
 /* ── brand kit UI (Settings tab) ── */
+const BRAND_COLOR_IDS = ['brandC1', 'brandC2', 'brandC3', 'brandC4', 'brandC5', 'brandC6'];
 function brandDefaults(){
   return normalizeBrand({ active: false, name: '', paper: '#f6ece1', usePaper: false,
-    accents: ['#d97757', '#5b72c9', '#6e9e63', '#7c5aa0'], headFont: 'serif', bodyFont: 'sans' });
+    accents: ['#d97757', '#5b72c9', '#6e9e63', '#7c5aa0', '#c9a227', '#1f1e1b'],
+    headFont: 'serif', bodyFont: 'sans' });
 }
 function brandFontOptions(sel, current){
   sel.replaceChildren();
@@ -2766,10 +2768,13 @@ function brandSyncUI(){
   const b = brand || brandDefaults();
   $('brandActiveChk').checked = !!b.active;
   $('brandName').value = b.name || '';
-  ['brandC1', 'brandC2', 'brandC3', 'brandC4'].forEach((id, i) => {
-    $(id).value = b.accents[i] || '#d97757';
+  const seed = ['#d97757', '#5b72c9', '#6e9e63', '#7c5aa0', '#c9a227', '#1f1e1b'];
+  BRAND_COLOR_IDS.forEach((id, i) => {
+    $(id).value = b.accents[i] || seed[i];
+    $(id + 'Hex').textContent = $(id).value;
   });
   $('brandPaper').value = b.paper || '#f6ece1';
+  $('brandPaperHex').textContent = $('brandPaper').value;
   $('brandPaperOn').checked = !!b.usePaper;
   brandFontOptions($('brandHeadFont'), b.headFont);
   brandFontOptions($('brandBodyFont'), b.bodyFont);
@@ -2780,7 +2785,7 @@ function brandFromUI(){
     name: $('brandName').value.trim(),
     paper: $('brandPaper').value,
     usePaper: $('brandPaperOn').checked,
-    accents: ['brandC1', 'brandC2', 'brandC3', 'brandC4'].map(id => $(id).value),
+    accents: BRAND_COLOR_IDS.map(id => $(id).value),
     headFont: $('brandHeadFont').value,
     bodyFont: $('brandBodyFont').value,
   });
@@ -2792,8 +2797,11 @@ function brandFromUI(){
 function initBrandUI(){
   brandSyncUI();
   ['brandActiveChk', 'brandName', 'brandPaper', 'brandPaperOn',
-   'brandC1', 'brandC2', 'brandC3', 'brandC4', 'brandHeadFont', 'brandBodyFont']
+   ...BRAND_COLOR_IDS, 'brandHeadFont', 'brandBodyFont']
     .forEach(id => $(id).addEventListener('change', brandFromUI));
+  // live hex readout while the native picker is open
+  for (const id of [...BRAND_COLOR_IDS, 'brandPaper'])
+    $(id).addEventListener('input', () => { $(id + 'Hex').textContent = $(id).value; });
   $('brandActiveChk').addEventListener('change', () => {
     if ($('brandActiveChk').checked){
       defaults.font = $('brandBodyFont').value;
@@ -4819,7 +4827,7 @@ function normalizeBrand(b){
     name: typeof b.name === 'string' ? b.name.slice(0, 40) : '',
     paper: hex(b.paper),
     usePaper: !!b.usePaper,
-    accents: accents.length ? accents : ['#d97757', '#5b72c9', '#6e9e63', '#7c5aa0'],
+    accents: accents.length ? accents : ['#d97757', '#5b72c9', '#6e9e63', '#7c5aa0', '#c9a227', '#1f1e1b'],
     headFont: fontKey(b.headFont, 'serif'),
     bodyFont: fontKey(b.bodyFont, 'sans'),
   };

@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.54.0)
+# KoralPaper — *Draw your thinking* (v3.54.1)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -111,7 +111,7 @@ and Settings.
   Desktop there is a fallback: the same tab copies a **design prompt** you
   can paste into any Claude — the .json it answers with opens straight in
   the app
-- **Brand kit (Settings):** your identity in one small file: name, four accent
+- **Brand kit (Settings):** your identity in one small file: name, six accent
   colors, paper, heading and body fonts (any Google font). When active, charts
   color by your accents, chart and template headlines use your heading font,
   new documents start on your paper, the accents join the color swatches, and

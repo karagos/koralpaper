@@ -650,12 +650,17 @@
         and designs on brand. Export the kit as a file to give your whole team the same look.</p>
       <div class="setrow"><label>Active</label><input type="checkbox" id="brandActiveChk" class="brandchk"></div>
       <div class="setrow"><label>Name</label><input type="text" id="brandName" class="brandtextinput" placeholder="e.g. CAIO" autocomplete="off"></div>
-      <div class="setrow"><label>Accents</label><div class="brandaccents" id="brandAccents">
-        <input type="color" id="brandC1"><input type="color" id="brandC2">
-        <input type="color" id="brandC3"><input type="color" id="brandC4">
+      <div class="setrow brandrow"><label>Accents</label><div class="brandaccents" id="brandAccents">
+        <span class="brandacc"><input type="color" id="brandC1"><span class="brandhex" id="brandC1Hex"></span></span>
+        <span class="brandacc"><input type="color" id="brandC2"><span class="brandhex" id="brandC2Hex"></span></span>
+        <span class="brandacc"><input type="color" id="brandC3"><span class="brandhex" id="brandC3Hex"></span></span>
+        <span class="brandacc"><input type="color" id="brandC4"><span class="brandhex" id="brandC4Hex"></span></span>
+        <span class="brandacc"><input type="color" id="brandC5"><span class="brandhex" id="brandC5Hex"></span></span>
+        <span class="brandacc"><input type="color" id="brandC6"><span class="brandhex" id="brandC6Hex"></span></span>
       </div></div>
-      <div class="setrow"><label>Paper</label><input type="color" id="brandPaper">
-        <label class="chartcheck" title="New documents start with this paper color"><input type="checkbox" id="brandPaperOn"> use for new documents</label></div>
+      <div class="setrow brandrow"><label>Paper</label>
+        <span class="brandacc"><input type="color" id="brandPaper"><span class="brandhex" id="brandPaperHex"></span></span>
+        <label class="chartcheck" title="New documents start with this paper color"><input type="checkbox" id="brandPaperOn"> new documents</label></div>
       <div class="setrow"><label>Headings</label><select id="brandHeadFont" class="brandselect"></select></div>
       <div class="setrow"><label>Body</label><select id="brandBodyFont" class="brandselect"></select></div>
       <div class="setactions">

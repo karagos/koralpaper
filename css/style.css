@@ -497,8 +497,18 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 .chartminiseg button.sel{background:var(--coral); color:#FBF6EE; border-color:var(--coral);}
 
 /* brand kit settings */
-.brandaccents{display:flex; gap:6px;}
-.brandaccents input, #brandPaper{width:34px; height:30px; padding:0; border:none; background:none; cursor:pointer;}
+.brandaccents{display:flex; gap:7px; flex-wrap:wrap;}
+.brandacc{display:flex; flex-direction:column; align-items:center; gap:1px;}
+.brandacc input{width:34px; height:30px; padding:0; border:none; background:none; cursor:pointer;}
+.brandhex{
+  font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:9px;
+  letter-spacing:0; color:var(--ink-soft); text-transform:uppercase;
+}
+.brandrow{align-items:flex-start;}
+.brandrow .chartcheck{white-space:nowrap; margin-top:6px;}
+/* settings action rows: auto-width buttons, never the stretched panel style */
+.setactions{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.setactions .minipill{flex:0 0 auto; padding:8px 14px;}
 .brandtextinput{
   flex:1; font-family:var(--sans); font-size:13px; font-weight:500;
   padding:7px 9px; border:1.5px solid var(--line-soft); border-radius:8px;
