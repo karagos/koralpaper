@@ -5250,6 +5250,13 @@ function showWelcome(){
   $('setShowWelcome').addEventListener('click', showWelcome);
 }
 
+/* ── PWA: offline + installable when served over the web ── */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
 /* ── boot ──────────────────────────────────────────── */
 function boot(){
   $('menuVersion').textContent = `KoralPaper v${APP_VERSION}`;

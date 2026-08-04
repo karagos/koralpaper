@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.27.0)
+# KoralPaper — *Draw your thinking* (v3.28.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -21,17 +21,45 @@ your machine. During drags and pans only the moving elements are redrawn
 (everything else is served from an offscreen bitmap), so even documents with
 hundreds of elements stay perfectly fluid.
 
-## How to start
+## Start drawing (nothing to install)
 
-Download or clone this repository, then double-click **`index.html`** —
-it runs fully offline from `file://` in any modern browser (built on macOS,
-works anywhere Chrome/Safari/Firefox run). Your sketch autosaves to the
-browser's local storage and reopens exactly where you left it next time.
-A first run greets you with a welcome card offering the 60-second tour or a
-blank page (the tour is always available later via ☰ → "Load the KoralPaper
-tour", and the card itself replays anytime from ? → Settings → "Show the
-welcome screen again"), and a blank canvas shows gentle starter hints until
-your first element lands. Press **?** inside the app for the full shortcuts card.
+**→ [koralpaper on the web](https://karagos.github.io/koralpaper/)** — open
+the link and draw. Works on Mac, Windows, Linux, ChromeOS **and iPad**, in
+any modern browser.
+
+Even better, **install it as an app**: the page is a PWA, so after the first
+visit it works fully offline.
+
+- **Mac / Windows (Chrome or Edge):** click the install icon in the address
+  bar (or menu → "Install KoralPaper").
+- **iPad / iPhone (Safari):** Share button → **Add to Home Screen**.
+- Your work autosaves in the browser and stays on your device — the "app"
+  never talks to a server.
+
+## Or run it from a folder
+
+Prefer a local copy? Grab the newest ZIP from the
+[**Releases page**](https://github.com/karagos/koralpaper/releases)
+(or clone the repo), unzip, and double-click **`index.html`** — it runs
+straight from the file, offline, in any modern browser. To update later,
+download the new ZIP and replace the folder; your work lives in the
+browser's storage, not in the folder.
+
+## Add Claude (optional, one minute)
+
+To let Claude draw on your paper: install the free
+[Claude Desktop](https://claude.ai/download) app (Mac or Windows), then
+double-click **`koralpaper.mcpb`** from the `mcp/` folder (also attached to
+each Release) and confirm the install inside Claude Desktop. Full details in
+the app under **? → Claude**.
+
+## First run
+
+A welcome card offers the 60-second tour or a blank page (the tour stays
+available via ☰ → "Load the KoralPaper tour", and the card replays from
+? → Settings). A blank canvas shows gentle starter hints until your first
+element lands. Press **?** inside the app for shortcuts, the Claude setup,
+and Settings.
 
 ## What it does
 

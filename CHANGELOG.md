@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.28.0 — 2026-08-04
+- **KoralPaper is live on the web.** The repo now serves the app at
+  https://karagos.github.io/koralpaper/ — open the link and draw, on any
+  OS including iPad. Nothing about privacy changes: the page is static,
+  your work stays in your browser.
+- **Installable app (PWA).** A web manifest, app icons and a service
+  worker make the page installable (Chrome/Edge: install icon; iPad:
+  Add to Home Screen) and fully offline after the first visit. Updates
+  arrive automatically when online (network-first, cache fallback).
+- **Real installation docs + first GitHub Release.** The README now has
+  a proper install section (web app / local folder / Claude extension),
+  and Releases carry a ready-to-use ZIP plus the koralpaper.mcpb.
+
 ## v3.27.0 — 2026-08-04
 - **Text color, independent of the outline.** A new "Text" row in the
   style panel colors the text of shapes, labels and text elements
