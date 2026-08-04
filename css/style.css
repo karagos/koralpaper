@@ -119,8 +119,8 @@ body.dark .menu button.danger{color:#F09070;}
 .menu.right{left:auto; right:0;}
 .menu.up{top:auto; bottom:calc(100% + 8px); min-width:250px; max-height:62vh; overflow-y:auto;}
 .menu .menuhead{
-  font-size:10.5px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;
-  color:var(--ink-soft); padding:8px 11px 3px;
+  font-size:10.5px; font-weight:800; letter-spacing:1.1px; text-transform:uppercase;
+  color:var(--coral); padding:8px 11px 3px;
 }
 .menu button .dim{color:var(--ink-soft); font-weight:500; font-size:12px; float:right; margin-left:14px;
   font-variant-numeric:tabular-nums;}
@@ -405,10 +405,11 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 .tpldialog .actions{flex-wrap:wrap; gap:6px;}
 
 .menukey{float:right; font-size:11px; color:var(--ink-soft); letter-spacing:.4px;}
+#expTransToggle{font-weight:650;}
 .menucheck{
-  float:right; width:17px; height:17px; border-radius:5px;
-  border:1.5px solid var(--line-soft); text-align:center;
-  font-size:11px; font-weight:800; line-height:15px; color:#FBF6EE;
+  float:right; width:18px; height:18px; border-radius:5px;
+  border:2px solid var(--line); background:var(--paper); text-align:center;
+  font-size:12px; font-weight:800; line-height:15px; color:#FBF6EE;
 }
 #expTransToggle.sel .menucheck{background:var(--coral); border-color:var(--coral);}
 

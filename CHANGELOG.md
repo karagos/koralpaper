@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.36.1 — 2026-08-04
+- Export menu visibility polish: the "This page" and "Whole document"
+  group headers are now coral so the categories signpost clearly, and
+  the "Transparent background" toggle is bold with a visible empty
+  checkbox even when unchecked.
+
 ## v3.36.0 — 2026-08-04
 - **Two menus, two jobs.** The ☰ menu now holds only the document and
   the show: New / Open / Save / Import / Templates, then Present /
