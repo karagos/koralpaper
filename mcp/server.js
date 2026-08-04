@@ -12,7 +12,7 @@
 'use strict';
 const http = require('http');
 
-const PORT = 8137;
+const PORT = Number(process.env.KORALPAPER_PORT) || 8137;
 const CMD_TIMEOUT_MS = 30000;
 const POLL_HOLD_MS = 25000;
 
@@ -86,13 +86,78 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ bridge: 'koralpaper', app: appConnected() }));
     return;
   }
+  if (req.method === 'POST' && req.url.startsWith('/dispatch')){
+    // a proxy instance (another Claude app) forwards a tool call to us
+    let body = '';
+    req.on('data', d => { body += d; });
+    req.on('end', async () => {
+      let out;
+      try {
+        const { action, args } = JSON.parse(body);
+        out = await dispatch(action, args);
+      } catch (e){
+        out = { error: String(e && e.message || e) };
+      }
+      res.writeHead(200, corsHeaders({ 'Content-Type': 'application/json' }));
+      res.end(JSON.stringify(out));
+    });
+    return;
+  }
   res.writeHead(404, corsHeaders()); res.end();
 });
+/* ── multi-instance: two Claude apps, one bridge ────
+   The connector may run in Claude Desktop AND Claude Code at the same
+   time. Only one process can own the port; any instance that cannot
+   bind becomes a PROXY and forwards its tool calls to the owner over
+   HTTP, so every Claude app works, whichever launched first. If the
+   owner quits, the proxy grabs the port and takes over. */
+let proxyMode = false;
 server.on('error', err => {
-  // port already taken (a second Claude window?) — report via MCP errors
-  process.stderr.write('KoralPaper bridge port error: ' + err.message + '\n');
+  if (err && err.code === 'EADDRINUSE'){
+    proxyMode = true;
+    process.stderr.write('KoralPaper bridge: port busy, running as proxy to the primary instance\n');
+  } else {
+    process.stderr.write('KoralPaper bridge error: ' + (err && err.message) + '\n');
+  }
 });
 server.listen(PORT, '127.0.0.1');
+
+function httpJSON(method, path, payload){
+  return new Promise((resolve, reject) => {
+    const body = payload === undefined ? null : JSON.stringify(payload);
+    const req = http.request({
+      host: '127.0.0.1', port: PORT, path, method,
+      headers: body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {},
+      timeout: CMD_TIMEOUT_MS + 5000,
+    }, res => {
+      let d = '';
+      res.on('data', c => { d += c; });
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch (e){ reject(new Error('bridge answered unreadably')); } });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('bridge timeout')));
+    req.end(body);
+  });
+}
+async function proxyDispatch(action, args){
+  try {
+    return await httpJSON('POST', '/dispatch', { action, args });
+  } catch (e){
+    if (e && (e.code === 'ECONNREFUSED' || e.code === 'ECONNRESET')){
+      // the primary quit — take over the port and serve directly
+      proxyMode = false;
+      try { server.listen(PORT, '127.0.0.1'); } catch (e2){}
+      await new Promise(r => setTimeout(r, 300));
+      if (!proxyMode) return dispatch(action, args);
+    }
+    throw e;
+  }
+}
+async function bridgeAppConnected(){
+  if (!proxyMode) return appConnected();
+  try { const s = await httpJSON('GET', '/status'); return !!(s && s.app); }
+  catch (e){ return appConnected(); }
+}
 
 /* ── element schema shared by the drawing tools ── */
 const STROKES = 'ink (black), gdark, gmid, glight, white, coral, blue, green, plum, none, or any #hex';
@@ -192,14 +257,14 @@ function replyErr(id, code, message){ send({ jsonrpc: '2.0', id, error: { code, 
 async function handleToolCall(id, name, args){
   try {
     if (name === 'koralpaper_status'){
-      const linked = appConnected();
+      const linked = await bridgeAppConnected();
       reply(id, { content: [{ type: 'text', text: linked
         ? 'KoralPaper is open and linked. Ready to draw.'
         : 'KoralPaper is not linked. Ask the user to open KoralPaper (index.html) in their browser — the app links to this bridge automatically within a few seconds.' }] });
       return;
     }
     const action = name.replace('koralpaper_', '');
-    const result = await dispatch(action, args);
+    const result = proxyMode ? await proxyDispatch(action, args) : await dispatch(action, args);
     if (result && result.error){
       reply(id, { content: [{ type: 'text', text: 'KoralPaper reported: ' + result.error }], isError: true });
       return;
@@ -239,7 +304,7 @@ function onMessage(msg){
     reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'koralpaper', version: '1.0.0' },
+      serverInfo: { name: 'koralpaper', version: '1.1.0' },
       instructions: 'These tools draw directly in the KoralPaper app (hand-drawn diagram studio) running in the user\'s browser. Workflow: koralpaper_status → koralpaper_read_document (if editing) → create/add/update → koralpaper_render_page to visually check the result, and iterate until the layout is clean.',
     });
     return;

@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.26.1 — 2026-08-04
+- **Bridge 1.1.0: every Claude app works at once.** The connector can be
+  installed in Claude Desktop, Claude Code and Cowork at the same time.
+  Previously only the first instance to claim the local port could reach
+  the paper; the rest silently reported "not linked". Now any instance
+  that finds the port busy runs as a proxy, forwarding its tool calls to
+  the primary — and if the primary quits, the proxy takes over the port.
+  Update by double-clicking the rebuilt `mcp/koralpaper.mcpb` and
+  restarting your Claude apps.
+
 ## v3.26.0 — 2026-08-04
 - **Design with Claude.** KoralPaper now ships an MCP extension for the
   free Claude Desktop app: double-click `mcp/koralpaper.mcpb` to install
