@@ -157,6 +157,8 @@ body.dark .menu button.danger{color:#F09070;}
   pointer-events:none;
 }
 .paperpop{flex-direction:column; align-items:stretch; width:206px;}
+.paperscope{margin-bottom:2px;}
+.paperscope button{flex:1;}
 .paperswatches{display:flex; flex-wrap:wrap; gap:7px;}
 .paperswatches button{
   width:24px; height:24px; border-radius:8px; padding:0;

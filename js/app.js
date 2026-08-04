@@ -76,13 +76,17 @@ let histIndex = -1;
 let renderQueued = false;
 
 const pal = () => PALETTES[state.theme];
-const effectiveBg = () => state.bgColor || pal().bg;
-function effectiveGridColor(){
-  if (!state.bgColor) return pal().grid;
-  const n = parseInt(state.bgColor.slice(1), 16);
+/* paper color: a page's own bg wins, then the document color, then theme */
+const pageBg = () => { const p = state.pages && state.pages[state.pageIndex]; return (p && p.bg) || null; };
+const effectiveBg = () => pageBg() || state.bgColor || pal().bg;
+const pageBgOf = p => (p && p.bg) || state.bgColor || pal().bg;
+function gridColorForBg(c){
+  if (!c) return pal().grid;
+  const n = parseInt(c.slice(1), 16);
   const lum = (0.299*((n>>16)&255) + 0.587*((n>>8)&255) + 0.114*(n&255)) / 255;
   return lum > 0.5 ? 'rgba(0,0,0,0.09)' : 'rgba(255,255,255,0.10)';
 }
+function effectiveGridColor(){ return gridColorForBg(pageBg() || state.bgColor); }
 function outsideColor(){
   // the dimmed area around an artboard, derived from the paper color
   const bg = effectiveBg();
@@ -662,6 +666,7 @@ function loadSaved(){
     if (Array.isArray(data.pages) && data.pages.length){
       state.pages = data.pages.map(p => ({
         id: p.id || uid(), name: p.name || 'Page',
+        bg: (typeof p.bg === 'string' && p.bg[0] === '#') ? p.bg : null,
         elements: migrateElements(p.elements || [], data.v),
       }));
       state.pageIndex = clamp(Number(data.pageIndex) || 0, 0, state.pages.length - 1);
@@ -3098,9 +3103,20 @@ const PAPER_PRESETS = [
   { name: 'Soft mauve',     v: '#F3E7EE' },
   { name: 'Warm linen',     v: '#F6ECE1' },
 ];
+let paperScope = 'all'; // 'all' = whole document, 'page' = current page only
 function setPaper(v){
-  state.bgColor = v;
-  syncPaperUI(); requestRender(); scheduleAutosave();
+  if (paperScope === 'page'){
+    if (state.pages[state.pageIndex]) state.pages[state.pageIndex].bg = v;
+  } else {
+    state.bgColor = v;
+  }
+  syncPaperUI(); requestRender(); scheduleAutosave(); scheduleThumbRefresh();
+}
+function setPaperScope(sc){
+  paperScope = sc;
+  document.querySelectorAll('#paperScopeSeg button').forEach(b =>
+    b.classList.toggle('sel', b.dataset.ps === sc));
+  syncPaperUI();
 }
 function buildPaperSwatches(){
   const wrap = $('paperSwatches');
@@ -3119,14 +3135,17 @@ function syncPaperUI(){
   const hex = /^#[0-9a-f]{6}$/i.test(bg) ? bg : '#f2efe6';
   $('paperInput').value = hex.toLowerCase();
   $('paperHex').value = hex.toUpperCase();
+  const scopeVal = paperScope === 'page' ? pageBg() : state.bgColor;
   for (const b of $('paperSwatches').children){
     const isTheme = b.dataset.paper === 'theme';
     b.style.background = isTheme ? pal().bg : b.dataset.paper;
     b.classList.toggle('picked', isTheme
-      ? !state.bgColor
-      : (state.bgColor || '').toLowerCase() === b.dataset.paper.toLowerCase());
+      ? !scopeVal
+      : (scopeVal || '').toLowerCase() === b.dataset.paper.toLowerCase());
   }
 }
+document.querySelectorAll('#paperScopeSeg button').forEach(b =>
+  b.addEventListener('click', ev => { ev.stopPropagation(); setPaperScope(b.dataset.ps); }));
 function closePaperPop(){ $('paperPop').classList.add('hidden'); }
 $('paperBtn').addEventListener('click', ev => {
   ev.stopPropagation();
@@ -3141,8 +3160,7 @@ $('paperBtn').addEventListener('click', ev => {
 });
 $('paperPop').addEventListener('click', ev => ev.stopPropagation());
 $('paperInput').addEventListener('input', ev => {
-  state.bgColor = ev.target.value;
-  syncPaperUI(); requestRender();
+  setPaper(ev.target.value);
 });
 $('paperInput').addEventListener('change', () => {
   scheduleAutosave();
@@ -3155,7 +3173,7 @@ function normalizedPaperHex(){
 }
 $('paperHex').addEventListener('input', () => {
   const v = normalizedPaperHex();
-  if (v){ state.bgColor = v; $('paperInput').value = v; syncPaperUI(); requestRender(); }
+  if (v){ setPaper(v); $('paperInput').value = v; }
 });
 $('paperHex').addEventListener('keydown', ev => {
   ev.stopPropagation();
@@ -3422,7 +3440,7 @@ function renderThumbInto(cv, page){
   cv.style.width = tw + 'px'; cv.style.height = th + 'px';
   const tctx = cv.getContext('2d');
   if (!b){
-    tctx.fillStyle = effectiveBg();
+    tctx.fillStyle = pageBgOf(page);
     tctx.fillRect(0, 0, cv.width, cv.height);
     return;
   }
@@ -3434,7 +3452,7 @@ function renderThumbInto(cv, page){
       x: (cv.width - b.w * z) / 2 - b.x * z,
       y: (cv.height - b.h * z) / 2 - b.y * z, z,
     },
-    pal: pal(), grid: false, bg: effectiveBg(), hideBoardFrame: true,
+    pal: pal(), grid: false, bg: pageBgOf(page), hideBoardFrame: true,
   });
 }
 function refreshThumb(i){
@@ -3925,6 +3943,7 @@ function runFileAction(act){
   if (act === 'demo') loadDemo();
   if (act === 'paperReset'){
     state.bgColor = null;
+    if (state.pages[state.pageIndex]) state.pages[state.pageIndex].bg = null;
     syncPaperUI(); requestRender(); scheduleAutosave();
   }
   if (act === 'clear'){
@@ -3982,6 +4001,7 @@ fileInput.addEventListener('change', () => {
       if (Array.isArray(data.pages) && data.pages.length){
         state.pages = data.pages.map(p => ({
           id: p.id || uid(), name: p.name || 'Page',
+          bg: (typeof p.bg === 'string' && p.bg[0] === '#') ? p.bg : null,
           elements: migrateElements(p.elements || [], data.version),
         }));
         state.pageIndex = clamp(Number(data.pageIndex) || 0, 0, state.pages.length - 1);
@@ -4294,8 +4314,11 @@ function applyTemplate(def){
   const built = def.build ? def.build() : def;
   syncPageRef();
   const startIdx = state.pages.length;
-  for (const pg of built.pages)
-    state.pages.push(makePage(clonePageElements(pg.elements), pg.name));
+  for (const pg of built.pages){
+    const np = makePage(clonePageElements(pg.elements), pg.name);
+    if (typeof pg.bg === 'string' && pg.bg[0] === '#') np.bg = pg.bg;
+    state.pages.push(np);
+  }
   if (built.board) state.board = { ...built.board };
   if (built.bg){ state.bgColor = built.bg; syncPaperUI(); }
   state.pageIndex = startIdx;
@@ -4338,8 +4361,8 @@ function tplSnapshot(name, scope){
     return out;
   };
   const pages = scope === 'all'
-    ? state.pages.map(p => ({ name: p.name, elements: strip(p.elements) }))
-    : [{ name: state.pages[state.pageIndex].name || name, elements: strip(state.elements) }];
+    ? state.pages.map(p => ({ name: p.name, bg: p.bg || null, elements: strip(p.elements) }))
+    : [{ name: state.pages[state.pageIndex].name || name, bg: pageBg(), elements: strip(state.elements) }];
   return {
     id: uid(), name, pages,
     board: state.board ? { ...state.board } : null,
@@ -5510,9 +5533,9 @@ function exportPDF(pageIdxs){
     renderScene(off.getContext('2d'), els, {
       width: off.width, height: off.height,
       camera: { x: -crop.x * sc, y: -crop.y * sc, z: sc },
-      pal: pal(), bg: effectiveBg(),
+      pal: pal(), bg: pageBgOf(state.pages[i]),
       grid: state.board ? state.grid : false, gridSize: gsize(),
-      gridColor: effectiveGridColor(),
+      gridColor: gridColorForBg(state.pages[i].bg || state.bgColor),
     });
     imgs.push({
       bytes: dataURLToBytes(off.toDataURL('image/jpeg', 0.92)),
@@ -5603,7 +5626,9 @@ function buildZip(files){ // files: [{name, data: Uint8Array}]
     ...u32(cdSize), ...u32(offset), ...u16(0)]);
   return new Blob([...chunks, ...central, eocd], { type: 'application/zip' });
 }
-function renderPagePNGBlob(elements, transparent){
+function renderPagePNGBlob(elements, transparent, page){
+  const bg2 = page ? pageBgOf(page) : effectiveBg();
+  const gc2 = page ? gridColorForBg(page.bg || state.bgColor) : effectiveGridColor();
   return new Promise(resolve => {
     const off = document.createElement('canvas');
     const octx = off.getContext('2d');
@@ -5613,9 +5638,9 @@ function renderPagePNGBlob(elements, transparent){
       renderScene(octx, elements, {
         width: board.w, height: board.h,
         camera: { x: -board.x, y: -board.y, z: 1 },
-        pal: pal(), transparent, bg: effectiveBg(),
+        pal: pal(), transparent, bg: bg2,
         grid: transparent ? false : state.grid, gridSize: gsize(),
-        gridColor: effectiveGridColor(),
+        gridColor: gc2,
       });
     } else {
       const b = sceneBounds(elements);
@@ -5627,7 +5652,7 @@ function renderPagePNGBlob(elements, transparent){
       renderScene(octx, elements, {
         width: off.width, height: off.height,
         camera: { x: (pad - b.x) * scale, y: (pad - b.y) * scale, z: scale },
-        pal: pal(), grid: false, transparent, bg: effectiveBg(),
+        pal: pal(), grid: false, transparent, bg: bg2,
       });
     }
     off.toBlob(resolve, 'image/png');
@@ -5640,7 +5665,7 @@ async function exportAllPages(){
   const files = [];
   const pad = state.pages.length > 9 ? 2 : 1;
   for (let i = 0; i < state.pages.length; i++){
-    const blob = await renderPagePNGBlob(visibleEls(state.pages[i].elements), false);
+    const blob = await renderPagePNGBlob(visibleEls(state.pages[i].elements), false, state.pages[i]);
     if (!blob) continue; // empty page — skipped
     files.push({
       name: `${String(i + 1).padStart(pad, '0')}-${(state.pages[i].name || 'page').replace(/[\/\\:*?"<>|]/g, '-')}.png`,
@@ -6164,7 +6189,7 @@ async function claudeExecute(action, args){
     if (args.board && Number(args.board.w) > 0 && Number(args.board.h) > 0){
       state.board = { name: args.board.name || 'Custom', w: Number(args.board.w), h: Number(args.board.h), x: 0, y: 0 };
     }
-    if (typeof args.paper === 'string' && args.paper[0] === '#') state.bgColor = args.paper;
+    if (typeof args.paper === 'string' && args.paper[0] === '#') state.pages[state.pageIndex].bg = args.paper;
     updateBoundArrows(state.elements);
     preloadDocFonts();
     syncToggles(); syncBoardBtn(); buildBoardMenuSel(); syncPaperUI();
@@ -6292,9 +6317,9 @@ function shareHTML(){
   const pages = [];
   for (const p of state.pages){
     const svg = renderSceneSVG(visibleEls(p.elements), {
-      pal: pal(), transparent: false, bg: effectiveBg(),
+      pal: pal(), transparent: false, bg: pageBgOf(p),
       board: state.board, grid: state.board ? state.grid : false,
-      gridColor: effectiveGridColor(), gridSize: gsize(),
+      gridColor: gridColorForBg(p.bg || state.bgColor), gridSize: gsize(),
     });
     if (svg) pages.push({ name: p.name || 'Page', svg });
   }

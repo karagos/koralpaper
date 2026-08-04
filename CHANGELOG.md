@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.50.0
+
+- Per-page paper color: the paper popover (round swatch, top right) now has an "All pages / This page" switch. "This page" colors only the page you are on, so one black page can live inside an otherwise white document. A page's own color always wins over the document color; "Reset paper color" clears both for the current page.
+- Everything respects it: the canvas, page thumbnails, PDF export, PNG carousel export, shared HTML, and the grid contrast on each page.
+- Templates saved from multi-colored documents keep each page's paper, and Claude's pages now set their paper per page too: replicating several posters keeps each page's own background instead of the last one winning.
+
 ## v3.49.1
 
 - Fix: dragging a text block's corner handle stopped growing the text at 200 px. Text now scales up to 600 px by dragging, and Claude can set sizes up to 600 too. Poster headlines can be as big as the page.
