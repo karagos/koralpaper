@@ -481,6 +481,10 @@
       <input type="text" id="chartXLabel" placeholder="X axis label (optional)" autocomplete="off">
       <input type="text" id="chartYLabel" placeholder="Y axis label (optional)" autocomplete="off">
     </div>
+    <div class="tplsaverow chartmeta chartopts hidden" id="chartLineOpts">
+      <label class="chartcheck" title="Smooth curves that still pass through every value"><input type="checkbox" id="chartCurved" checked> Curved lines</label>
+      <label class="chartcheck" title="Draw a small ring at every value. Off: selecting a line reveals its points"><input type="checkbox" id="chartDotsChk"> Value dots</label>
+    </div>
     <div class="chartprevwrap">
       <canvas id="chartPreview"></canvas>
       <div id="chartErr" class="charterr hidden"></div>

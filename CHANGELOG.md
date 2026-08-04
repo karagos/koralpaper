@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.43.0
+
+- Line charts are curved again, correctly this time: the new curves are interpolating splines, so they bend smoothly AND pass exactly through every value. A "Curved lines" checkbox in the dialog switches back to straight segments.
+- Value dots are now optional and OFF by default ("Value dots" checkbox). Instead, selecting a line on the canvas reveals small rings at its data points, so the values are there when you want to inspect, invisible when you present.
+- Both options are remembered per chart and preserved through "Edit chart data".
+
 ## v3.42.2
 
 - Fix: line charts now pass exactly through their data points. The freehand smoothing was treating the few chart points as loose curve guides, so lines drifted far from the markers (very visible with negative values). Chart lines are now built from a dense point path, keeping the hand-drawn feel while honoring every value. Existing charts pick up the fix the next time you use "Edit chart data" and Update.

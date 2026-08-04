@@ -451,6 +451,24 @@ function drawOverlay(){
     ctx.setLineDash([]);
   }
 
+  // chart lines: reveal the data points of every SELECTED line as small rings
+  if (state.selection.size && !presenting){
+    const pnow = pal();
+    for (const el of selected()){
+      if (!el.chartDots || el.type !== 'draw') continue;
+      const col = resolveStroke(pnow, el.stroke) || pnow.stroke.ink;
+      ctx.lineWidth = 2.2 / z;
+      for (const pt of el.chartDots){
+        ctx.beginPath();
+        ctx.arc(el.x + pt[0], el.y + pt[1], 4.5 / Math.sqrt(z), 0, Math.PI * 2);
+        ctx.fillStyle = state.theme === 'light' ? '#FBF9F2' : '#2C2924';
+        ctx.fill();
+        ctx.strokeStyle = col;
+        ctx.stroke();
+      }
+    }
+  }
+
   // mind-map fold badges: − on expanded parents, +N on folded ones
   const badges = mindBadgesFor(state.elements);
   if (badges.length){
@@ -4482,26 +4500,44 @@ function chartBuildLine(d, spec){
   }
   const slot = plotW / nC;
   const px = i => plotX + slot * i + slot / 2;
+  const curved = spec.curved !== false;
   d.series.forEach((name, j) => {
     const abs = d.vals.map((row, i) => [px(i), y(row[j])]);
-    /* densify each segment: freehand smoothing treats sparse points as curve
-       controls and would miss the real values, so give it a tight polyline
-       that passes through every data point */
-    const dense = [abs[0]];
-    for (let i = 1; i < abs.length; i++){
-      const [ax, ay] = abs[i - 1], [bx, by] = abs[i];
-      const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 12));
-      for (let k = 1; k <= n; k++) dense.push([ax + (bx - ax) * k / n, ay + (by - ay) * k / n]);
+    /* build a dense path THROUGH every data point: straight segments, or a
+       Catmull-Rom spline (which interpolates its vertices, unlike the
+       freehand smoothing that only grazes them) */
+    let dense;
+    if (curved && abs.length >= 3){
+      dense = [abs[0]];
+      for (let i = 0; i < abs.length - 1; i++){
+        const p0 = abs[i - 1] || abs[i], p1 = abs[i], p2 = abs[i + 1], p3 = abs[i + 2] || p2;
+        for (let k = 1; k <= 16; k++){
+          const t = k / 16, t2 = t * t, t3 = t2 * t;
+          dense.push([
+            0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+            0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3),
+          ]);
+        }
+      }
+    } else {
+      dense = [abs[0]];
+      for (let i = 1; i < abs.length; i++){
+        const [ax, ay] = abs[i - 1], [bx, by] = abs[i];
+        const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 12));
+        for (let k = 1; k <= n; k++) dense.push([ax + (bx - ax) * k / n, ay + (by - ay) * k / n]);
+      }
     }
-    const minX = Math.min(...abs.map(p => p[0])), minY = Math.min(...abs.map(p => p[1]));
+    const minX = Math.min(...dense.map(p => p[0])), minY = Math.min(...dense.map(p => p[1]));
     const ln = newElement('draw', minX, minY, {
       stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 3, sketch: 1, fill: 'none',
     });
     ln.points = dense.map(p => [p[0] - minX, p[1] - minY]);
     ln.w = Math.max(...ln.points.map(p => p[0]));
     ln.h = Math.max(...ln.points.map(p => p[1]));
+    // remembered data vertices: the overlay shows these when the line is selected
+    ln.chartDots = abs.map(p => [p[0] - minX, p[1] - minY]);
     els.push(ln);
-    if (nC <= 14) abs.forEach(pt => {
+    if (spec.dots && nC <= 20) abs.forEach(pt => {
       const dot = newElement('ellipse', pt[0] - 4.5, pt[1] - 4.5, {
         fill: 'white', stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 2.4, sketch: 1,
       });
@@ -4682,11 +4718,14 @@ function chartSpecFromUI(){
     title: $('chartTitle').value.trim(),
     xl: $('chartXLabel').value.trim(),
     yl: $('chartYLabel').value.trim(),
+    curved: $('chartCurved').checked,
+    dots: $('chartDotsChk').checked,
   };
 }
 function chartSyncTypeUI(){
   document.querySelectorAll('#chartTypeSeg button').forEach(b => b.classList.toggle('sel', b.dataset.ct === chartType));
   $('chartAxisRow').classList.toggle('hidden', chartType === 'pie' || chartType === 'donut' || chartType === 'table');
+  $('chartLineOpts').classList.toggle('hidden', chartType !== 'line');
   $('chartIntro').textContent = chartType === 'table' ? CHART_INTROS.table
     : (chartType === 'pie' || chartType === 'donut') ? CHART_INTROS.pie : CHART_INTROS.chart;
 }
@@ -4732,6 +4771,8 @@ function chartOpen(fromEl){
     $('chartTitle').value = c.title || '';
     $('chartXLabel').value = c.xl || '';
     $('chartYLabel').value = c.yl || '';
+    $('chartCurved').checked = c.curved !== false;
+    $('chartDotsChk').checked = !!c.dots;
     chartDirty = true;
   } else if (!chartDirty && !$('chartData').value){
     $('chartData').value = CHART_SAMPLES[chartType];
@@ -4795,6 +4836,8 @@ $('chartData').addEventListener('keydown', ev => {
 });
 ['chartTitle', 'chartXLabel', 'chartYLabel'].forEach(id =>
   $(id).addEventListener('input', chartPreviewRefresh));
+['chartCurved', 'chartDotsChk'].forEach(id =>
+  $(id).addEventListener('change', chartPreviewRefresh));
 $('chartAddBtn').addEventListener('click', chartApply);
 $('chartCloseBtn').addEventListener('click', () => { $('chartDialog').classList.add('hidden'); chartEditCtx = null; });
 $('chartToolBtn').addEventListener('click', () => chartOpen(null));
