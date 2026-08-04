@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.53.1
+
+- Fix: merging kept every text's color wrong when the target had its own color logic. A black text merged into a yellow shape stays black now. Each merged line keeps its exact original color (as letter colors where needed), in both "Merge texts into one" and "Merge text into the shape", and existing letter colors are never overwritten.
+
 ## v3.53.0
 
 - Merge text into a shape: select one shape plus any number of text elements and right-click → "Merge text into the shape". The texts become the shape's own label, in the order you selected them, keeping bold, highlights and letter colors. An empty shape adopts the first text's font, size, weight and color, so the look carries over.

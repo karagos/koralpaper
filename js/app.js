@@ -1848,6 +1848,33 @@ $('frameOn').addEventListener('click', () => applyStyle({ frame: true }));
 $('frameOff').addEventListener('click', () => applyStyle({ frame: false }));
 
 /* ── right-click context menu ──────────────────────── */
+/* after a merge, chars from parts whose color differs from the target's
+   own text color get explicit letter-color runs, so nothing changes hue */
+function mergeKeepColors(el, parts){
+  const base = el.textColor || el.stroke;
+  const len = String(el.text || '').length;
+  if (!len) return;
+  const chars = [];
+  for (let i = 0; i < len; i++){
+    const r = styleAtChar(el.runs, i);
+    chars.push(r ? { b: !!r.b, i: !!r.i, hl: r.hl || null, co: r.co || null }
+      : { b: false, i: false, hl: null, co: null });
+  }
+  for (const p of parts){
+    if (!p.color || p.color === base || p.color === 'none') continue;
+    for (let i = p.s; i < p.e && i < len; i++) if (!chars[i].co) chars[i].co = p.color;
+  }
+  const runs = [];
+  for (let i = 0; i < len; i++){
+    const c = chars[i];
+    if (!c.b && !c.i && !c.hl && !c.co) continue;
+    const last = runs[runs.length - 1];
+    if (last && last.e === i && !!last.b === c.b && !!last.i === c.i
+        && (last.hl || null) === c.hl && (last.co || null) === c.co) last.e = i + 1;
+    else runs.push({ s: i, e: i + 1, b: c.b, i: c.i, hl: c.hl, co: c.co });
+  }
+  el.runs = runs.length ? runs : null;
+}
 /* merge 2+ selected TEXT elements into one, ordered by selection order
    (the Set keeps insertion order, i.e. the order they were clicked) */
 function mergeTexts(){
@@ -1861,15 +1888,18 @@ function mergeTexts(){
   delete nu._editing;
   let text = '';
   const runs = [];
+  const colorParts = [];
   let off = 0;
   for (const e of parts){
     if (text){ text += '\n'; off += 1; }
     const t = String(e.text || '');
     if (e.runs) for (const r of e.runs) runs.push({ ...r, s: r.s + off, e: r.e + off });
+    colorParts.push({ s: off, e: off + t.length, color: e.textColor || e.stroke });
     text += t; off += t.length;
   }
   nu.text = text;
   nu.runs = runs.length ? runs : null;
+  mergeKeepColors(nu, colorParts);
   nu.x = Math.min(...parts.map(e => e.x));
   nu.y = Math.min(...parts.map(e => e.y));
   autosizeText(nu);
@@ -1892,11 +1922,13 @@ function mergeTextIntoShape(){
   const adopt = !String(shape.text || '').trim();
   let text = adopt ? '' : String(shape.text);
   const runs = (!adopt && shape.runs) ? shape.runs.map(r => ({ ...r })) : [];
+  const colorParts = [];
   let off = text.length;
   for (const t of texts){
     if (text){ text += '\n'; off += 1; }
     const tt = String(t.text || '');
     if (t.runs) for (const r of t.runs) runs.push({ ...r, s: r.s + off, e: r.e + off });
+    colorParts.push({ s: off, e: off + tt.length, color: t.textColor || t.stroke });
     text += tt; off += tt.length;
   }
   shape.text = text;
@@ -1905,9 +1937,12 @@ function mergeTextIntoShape(){
     const f = texts[0];
     shape.font = f.font;
     shape.size = f.size;
-    if (f.textColor) shape.textColor = f.textColor;
+    // a text's color lives in its stroke: carry it over explicitly so the
+    // label doesn't fall back to the shape's own color logic
+    shape.textColor = f.textColor || (f.stroke !== 'none' ? f.stroke : null);
     if (f.fweight) shape.fweight = f.fweight;
   }
+  mergeKeepColors(shape, colorParts);
   const gone = new Set(texts.map(e => e.id));
   state.elements = state.elements.filter(e => !gone.has(e.id));
   updateBoundArrows(state.elements);
