@@ -1300,12 +1300,17 @@ function resizeTo(it, sx, sy, shiftKey){
   const fx = Math.min(x0, x1), fy = Math.min(y0, y1);
   const fw = Math.abs(x1 - x0), fh = Math.abs(y1 - y0);
   const kx = fw / (b.w || 1), ky = fh / (b.h || 1);
+  /* corner handles scale the type along with the geometry; side handles
+     stretch the geometry only and leave every font size untouched */
+  const cornerDrag = h.length === 2;
   for (const o of it.orig){
     const el = byId(o.id);
     if (!el) continue;
     if (el.type === 'text'){
-      const s = Math.max(kx, ky);
-      el.size = clamp(Math.round(o.size * s), 8, 600);
+      if (cornerDrag){
+        const s = Math.max(kx, ky);
+        el.size = clamp(Math.round(o.size * s), 8, 600);
+      }
       el.x = fx + (o.x - b.x) * kx;
       el.y = fy + (o.y - b.y) * ky;
       autosizeText(el);
@@ -1322,6 +1327,8 @@ function resizeTo(it, sx, sy, shiftKey){
     el.y = fy + (o.y - b.y) * ky;
     el.w = Math.max(8, o.w * kx);
     el.h = Math.max(8, o.h * ky);
+    if (cornerDrag && canHaveText(el) && el.text && el.text.trim())
+      el.size = clamp(Math.round(o.size * Math.max(kx, ky)), 8, 600);
   }
 }
 
@@ -1874,6 +1881,40 @@ function mergeTexts(){
   commit(); syncPanel(); requestRender();
   showHint('Merged into one text. The line order follows your selection order');
 }
+/* merge selected TEXT elements into the one selected shape, as its text.
+   Text order follows selection order; the shape keeps its identity. */
+function mergeTextIntoShape(){
+  const els = [...state.selection].map(byId).filter(Boolean);
+  const shapes = els.filter(e => e.type !== 'text' && canHaveText(e) && !isLinear(e));
+  const texts = els.filter(e => e.type === 'text');
+  if (shapes.length !== 1 || !texts.length) return;
+  const shape = shapes[0];
+  const adopt = !String(shape.text || '').trim();
+  let text = adopt ? '' : String(shape.text);
+  const runs = (!adopt && shape.runs) ? shape.runs.map(r => ({ ...r })) : [];
+  let off = text.length;
+  for (const t of texts){
+    if (text){ text += '\n'; off += 1; }
+    const tt = String(t.text || '');
+    if (t.runs) for (const r of t.runs) runs.push({ ...r, s: r.s + off, e: r.e + off });
+    text += tt; off += tt.length;
+  }
+  shape.text = text;
+  shape.runs = runs.length ? runs : null;
+  if (adopt){
+    const f = texts[0];
+    shape.font = f.font;
+    shape.size = f.size;
+    if (f.textColor) shape.textColor = f.textColor;
+    if (f.fweight) shape.fweight = f.fweight;
+  }
+  const gone = new Set(texts.map(e => e.id));
+  state.elements = state.elements.filter(e => !gone.has(e.id));
+  updateBoundArrows(state.elements);
+  setSelection(new Set([shape.id]));
+  commit(); syncPanel(); requestRender();
+  showHint('Text merged into the shape. Double-click it to edit');
+}
 function openCtxMenu(ev){
   const [sx, sy] = toScene(ev.clientX, ev.clientY);
   const hit = topElementAt(sx, sy);
@@ -1897,6 +1938,10 @@ function openCtxMenu(ev){
       add('Edit chart data…', () => chartOpen(sel[0]));
     if (sel.length >= 2 && sel.every(e => e.type === 'text'))
       add(`Merge ${sel.length} texts into one`, mergeTexts);
+    if (sel.length >= 2
+        && sel.filter(e => e.type !== 'text' && canHaveText(e) && !isLinear(e)).length === 1
+        && sel.filter(e => e.type === 'text').length === sel.length - 1)
+      add('Merge text into the shape', mergeTextIntoShape);
     if (sel.length === 1 && sel[0].type === 'image'){
       add('Crop image', () => startCrop(sel[0]));
       if (sel[0].crop) add('Uncrop', () => resetCrop(sel[0]));

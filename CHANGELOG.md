@@ -1,5 +1,10 @@
 # KoralPaper — Changelog
 
+## v3.53.0
+
+- Merge text into a shape: select one shape plus any number of text elements and right-click → "Merge text into the shape". The texts become the shape's own label, in the order you selected them, keeping bold, highlights and letter colors. An empty shape adopts the first text's font, size, weight and color, so the look carries over.
+- Smarter resizing for anything with text: the side handles now stretch only the geometry and never touch the font size, on shapes and on text elements alike. The corner handles scale the type along with the shape, which is also new for shapes (their labels used to stay tiny no matter how big you dragged them).
+
 ## v3.52.0
 
 Security and consistency pass, following a full audit.
