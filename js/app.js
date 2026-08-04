@@ -4599,22 +4599,33 @@ function chartBuildPie(d, spec, donut){
     const a2 = a + (v / total) * Math.PI * 2;
     const pts = [];
     const steps = Math.max(3, Math.ceil((a2 - a) / 0.09));
+    const sharp = spec.style === 'clean';
+    /* corners must be dense on BOTH sides or the freehand smoothing cuts
+       them inward and leaves seams between slices; in clean style the
+       corner point is doubled, which pins the curve to an exact corner */
+    const corner = pp => { pts.push(pp.slice()); if (sharp) pts.push(pp.slice()); };
+    const edge = (p1, p2) => {
+      const n2 = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 10));
+      for (let q = 1; q < n2; q++) pts.push([p1[0] + (p2[0] - p1[0]) * q / n2, p1[1] + (p2[1] - p1[1]) * q / n2]);
+    };
+    const arcPt = (ang, rr) => [cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr];
     if (donut){
-      for (let k = 0; k <= steps; k++){
-        const ang = a + (a2 - a) * k / steps;
-        pts.push([cx + Math.cos(ang) * r, cy + Math.sin(ang) * r]);
-      }
-      for (let k = steps; k >= 0; k--){
-        const ang = a + (a2 - a) * k / steps;
-        pts.push([cx + Math.cos(ang) * rIn, cy + Math.sin(ang) * rIn]);
-      }
-      pts.push(pts[0].slice());
+      corner(arcPt(a, r));
+      for (let k = 1; k < steps; k++) pts.push(arcPt(a + (a2 - a) * k / steps, r));
+      corner(arcPt(a2, r));
+      edge(arcPt(a2, r), arcPt(a2, rIn));
+      corner(arcPt(a2, rIn));
+      for (let k = steps - 1; k > 0; k--) pts.push(arcPt(a + (a2 - a) * k / steps, rIn));
+      corner(arcPt(a, rIn));
+      edge(arcPt(a, rIn), arcPt(a, r));
+      pts.push(arcPt(a, r));
     } else {
-      pts.push([cx, cy]);
-      for (let k = 0; k <= steps; k++){
-        const ang = a + (a2 - a) * k / steps;
-        pts.push([cx + Math.cos(ang) * r, cy + Math.sin(ang) * r]);
-      }
+      corner([cx, cy]);
+      edge([cx, cy], arcPt(a, r));
+      corner(arcPt(a, r));
+      for (let k = 1; k < steps; k++) pts.push(arcPt(a + (a2 - a) * k / steps, r));
+      corner(arcPt(a2, r));
+      edge(arcPt(a2, r), [cx, cy]);
       pts.push([cx, cy]);
     }
     const minX = Math.min(...pts.map(pp => pp[0])), minY = Math.min(...pts.map(pp => pp[1]));
@@ -4819,6 +4830,8 @@ function chartBuild(spec){
     t.y = tb.y - t.h - 18;
     els.push(t);
   }
+  /* clean style: crisp professional geometry, no hand wobble anywhere */
+  if (spec.style === 'clean') for (const el of els) el.sketch = 0;
   const b = sceneBounds(els);
   for (const el of els){ el.x -= b.x; el.y -= b.y; }
   return { els, w: b.w, h: b.h };
@@ -4855,6 +4868,7 @@ function chartSpecFromUI(){
     showVals: $('chartShowVals').checked,
     showPct: $('chartShowPct').checked,
     legend: (document.querySelector('#chartLegendSeg .sel') || {}).dataset?.lg || 'top',
+    style: (document.querySelector('#chartStyleSeg .sel') || {}).dataset?.cs || 'sketch',
   };
 }
 function chartSetSeg(segId, attr, value){
@@ -4924,6 +4938,7 @@ function chartOpen(fromEl){
     $('chartShowVals').checked = !!c.showVals;
     $('chartShowPct').checked = c.showPct !== false;
     chartSetSeg('chartLegendSeg', 'lg', c.legend || 'top');
+    chartSetSeg('chartStyleSeg', 'cs', c.style || 'sketch');
     chartDirty = true;
   } else if (!chartDirty && !$('chartData').value){
     $('chartData').value = CHART_SAMPLES[chartType];
@@ -4991,7 +5006,7 @@ $('chartDotsChk').addEventListener('change', chartPreviewRefresh);
 $('chartShowVals').addEventListener('change', chartPreviewRefresh);
 $('chartShowPct').addEventListener('change', chartPreviewRefresh);
 $('chartCurve').addEventListener('input', chartPreviewRefresh);
-document.querySelectorAll('#chartGridDash button, #chartGridW button, #chartLegendSeg button').forEach(b =>
+document.querySelectorAll('#chartGridDash button, #chartGridW button, #chartLegendSeg button, #chartStyleSeg button').forEach(b =>
   b.addEventListener('click', () => {
     const seg = b.closest('.segment');
     seg.querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b));

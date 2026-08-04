@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.47.0
+
+- Two chart styles: a Style row in the dialog switches every chart and table between Sketchy (the hand-drawn wobble) and Clean (crisp, straight, professional). It applies to all types: tables, bars, pies, donuts, lines and spiders, including the legend and labels.
+- Pie and donut slices are drawn tighter: no more thin seams between slices, and in Clean style the wedge corners are perfectly sharp.
+- The style is saved per chart and preserved through "Edit chart data", so the same numbers can live as a sketch on one page and a boardroom version on another.
+
 ## v3.46.0
 
 - Value labels: a new Labels row in the chart dialog. Tick "Values" and every number is written on the chart: above each bar (below for negatives), at each point of a line, and just outside each vertex of a spider, colored per series.
