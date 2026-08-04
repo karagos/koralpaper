@@ -4401,32 +4401,25 @@ function chartSpline(pts, curve, closed){
 }
 function chartGridDash(spec){ return spec.gridDash || 'solid'; }
 function chartGridW(spec){ return spec.gridW || 1.4; }
-/* title + legend header shared by bar and line charts; returns next free y */
-function chartHeader(els, spec, d, plotX, plotW, lineMode){
-  let ty = 0;
-  if (spec.title){
-    const t = chartText(spec.title, 26, 'ink', { font: 'serif' });
-    t.x = plotX + plotW / 2 - t.w / 2; t.y = ty;
-    els.push(t); ty += t.h + 14;
-  }
-  if (d.series.length > 1){
-    let lx = plotX;
-    d.series.forEach((name, j) => {
-      const sw2 = newElement('rect', lx, ty + 2, {
-        fill: lineMode ? 'white' : CHART_FILLS[j % CHART_FILLS.length],
-        stroke: lineMode ? CHART_STROKES[j % CHART_STROKES.length] : 'ink',
-        sw: lineMode ? 2.6 : 1.8, round: 0, sketch: 1,
-      });
-      sw2.w = 14; sw2.h = 14;
-      els.push(sw2);
-      const t = chartText(name, 13, 'ink');
-      t.x = lx + 20; t.y = ty + 9 - t.h / 2;
-      els.push(t);
-      lx += 20 + t.w + 20;
+/* legend items built at origin; vertical=true stacks them */
+function chartLegendEls(d, lineMode, vertical){
+  const items = [];
+  let lx = 0, ly = 0;
+  d.series.forEach((name, j) => {
+    const sw2 = newElement('rect', lx, ly + 2, {
+      fill: lineMode ? 'white' : CHART_FILLS[j % CHART_FILLS.length],
+      stroke: lineMode ? CHART_STROKES[j % CHART_STROKES.length] : 'ink',
+      sw: lineMode ? 2.6 : 1.8, round: 0, sketch: 1,
     });
-    ty += 26;
-  }
-  return ty;
+    sw2.w = 14; sw2.h = 14;
+    items.push(sw2);
+    const t = chartText(name, 13, 'ink');
+    t.x = lx + 20; t.y = ly + 9 - t.h / 2;
+    items.push(t);
+    if (vertical) ly += 24;
+    else lx += 20 + t.w + 20;
+  });
+  return items;
 }
 /* value axis scale for bars and lines */
 function chartScale(d){
@@ -4442,8 +4435,7 @@ function chartBuildBars(d, spec, horizontal){
   const els = [];
   const { vmin, vmax, step } = chartScale(d);
   const plotW = horizontal ? 460 : 520, plotH = horizontal ? Math.max(220, d.cats.length * 44) : 300;
-  const plotX = 0;
-  const plotY = chartHeader(els, spec, d, plotX, plotW, false);
+  const plotX = 0, plotY = 0;
   const nS = d.series.length, nC = d.cats.length;
   if (!horizontal){
     const y = v => plotY + plotH * (vmax - v) / (vmax - vmin);
@@ -4464,6 +4456,12 @@ function chartBuildBars(d, spec, horizontal){
         });
         bar.w = Math.max(4, barW - 3); bar.h = bh;
         els.push(bar);
+        if (spec.showVals){
+          const vt = chartText(chartFmt(v), 11.5, 'gdark');
+          vt.x = bar.x + bar.w / 2 - vt.w / 2;
+          vt.y = v >= 0 ? by - vt.h - 4 : by + bh + 4;
+          els.push(vt);
+        }
       });
       const t = chartText(cat, 13, 'gdark');
       t.x = plotX + slot * i + slot / 2 - t.w / 2; t.y = plotY + plotH + 10;
@@ -4500,6 +4498,12 @@ function chartBuildBars(d, spec, horizontal){
         });
         bar.w = bw; bar.h = Math.max(4, barH - 3);
         els.push(bar);
+        if (spec.showVals){
+          const vt = chartText(chartFmt(v), 11.5, 'gdark');
+          vt.x = v >= 0 ? bx + bw + 6 : bx - 6 - vt.w;
+          vt.y = bar.y + bar.h / 2 - vt.h / 2;
+          els.push(vt);
+        }
       });
       const t = chartText(cat, 13, 'gdark');
       t.x = plotX - 10 - t.w; t.y = plotY + slot * i + slot / 2 - t.h / 2;
@@ -4524,8 +4528,7 @@ function chartBuildBars(d, spec, horizontal){
 function chartBuildLine(d, spec){
   const els = [];
   const { vmin, vmax, step } = chartScale(d);
-  const plotW = 520, plotH = 300, plotX = 0;
-  const plotY = chartHeader(els, spec, d, plotX, plotW, true);
+  const plotW = 520, plotH = 300, plotX = 0, plotY = 0;
   const nC = d.cats.length;
   const y = v => plotY + plotH * (vmax - v) / (vmax - vmin);
   for (let v = vmin; v <= vmax + 1e-9; v += step){
@@ -4556,6 +4559,12 @@ function chartBuildLine(d, spec){
       });
       dot.w = 9; dot.h = 9;
       els.push(dot);
+    });
+    if (spec.showVals) abs.forEach((pt, i) => {
+      const vt = chartText(chartFmt(d.vals[i][j]), 11.5, CHART_STROKES[j % CHART_STROKES.length]);
+      vt.x = pt[0] - vt.w / 2;
+      vt.y = pt[1] - vt.h - (spec.dots ? 9 : 5);
+      els.push(vt);
     });
   });
   d.cats.forEach((cat, i) => {
@@ -4618,18 +4627,16 @@ function chartBuildPie(d, spec, donut){
     els.push(slice);
     const mid = (a + a2) / 2, lr = r + 18;
     const pct = Math.round(v / total * 100);
-    const t = chartText(`${d.cats[i]} · ${pct}%`, 14, 'ink');
+    const lparts = [d.cats[i]];
+    if (spec.showVals) lparts.push(chartFmt(v));
+    if (spec.showPct !== false) lparts.push(pct + '%');
+    const t = chartText(lparts.join(' \u00B7 '), 14, 'ink');
     const lx = cx + Math.cos(mid) * lr, ly = cy + Math.sin(mid) * lr;
     t.x = Math.cos(mid) >= 0.06 ? lx : Math.cos(mid) <= -0.06 ? lx - t.w : lx - t.w / 2;
     t.y = ly - t.h / 2;
     els.push(t);
     a = a2;
   });
-  if (spec.title){
-    const t = chartText(spec.title, 26, 'ink', { font: 'serif' });
-    t.x = cx - t.w / 2; t.y = cy - r - 70;
-    els.push(t);
-  }
   return els;
 }
 function chartBuildSpider(d, spec){
@@ -4713,29 +4720,14 @@ function chartBuildSpider(d, spec){
       dot.w = 9; dot.h = 9;
       els.push(dot);
     });
-  });
-  // legend + title above the web
-  let topY = -(R + 46);
-  if (d.series.length > 1){
-    topY -= 24;
-    let lx = -R;
-    d.series.forEach((name, j) => {
-      const sw2 = newElement('rect', lx, topY, {
-        fill: CHART_FILLS[j % CHART_FILLS.length], stroke: 'ink', sw: 1.8, round: 0, sketch: 1,
-      });
-      sw2.w = 14; sw2.h = 14;
-      els.push(sw2);
-      const t = chartText(name, 13, 'ink');
-      t.x = lx + 20; t.y = topY + 7 - t.h / 2;
-      els.push(t);
-      lx += 20 + t.w + 20;
+    if (spec.showVals) verts.forEach((pp, i) => {
+      const a = ang(i);
+      const vt = chartText(chartFmt(d.vals[i][j]), 11.5, CHART_STROKES[j % CHART_STROKES.length]);
+      const lx2 = pp[0] + Math.cos(a) * 14, ly2 = pp[1] + Math.sin(a) * 14;
+      vt.x = lx2 - vt.w / 2; vt.y = ly2 - vt.h / 2;
+      els.push(vt);
     });
-  }
-  if (spec.title){
-    const t = chartText(spec.title, 26, 'ink', { font: 'serif' });
-    t.x = cx - t.w / 2; t.y = topY - 44;
-    els.push(t);
-  }
+  });
   return els;
 }
 function chartBuildTable(spec){
@@ -4757,12 +4749,7 @@ function chartBuildTable(spec){
   }
   const totalW = colW.reduce((acc, w) => acc + w, 0);
   const totalH = headH + (rows.length - 1) * rowH;
-  let ty = 0;
-  if (spec.title){
-    const t = chartText(spec.title, 26, 'ink', { font: 'serif' });
-    t.x = totalW / 2 - t.w / 2; t.y = 0;
-    els.push(t); ty = t.h + 16;
-  }
+  const ty = 0;
   const head = newElement('rect', 0, ty, { fill: 'coral', stroke: 'none', round: 0, sketch: 1 });
   head.w = totalW; head.h = headH;
   els.push(head);
@@ -4801,15 +4788,36 @@ function chartBuildTable(spec){
   return els;
 }
 function chartBuild(spec){
-  let els;
+  let els, d = null;
   if (spec.type === 'table') els = chartBuildTable(spec);
   else {
-    const d = chartParseData(spec.data);
+    d = chartParseData(spec.data);
     if (spec.type === 'bars') els = chartBuildBars(d, spec, false);
     else if (spec.type === 'hbars') els = chartBuildBars(d, spec, true);
     else if (spec.type === 'line') els = chartBuildLine(d, spec);
     else if (spec.type === 'spider') els = chartBuildSpider(d, spec);
     else els = chartBuildPie(d, spec, spec.type === 'donut');
+  }
+  /* legend, placed on the chosen side of the finished chart */
+  if (d && d.series.length > 1 && spec.type !== 'pie' && spec.type !== 'donut'){
+    const pos = spec.legend || 'top';
+    const vertical = pos === 'left' || pos === 'right';
+    const items = chartLegendEls(d, spec.type === 'line', vertical);
+    const lb = sceneBounds(items), cb = sceneBounds(els);
+    let dx = 0, dy = 0;
+    if (pos === 'top'){ dx = cb.x + cb.w / 2 - (lb.x + lb.w / 2); dy = cb.y - lb.h - 16 - lb.y; }
+    else if (pos === 'bottom'){ dx = cb.x + cb.w / 2 - (lb.x + lb.w / 2); dy = cb.y + cb.h + 16 - lb.y; }
+    else if (pos === 'left'){ dx = cb.x - lb.w - 24 - lb.x; dy = cb.y + cb.h / 2 - (lb.y + lb.h / 2); }
+    else { dx = cb.x + cb.w + 24 - lb.x; dy = cb.y + cb.h / 2 - (lb.y + lb.h / 2); }
+    for (const el of items){ el.x += dx; el.y += dy; els.push(el); }
+  }
+  /* title, centered above everything */
+  if (spec.title){
+    const tb = sceneBounds(els);
+    const t = chartText(spec.title, 26, 'ink', { font: 'serif' });
+    t.x = tb.x + tb.w / 2 - t.w / 2;
+    t.y = tb.y - t.h - 18;
+    els.push(t);
   }
   const b = sceneBounds(els);
   for (const el of els){ el.x -= b.x; el.y -= b.y; }
@@ -4844,6 +4852,9 @@ function chartSpecFromUI(){
     dots: $('chartDotsChk').checked,
     gridDash: (document.querySelector('#chartGridDash .sel') || {}).dataset?.gd || 'solid',
     gridW: Number((document.querySelector('#chartGridW .sel') || {}).dataset?.gw || 1.4),
+    showVals: $('chartShowVals').checked,
+    showPct: $('chartShowPct').checked,
+    legend: (document.querySelector('#chartLegendSeg .sel') || {}).dataset?.lg || 'top',
   };
 }
 function chartSetSeg(segId, attr, value){
@@ -4855,6 +4866,9 @@ function chartSyncTypeUI(){
   $('chartAxisRow').classList.toggle('hidden', ['pie', 'donut', 'table', 'spider'].includes(chartType));
   $('chartLineOpts').classList.toggle('hidden', chartType !== 'line' && chartType !== 'spider');
   $('chartGridOpts').classList.toggle('hidden', ['pie', 'donut', 'table'].includes(chartType));
+  $('chartValOpts').classList.toggle('hidden', chartType === 'table');
+  $('chartPctWrap').classList.toggle('hidden', chartType !== 'pie' && chartType !== 'donut');
+  $('chartLegendOpts').classList.toggle('hidden', ['pie', 'donut', 'table'].includes(chartType));
   $('chartIntro').textContent = chartType === 'table' ? CHART_INTROS.table
     : chartType === 'spider' ? CHART_INTROS.spider
     : (chartType === 'pie' || chartType === 'donut') ? CHART_INTROS.pie : CHART_INTROS.chart;
@@ -4907,6 +4921,9 @@ function chartOpen(fromEl){
     $('chartDotsChk').checked = !!c.dots;
     chartSetSeg('chartGridDash', 'gd', c.gridDash || 'solid');
     chartSetSeg('chartGridW', 'gw', c.gridW || 1.4);
+    $('chartShowVals').checked = !!c.showVals;
+    $('chartShowPct').checked = c.showPct !== false;
+    chartSetSeg('chartLegendSeg', 'lg', c.legend || 'top');
     chartDirty = true;
   } else if (!chartDirty && !$('chartData').value){
     $('chartData').value = CHART_SAMPLES[chartType];
@@ -4971,8 +4988,10 @@ $('chartData').addEventListener('keydown', ev => {
 ['chartTitle', 'chartXLabel', 'chartYLabel'].forEach(id =>
   $(id).addEventListener('input', chartPreviewRefresh));
 $('chartDotsChk').addEventListener('change', chartPreviewRefresh);
+$('chartShowVals').addEventListener('change', chartPreviewRefresh);
+$('chartShowPct').addEventListener('change', chartPreviewRefresh);
 $('chartCurve').addEventListener('input', chartPreviewRefresh);
-document.querySelectorAll('#chartGridDash button, #chartGridW button').forEach(b =>
+document.querySelectorAll('#chartGridDash button, #chartGridW button, #chartLegendSeg button').forEach(b =>
   b.addEventListener('click', () => {
     const seg = b.closest('.segment');
     seg.querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b));

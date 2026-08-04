@@ -1,5 +1,12 @@
 # KoralPaper — Changelog
 
+## v3.46.0
+
+- Value labels: a new Labels row in the chart dialog. Tick "Values" and every number is written on the chart: above each bar (below for negatives), at each point of a line, and just outside each vertex of a spider, colored per series.
+- Pies and donuts get independent "Values" and "Percent" checkboxes, so slice labels can read "Consulting · 45", "Consulting · 45%", both, or just the name.
+- Legend position: choose Top, Bottom, Left or Right in the new Legend row. Left and right stack the entries vertically. Applies to bars, lines and spiders with more than one series.
+- All options are saved with the chart and preserved through "Edit chart data".
+
 ## v3.45.0
 
 - Grid control for charts: a new Grid row in the dialog sets the style (Solid / Dash / Dots) and weight (Thin / Std / Bold) of the grey guide lines. It applies to the gridlines of bar and line charts and to the web rings and spokes of spider charts.

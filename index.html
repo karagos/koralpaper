@@ -501,6 +501,20 @@
         <input type="range" id="chartCurve" min="0" max="100" step="5" value="100"></label>
       <label class="chartcheck" title="Draw a small ring at every value. Off: selecting a line reveals its points"><input type="checkbox" id="chartDotsChk"> Value dots</label>
     </div>
+    <div class="tplsaverow chartmeta chartopts hidden" id="chartValOpts">
+      <span class="chartoptlabel">Labels</span>
+      <label class="chartcheck" title="Write each value on the chart"><input type="checkbox" id="chartShowVals"> Values</label>
+      <label class="chartcheck" id="chartPctWrap" title="Show each slice's share as a percentage"><input type="checkbox" id="chartShowPct" checked> Percent</label>
+    </div>
+    <div class="tplsaverow chartmeta chartopts hidden" id="chartLegendOpts">
+      <span class="chartoptlabel">Legend</span>
+      <div class="segment chartminiseg" id="chartLegendSeg" title="Where the series legend sits (shown when there is more than one series)">
+        <button data-lg="top" class="sel">Top</button>
+        <button data-lg="bottom">Bottom</button>
+        <button data-lg="left">Left</button>
+        <button data-lg="right">Right</button>
+      </div>
+    </div>
     <div class="chartprevwrap">
       <canvas id="chartPreview"></canvas>
       <div id="chartErr" class="charterr hidden"></div>
