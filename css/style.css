@@ -494,6 +494,18 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 }
 .chartminiseg button:hover{background:var(--card-2);}
 .chartminiseg button.sel{background:var(--coral); color:#FBF6EE; border-color:var(--coral);}
+
+/* font search + weight picker */
+.fontsearchwrap{padding:4px 6px 6px;}
+#fontSearch{
+  width:100%; font-family:var(--sans); font-size:13px; font-weight:500;
+  padding:7px 9px; border:1.5px solid var(--line-soft); border-radius:8px;
+  background:var(--card); color:var(--ink);
+}
+#fontSearch:focus{outline:none; border-color:var(--coral);}
+.weightbtn{flex:0 0 auto; min-width:58px;}
+.weightmenu{position:fixed; min-width:170px; max-height:60vh; overflow-y:auto; z-index:60;}
+.weightmenu button.sel{color:var(--coral); font-weight:700;}
 .chartslider input[type=range]{width:86px; height:16px; accent-color:var(--coral);}
 .chartprevwrap{
   position:relative; margin-top:9px; border:1.5px solid var(--line-soft);

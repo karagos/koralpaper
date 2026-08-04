@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.48.0';
+const APP_VERSION = '3.49.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -107,6 +107,27 @@ const FONTS = {
   tiny5:      { label:'Tiny5', stack:'"Tiny5",monospace', weight:'400', google:'Tiny5', group:'Pixel & dot' },
   doto:       { label:'Doto', stack:'"Doto",monospace', weight:'600', google:'Doto:wght@400;600;700', group:'Pixel & dot' },
 };
+/* any Google font by name: the key IS the family ('cg:Archivo Black'), so
+   documents stay portable — every app instance can rebuild the entry */
+function ensureCustomFont(key){
+  if (typeof key !== 'string' || !key.startsWith('cg:')) return null;
+  if (FONTS[key]) return FONTS[key];
+  const family = key.slice(3).trim();
+  if (!family) return null;
+  FONTS[key] = {
+    label: family,
+    stack: `"${family}","Helvetica Neue",sans-serif`,
+    weight: '400',
+    google: family.replace(/ /g, '+') + ':wght@100..900',
+    group: 'Your Google fonts',
+    custom: true,
+  };
+  return FONTS[key];
+}
+function weightUp(base){
+  const b = Number(base) || 400;
+  return String(Math.max(700, Math.min(900, b + 200)));
+}
 function boldWeightOf(f){
   if (f._bw) return f._bw;
   let bw = 700;
@@ -120,9 +141,11 @@ function boldWeightOf(f){
   }
   return (f._bw = String(bw));
 }
-function fontCSS(font, size, st){
+function fontCSS(font, size, st, fw){
+  ensureCustomFont(font);
   const f = FONTS[font] || FONTS.sans;
-  const weight = st && st.b ? boldWeightOf(f) : f.weight;
+  const base = fw || f.weight;
+  const weight = st && st.b ? (fw ? weightUp(fw) : boldWeightOf(f)) : base;
   return `${st && st.i ? 'italic ' : ''}${weight} ${size}px ${f.stack}`;
 }
 
@@ -194,8 +217,14 @@ function remapRuns(runs, at, removed, inserted){
   return out.length ? out : null;
 }
 function googleFontsHref(){
-  const fams = Object.values(FONTS).filter(f => f.google).map(f => 'family=' + f.google).join('&');
+  const fams = Object.values(FONTS).filter(f => f.google && !f.custom).map(f => 'family=' + f.google).join('&');
   return 'https://fonts.googleapis.com/css2?' + fams + '&display=swap';
+}
+function customFontHref(family){
+  return 'https://fonts.googleapis.com/css2?family=' + family.replace(/ /g, '+') + ':wght@100..900&display=swap';
+}
+function customFontHrefPlain(family){
+  return 'https://fonts.googleapis.com/css2?family=' + family.replace(/ /g, '+') + '&display=swap';
 }
 function lineHeightOf(size, mult){ return Math.round(size * (mult || 1.3)); }
 
@@ -337,7 +366,7 @@ function layoutText(el, maxW){
         j++;
       }
       const seg = { text: raw.slice(idx, j), b: !!st.b, i: !!st.i, hl: st.hl || null, co: st.co || null };
-      _measureCtx.font = fontCSS(el.font, el.size, seg);
+      _measureCtx.font = fontCSS(el.font, el.size, seg, el.fweight);
       seg.w = _measureCtx.measureText(seg.text).width;
       segs.push(seg);
       idx = j;
@@ -394,7 +423,7 @@ function drawRichLine(ctx, el, line, x0, ty, color, pal){
   ctx.textAlign = 'left';
   for (const seg of line.segs){
     if (seg.text){
-      ctx.font = fontCSS(el.font, el.size, seg);
+      ctx.font = fontCSS(el.font, el.size, seg, el.fweight);
       ctx.fillStyle = (seg.co && pal) ? (resolveStroke(pal, seg.co) || color) : color;
       ctx.fillText(seg.text, x, ty);
     }
@@ -2435,9 +2464,10 @@ function renderSceneSVG(elements, opts){
   };
 
   const fontAttrs = (el) => {
+    ensureCustomFont(el.font);
     const f = FONTS[el.font] || FONTS.sans;
     const track = el.lspace ? ` letter-spacing="${svgNum(el.lspace)}"` : '';
-    return `font-family="${svgEsc(f.stack.replace(/"/g, "'"))}" font-size="${el.size}" font-weight="${f.weight}"${track}`;
+    return `font-family="${svgEsc(f.stack.replace(/"/g, "'"))}" font-size="${el.size}" font-weight="${el.fweight || f.weight}"${track}`;
   };
 
   const richLineSVG = (el, ln, x0, ty, color) => {
@@ -2453,7 +2483,7 @@ function renderSceneSVG(elements, opts){
     for (const seg of ln.segs){
       if (seg.text){
         const f = FONTS[el.font] || FONTS.sans;
-        const wgt = seg.b ? boldWeightOf(f) : f.weight;
+        const wgt = seg.b ? (el.fweight ? weightUp(el.fweight) : boldWeightOf(f)) : (el.fweight || f.weight);
         const sty = seg.i ? ' font-style="italic"' : '';
         const sco = seg.co ? ` fill="${resolveStroke(pal, seg.co) || color}"` : '';
         spans.push(`<tspan x="${svgNum(x)}" font-weight="${wgt}"${sty}${sco}>${svgEsc(seg.text)}</tspan>`);

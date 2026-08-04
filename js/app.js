@@ -1521,7 +1521,7 @@ function positionEditor(){
   const el = editing.el;
   const z = state.camera.z;
   const fs = el.size * z;
-  editorEl.style.font = fontCSS(el.font, fs);
+  editorEl.style.font = fontCSS(el.font, fs, null, el.fweight);
   editorEl.style.lineHeight = lineHeightOf(el.size, el.lh) * z + 'px';
   editorEl.style.letterSpacing = ((el.lspace || 0) * z) + 'px';
   if (el.type === 'text'){
@@ -1726,7 +1726,7 @@ function reorder(mode){
 }
 
 /* ── copy / paste style ────────────────────────────── */
-const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor','frame'];
+const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor','frame','fweight'];
 let styleClipboard = null;
 function copyStyle(){
   const sel = selected();
@@ -2190,8 +2190,13 @@ function syncPanel(){
     : (!val('elbow') && Number(b.dataset.v) === val('curve')));
   const fontVal = val('font');
   const fSel = (typeof fontVal === 'string' && FONTS[fontVal]) ? fontVal : null;
-  $('fontBtnLabel').textContent = fSel ? FONTS[fSel].label : '—';
-  $('fontBtnLabel').style.fontFamily = fSel ? FONTS[fSel].stack : '';
+  if (fSel) ensureCustomFont(fSel);
+  $('fontBtnLabel').textContent = (fSel && FONTS[fSel]) ? FONTS[fSel].label : '—';
+  $('fontBtnLabel').style.fontFamily = (fSel && FONTS[fSel]) ? FONTS[fSel].stack : '';
+  const fwCur = sel.length ? (sel[0].fweight || null) : null;
+  $('weightBtnLabel').textContent = fwCur ? String(fwCur)
+    : (fSel && FONTS[fSel]) ? String(FONTS[fSel].weight) : '400';
+  $('weightBtnLabel').style.fontWeight = fwCur || ((fSel && FONTS[fSel]) ? FONTS[fSel].weight : 400);
   markSel('#sizeSeg button', b => Number(b.dataset.v) === val('size'));
   markSel('#alignSeg button', b => b.dataset.v === val('align'));
   markSel('#valignSeg button', b => b.dataset.v === (val('valign') || 'middle'));
@@ -2404,8 +2409,113 @@ $('adjResetBtn').addEventListener('click', () => {
 });
 
 /* ── font picker ───────────────────────────────────── */
+const GFONT_CATALOG = ['Abril Fatface','Alegreya','Alfa Slab One','Amatic SC','Anton','Antonio','Archivo','Archivo Black','Archivo Narrow','Asap','Assistant','Bangers','Barlow','Barlow Condensed','Bebas Neue','Bitter','Black Ops One','Bodoni Moda','Bree Serif','Bungee','Cabin','Cairo','Cardo','Catamaran','Chivo','Cinzel','Comfortaa','Cormorant','Cormorant Garamond','Courgette','Crimson Text','DM Sans','DM Serif Display','DM Serif Text','Dancing Script','Dosis','EB Garamond','Exo 2','Figtree','Fira Sans','Fjalla One','Fraunces','Gloria Hallelujah','Great Vibes','Heebo','Hind','Inconsolata','Inder','Inter','Inter Tight','Josefin Sans','Jost','Kanit','Karla','Lato','League Spartan','Lexend','Libre Baskerville','Libre Franklin','Lilita One','Lobster','Lora','Luckiest Guy','Manrope','Marcellus','Merriweather','Montserrat','Mukta','Mulish','Nanum Gothic','Noto Sans','Noto Serif','Nunito','Nunito Sans','Old Standard TT','Oswald','Outfit','Overpass','Oxygen','PT Sans','PT Serif','Pacifico','Passion One','Pathway Gothic One','Permanent Marker','Philosopher','Play','Playfair Display SC','Plus Jakarta Sans','Poppins','Prata','Prompt','Public Sans','Quicksand','Raleway','Righteous','Roboto','Roboto Condensed','Roboto Mono','Roboto Slab','Rubik','Rubik Mono One','Russo One','Sacramento','Satisfy','Sen','Shrikhand','Signika','Sora','Source Serif 4','Space Mono','Spectral','Staatliches','Syne','Tajawal','Teko','Tinos','Titan One','Titillium Web','Ubuntu','Ultra','Unbounded','Urbanist','Varela Round','Vollkorn','Work Sans','Yanone Kaffeesatz','Yellowtail','Zilla Slab'];
+function fontSearchRow(menu){
+  const wrap = document.createElement('div');
+  wrap.className = 'fontsearchwrap';
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.id = 'fontSearch'; inp.placeholder = 'Search all Google Fonts…';
+  inp.autocomplete = 'off'; inp.spellcheck = false;
+  inp.addEventListener('pointerdown', ev => ev.stopPropagation());
+  inp.addEventListener('keydown', ev => ev.stopPropagation());
+  inp.addEventListener('input', () => fontMenuFilter(inp.value));
+  wrap.appendChild(inp);
+  menu.appendChild(wrap);
+  const results = document.createElement('div');
+  results.id = 'fontSearchResults';
+  menu.appendChild(results);
+}
+function applyCustomFont(family){
+  const key = 'cg:' + family;
+  ensureCustomFont(key);
+  rememberGFont(family);
+  loadFontCssFor(family);
+  requestFontLoad(key);
+  applyStyle({ font: key });
+  buildCustomFontButtons();
+  closeFontMenu();
+}
+function buildCustomFontButtons(){
+  const box = $('fontCustomGroup');
+  if (!box) return;
+  box.replaceChildren();
+  const fams = savedGFonts();
+  if (!fams.length) return;
+  const head = document.createElement('div');
+  head.className = 'menuhead';
+  head.textContent = 'Your Google fonts';
+  box.appendChild(head);
+  for (const fam of fams){
+    const key = 'cg:' + fam;
+    ensureCustomFont(key);
+    const b = document.createElement('button');
+    b.dataset.font = key;
+    b.textContent = fam;
+    b.style.fontFamily = FONTS[key].stack;
+    b.addEventListener('click', ev => {
+      ev.stopPropagation();
+      loadFontCssFor(fam);
+      requestFontLoad(key);
+      applyStyle({ font: key });
+      closeFontMenu();
+    });
+    box.appendChild(b);
+  }
+}
+function fontMenuFilter(q){
+  const menu = $('fontMenu');
+  const query = (q || '').trim().toLowerCase();
+  // filter the existing buttons and their group heads
+  menu.querySelectorAll('button[data-font]').forEach(b => {
+    b.classList.toggle('hidden', !!query && !b.textContent.toLowerCase().includes(query));
+  });
+  menu.querySelectorAll('.menuhead').forEach(h => {
+    let sib = h.nextElementSibling, any = false;
+    while (sib && !sib.classList.contains('menuhead')){
+      if (sib.dataset && sib.dataset.font && !sib.classList.contains('hidden')) any = true;
+      sib = sib.nextElementSibling;
+    }
+    h.classList.toggle('hidden', !!query && !any);
+  });
+  // catalog suggestions for anything not already in the menu
+  const results = $('fontSearchResults');
+  results.replaceChildren();
+  if (!query) return;
+  const have = new Set([...menu.querySelectorAll('button[data-font]')].map(b => b.textContent.toLowerCase()));
+  const matches = GFONT_CATALOG.filter(f => f.toLowerCase().includes(query) && !have.has(f.toLowerCase())).slice(0, 10);
+  if (matches.length){
+    const head = document.createElement('div');
+    head.className = 'menuhead';
+    head.textContent = 'Google Fonts';
+    results.appendChild(head);
+    for (const fam of matches){
+      const b = document.createElement('button');
+      b.textContent = fam;
+      b.addEventListener('click', ev => { ev.stopPropagation(); applyCustomFont(fam); });
+      results.appendChild(b);
+    }
+  }
+  // free-typing: try any exact family name
+  const exact = [...have].includes(query) || matches.some(f => f.toLowerCase() === query);
+  if (query.length >= 3 && !exact){
+    const head = document.createElement('div');
+    head.className = 'menuhead';
+    head.textContent = 'Not listed?';
+    results.appendChild(head);
+    const b = document.createElement('button');
+    const pretty = q.trim().replace(/\w\S*/g, t => t[0].toUpperCase() + t.slice(1));
+    b.textContent = 'Load "' + pretty + '" from Google Fonts';
+    b.addEventListener('click', ev => { ev.stopPropagation(); applyCustomFont(pretty); });
+    results.appendChild(b);
+  }
+}
 function buildFontSelect(){
   const menu = $('fontMenu');
+  fontSearchRow(menu);
+  const customBox = document.createElement('div');
+  customBox.id = 'fontCustomGroup';
+  menu.appendChild(customBox);
+  buildCustomFontButtons();
   for (const g of FONT_GROUPS){
     const head = document.createElement('div');
     head.className = 'menuhead';
@@ -2435,8 +2545,53 @@ function buildFontSelect(){
     if (!t || !t.closest || (!t.closest('#fontMenu') && !t.closest('#fontBtn'))) closeFontMenu();
   });
 }
+const WEIGHT_NAMES = { 100:'Thin', 200:'ExtraLight', 300:'Light', 400:'Regular', 500:'Medium', 600:'SemiBold', 700:'Bold', 800:'ExtraBold', 900:'Black' };
+function buildWeightMenu(){
+  const menu = $('weightMenu');
+  const auto = document.createElement('button');
+  auto.textContent = 'Font default';
+  auto.addEventListener('click', ev => {
+    ev.stopPropagation();
+    applyStyle({ fweight: null });
+    $('weightMenu').classList.add('hidden');
+  });
+  menu.appendChild(auto);
+  for (const w of [100, 200, 300, 400, 500, 600, 700, 800, 900]){
+    const b = document.createElement('button');
+    b.dataset.w = w;
+    b.textContent = w + '  ' + WEIGHT_NAMES[w];
+    b.style.fontWeight = w;
+    b.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const sel2 = selected();
+      for (const el of sel2){ ensureWeightCss(el.font); requestFontLoad(el.font, w); }
+      if (!sel2.length && defaults.font){ ensureWeightCss(defaults.font); }
+      applyStyle({ fweight: w });
+      $('weightMenu').classList.add('hidden');
+    });
+    menu.appendChild(b);
+  }
+  $('weightBtn').addEventListener('click', ev => {
+    ev.stopPropagation();
+    const m2 = $('weightMenu');
+    if (!m2.classList.contains('hidden')){ m2.classList.add('hidden'); return; }
+    const r = $('weightBtn').getBoundingClientRect();
+    m2.classList.remove('hidden');
+    m2.style.left = Math.min(r.left, window.innerWidth - 190) + 'px';
+    m2.style.top = Math.min(r.bottom + 6, window.innerHeight - m2.scrollHeight - 10) + 'px';
+    const cur = selected().length ? selected()[0].fweight : null;
+    m2.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.w ? Number(b.dataset.w) === cur : !cur));
+  });
+  document.addEventListener('pointerdown', ev => {
+    const t = ev.target;
+    if (!t || !t.closest || (!t.closest('#weightMenu') && !t.closest('#weightBtn'))) $('weightMenu').classList.add('hidden');
+  });
+}
 function openFontMenu(){
   const m = $('fontMenu');
+  buildCustomFontButtons();
+  const fs = $('fontSearch');
+  if (fs && fs.value){ fs.value = ''; fontMenuFilter(''); }
   const r = $('fontBtn').getBoundingClientRect();
   m.classList.remove('hidden');
   m.style.left = Math.min(r.left, window.innerWidth - 244) + 'px';
@@ -2451,6 +2606,12 @@ function openFontMenu(){
   if (curBtn) curBtn.scrollIntoView({ block: 'center' });
 }
 function closeFontMenu(){ $('fontMenu').classList.add('hidden'); }
+function registerSavedGFonts(){
+  for (const fam of savedGFonts()){
+    ensureCustomFont('cg:' + fam);
+    loadFontCssFor(fam);
+  }
+}
 function loadGoogleFonts(){
   const link = document.createElement('link');
   link.rel = 'stylesheet';
@@ -2462,14 +2623,62 @@ function loadGoogleFonts(){
    DOM uses them — and canvas drawing doesn't count. So we explicitly request
    every Google font the document uses, and re-render whenever one arrives. */
 const fontLoadRequested = new Set();
-function preloadDocFonts(){
-  for (const p of state.pages) for (const el of p.elements) requestFontLoad(el.font);
+const fontCssLoaded = new Set();
+const GFONTS_KEY = 'koralpaper.gfonts';
+function savedGFonts(){
+  try { const v = JSON.parse(localStorage.getItem(GFONTS_KEY)); return Array.isArray(v) ? v : []; }
+  catch (e){ return []; }
 }
-function requestFontLoad(key){
+function rememberGFont(family){
+  const list = savedGFonts();
+  if (!list.includes(family)){
+    list.push(family);
+    try { localStorage.setItem(GFONTS_KEY, JSON.stringify(list)); } catch (e){}
+  }
+}
+/* per-family stylesheet asking for the FULL weight range; static (non
+   variable) fonts reject the range syntax, so fall back to the plain css */
+function loadFontCssFor(family){
+  if (fontCssLoaded.has(family)) return;
+  fontCssLoaded.add(family);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = customFontHref(family);
+  link.onerror = () => {
+    const plain = document.createElement('link');
+    plain.rel = 'stylesheet';
+    plain.href = customFontHrefPlain(family);
+    document.head.appendChild(plain);
+  };
+  link.onload = () => document.fonts.ready.then(refreshTextMetrics);
+  document.head.appendChild(link);
+}
+function fontFamilyOf(key){
   const f = FONTS[key];
-  if (!f || !f.google || fontLoadRequested.has(key)) return;
-  fontLoadRequested.add(key);
-  try { document.fonts.load(`${f.weight} 21px ${f.stack.split(',')[0]}`).catch(() => {}); }
+  if (!f || !f.google) return null;
+  return f.google.split(':')[0].replace(/\+/g, ' ');
+}
+/* the curated stylesheet only defines a few weights per family; the first
+   time an element wants another weight, fetch that family's full range */
+function ensureWeightCss(key){
+  const family = fontFamilyOf(key);
+  if (family) loadFontCssFor(family);
+}
+function preloadDocFonts(){
+  for (const p of state.pages) for (const el of p.elements){
+    if (ensureCustomFont(el.font)) loadFontCssFor(el.font.slice(3).trim());
+    requestFontLoad(el.font, el.fweight);
+    if (el.fweight) ensureWeightCss(el.font);
+  }
+}
+function requestFontLoad(key, weight){
+  ensureCustomFont(key);
+  const f = FONTS[key];
+  if (!f || !f.google) return;
+  const tag = key + '@' + (weight || f.weight);
+  if (fontLoadRequested.has(tag)) return;
+  fontLoadRequested.add(tag);
+  try { document.fonts.load(`${weight || f.weight} 21px ${f.stack.split(',')[0]}`).catch(() => {}); }
   catch (e){}
 }
 if (document.fonts && document.fonts.addEventListener){
@@ -3433,7 +3642,8 @@ RULES (these make you deterministic):
 - Measure by proportion. Everything scales from the reference width to the 1080 board: a headline spanning 80% of the width is w=864. Font size = the letter height as a fraction of page width x 1080 (poster headlines often 90 to 160, size can go up to 300).
 - Colors as #hex sampled from the reference (paper, text, blocks). Do not swap brand colors for palette names.
 - "sketch":0 on every element (crisp poster look) unless the reference is clearly hand-drawn.
-- "bold":true for bold text. Fonts: sans for grotesk/Helvetica posters, spacegrotesk for geometric, playfair for editorial serif, jetbrains for mono.
+- "bold":true for bold text, or "weight":100-900 for exact weights (300 light, 900 black).
+- Fonts: ANY Google font by exact name in "font" (e.g. "Archivo Black", "Bebas Neue", "Anton"); or sans for grotesk/Helvetica posters, spacegrotesk for geometric, playfair for editorial serif, jetbrains for mono.
 - Color blocks, stripes, footer bars = rect. Dots and circles = ellipse. Small logo marks: approximate with 1-3 tiny shapes or skip; photos: skip. Say what you skipped in one line.
 - Nothing extra: no decorations, captions, or watermarks that are not in the reference.
 
@@ -3462,6 +3672,7 @@ Rules:
 - Coordinates: y grows downward, origin top-left of the board. Typical box 190×92, gaps 100 to 120 px, keep 60 px margins.
 - "sketch":1 = hand-drawn wobble (default look), 0 = neat.
 - optional "runs" on any text: [{"s":0,"e":5,"b":true}] makes characters s..e bold ("i":true italic, "co":"coral" colors them).
+- optional "fweight": 100-900 sets the font weight; "font":"cg:Archivo Black" uses any Google font by name.
 - Multi-page is allowed: more entries in "pages". Omit "board" in appState for an unlimited canvas.
 
 The user saves your JSON as a .json file and opens it in KoralPaper. Now design what the user asks below, thinking about clear layout and generous spacing.
@@ -5859,7 +6070,10 @@ function claudeBuildElement(spec, idMap){
     fillStyle: ['solid', 'hachure', 'dense', 'cross', 'dots', 'waves'].includes(spec.fillStyle) ? spec.fillStyle : 'solid',
     dash: ['solid', 'dotted', 'dashed'].includes(spec.dash) ? spec.dash : 'solid',
     sw: widths.medium, sketch: spec.sketch === 0 ? 0 : 1, round: 1, opacity: 100,
-    font: (typeof spec.font === 'string' && FONTS[spec.font]) ? spec.font : 'sans',
+    font: (typeof spec.font === 'string' && FONTS[spec.font]) ? spec.font
+      : (typeof spec.font === 'string' && spec.font.startsWith('cg:') && ensureCustomFont(spec.font)) ? spec.font
+      : (typeof spec.font === 'string' && /^[A-Z][A-Za-z0-9 ]{2,30}$/.test(spec.font) && ensureCustomFont('cg:' + spec.font)) ? 'cg:' + spec.font
+      : 'sans',
     size: Number(spec.size) > 0 ? clamp(Number(spec.size), 8, 300)
       : (kind === 'chip' || kind === 'arrow' || kind === 'line' ? 16 : 21),
     align: ['left', 'center', 'right'].includes(spec.align) ? spec.align : (kind === 'text' ? 'left' : 'center'),
@@ -5871,6 +6085,15 @@ function claudeBuildElement(spec, idMap){
   el.x = x; el.y = y;
   if (spec.bold && typeof spec.text === 'string' && spec.text.length)
     el.runs = [{ s: 0, e: spec.text.length, b: true, i: false, hl: null, co: null }];
+  if (Number(spec.weight) >= 100 && Number(spec.weight) <= 900){
+    el.fweight = Math.round(Number(spec.weight) / 100) * 100;
+    ensureWeightCss(el.font); requestFontLoad(el.font, el.fweight);
+  }
+  if (el.font.startsWith('cg:')){
+    const fam = el.font.slice(3).trim();
+    loadFontCssFor(fam);
+    rememberGFont(fam); // Claude-loaded fonts appear in the font menu too
+  }
   if (kind === 'arrow' || kind === 'line'){
     el.curve = 0;
     el.elbow = !!spec.elbow;
@@ -6617,7 +6840,9 @@ function boot(){
   document.querySelector('.brand .name').title = `KoralPaper v${APP_VERSION}`;
   buildSwatches();
   buildPaperSwatches();
+  registerSavedGFonts();
   buildFontSelect();
+  buildWeightMenu();
   syncSettingsUI();
   applyWidthPresets();
   buildIconMenu();

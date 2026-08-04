@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.49.0
+
+- Search all of Google Fonts: the font picker has a search field. It filters the built-in collection, suggests popular Google fonts, and any exact family name can be loaded on demand ("Load ... from Google Fonts"). Loaded fonts are remembered in a "Your Google fonts" group, and documents stay portable: the font travels inside the file and reloads automatically on any machine.
+- Font weights: a new weight button next to the font picker offers the full range, 100 Thin to 900 Black, per element. Weights flow through the canvas, the text editor, SVG/PDF export and copy style. Variable fonts get their entire range; fonts without a weight snap to the nearest available one.
+- Claude can use both: elements accept "font": any Google family name (e.g. "Anton", "Archivo Black") and "weight": 100-900. The replica and design prompts teach this, so recreated posters now match typefaces and weights, not just layout.
+
 ## v3.48.0
 
 - Recreate a design from an image: the Claude tab in Help now has a "Copy the replica prompt" button. Paste the prompt into Claude Desktop together with a poster, slide or PDF page (several images = several pages) and Claude rebuilds it in KoralPaper: exact texts, sampled colors, proportional layout, one page per image, checking its own result with a rendered screenshot and correcting up to 3 rounds.
