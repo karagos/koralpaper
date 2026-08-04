@@ -549,6 +549,12 @@ function syncHistoryButtons(){
 }
 
 let autosaveTimer = null;
+let autosaveFailing = false;
+function setStorageWarn(on){
+  if (on === autosaveFailing) return;
+  autosaveFailing = on;
+  $('storageWarn').classList.toggle('hidden', !on);
+}
 function scheduleAutosave(){
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(() => {
@@ -560,8 +566,16 @@ function scheduleAutosave(){
         camera: state.camera, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
         theme: state.theme, bgColor: state.bgColor, board: state.board,
       }));
-    } catch (e) { /* storage full/unavailable — sketch still lives in memory */ }
+      setStorageWarn(false);
+    } catch (e) {
+      // storage full/unavailable — the sketch still lives in memory, but
+      // the user must KNOW a reload would lose it
+      setStorageWarn(true);
+    }
   }, 350);
+}
+function docSizeMB(){
+  try { return serialize().length / 1048576; } catch (e){ return 0; }
 }
 function loadSaved(){
   try {
@@ -3122,7 +3136,13 @@ function setPanelTab(t){
 }
 $('tabHelp').addEventListener('click', () => setPanelTab('help'));
 $('tabClaude').addEventListener('click', () => setPanelTab('claude'));
-$('tabSettings').addEventListener('click', () => setPanelTab('settings'));
+$('tabSettings').addEventListener('click', () => {
+  setPanelTab('settings');
+  const mb = docSizeMB();
+  $('setDocSize').textContent =
+    `This document: ${mb < 0.1 ? (mb * 1024).toFixed(0) + ' KB' : mb.toFixed(1) + ' MB'} · ` +
+    `browser autosave holds roughly 5 MB${autosaveFailing ? ' — AUTOSAVE IS CURRENTLY FAILING, save as .json' : ''}`;
+});
 $('claudeLinkBtn').addEventListener('click', () => {
   $('shortcutsCard').classList.remove('hidden');
   setPanelTab('claude');
@@ -5249,6 +5269,41 @@ function showWelcome(){
   wrap.addEventListener('pointerdown', ev => { if (ev.target === wrap) dismiss(); });
   $('setShowWelcome').addEventListener('click', showWelcome);
 }
+
+/* ── work protection: banners + second-tab guard ──── */
+$('storageWarnSave').addEventListener('click', saveJSON);
+$('tabWarnOk').addEventListener('click', () => $('tabWarn').classList.add('hidden'));
+/* a second open tab overwrites this tab's autosave and competes for
+   Claude's commands. Each living tab leaves a heartbeat in storage;
+   seeing a FRESH beat from another tab id means two tabs are truly
+   alive — no cooperation needed, so it works even when the browser
+   throttles or freezes the other tab. */
+const TAB_ID = uid();
+const BEAT_KEY = 'koralpaper.tabbeat';
+let tabWarnShown = false;
+function tabBeat(){
+  try { localStorage.setItem(BEAT_KEY, JSON.stringify({ id: TAB_ID, t: Date.now() })); }
+  catch (e){}
+}
+function tabCheck(){
+  try {
+    const b = JSON.parse(localStorage.getItem(BEAT_KEY) || 'null');
+    if (b && b.id !== TAB_ID && Date.now() - b.t < 6000 && !tabWarnShown){
+      tabWarnShown = true;
+      $('tabWarn').classList.remove('hidden');
+    }
+  } catch (e){}
+}
+tabCheck();
+tabBeat();
+setInterval(() => { tabCheck(); tabBeat(); }, 2500);
+window.addEventListener('pagehide', () => {
+  // a reload must not scare the reborn tab with its own ghost beat
+  try {
+    const b = JSON.parse(localStorage.getItem(BEAT_KEY) || 'null');
+    if (b && b.id === TAB_ID) localStorage.removeItem(BEAT_KEY);
+  } catch (e){}
+});
 
 /* ── PWA: offline + installable when served over the web ── */
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')){

@@ -405,6 +405,25 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 
 .menukey{float:right; font-size:11px; color:var(--ink-soft); letter-spacing:.4px;}
 
+/* ── work-protection banners ── */
+.warnbanner{
+  position:fixed; left:50%; transform:translateX(-50%); bottom:78px;
+  z-index:80; max-width:min(560px, calc(100vw - 40px));
+  background:#8A4B1F; color:#FDF3E4;
+  border:1.5px solid rgba(0,0,0,.25); border-radius:12px;
+  box-shadow:0 8px 24px -8px rgba(0,0,0,.45);
+  font-size:13px; line-height:1.5; padding:11px 14px;
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  pointer-events:auto;
+}
+.warnbanner b{font-weight:700;}
+.warnbanner .minipill{
+  background:#FDF3E4; color:#6B3812; border:none; font-weight:700;
+  flex:0 0 auto; margin-left:auto;
+}
+.warnbanner.tabwarn{bottom:auto; top:76px; background:#4A5568; color:#F2F5FA;}
+.warnbanner.tabwarn .minipill{background:#F2F5FA; color:#33404F;}
+
 /* ── Claude link ── */
 .claudelink{color:var(--coral);}
 .claudelink svg{animation:claudepulse 2.6s ease-in-out infinite;}
@@ -523,6 +542,11 @@ body.dark #tooltip{box-shadow:0 4px 14px -4px rgba(0,0,0,.7);}
 .setrow input[type=range]{flex:1;}
 .setrow b{width:30px; text-align:right; font-size:12.5px; font-variant-numeric:tabular-nums;}
 .setactions{margin-top:8px;}
+.docsize{
+  font-size:11.5px; color:var(--ink-soft); margin:6px 0 0;
+  padding:6px 9px; border-radius:8px;
+  background:color-mix(in srgb, var(--ink) 5%, transparent);
+}
 .setreset{padding:5px 11px; font-size:11px;}
 .shortcuts td.sect{
   font-family:var(--serif); font-style:italic; font-weight:600; font-size:13px;

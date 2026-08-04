@@ -1,5 +1,21 @@
 # KoralPaper — Changelog
 
+## v3.29.0 — 2026-08-04
+- **Autosave failure is loud now.** When the document outgrows the
+  browser's storage, autosave used to fail silently — a reload would
+  lose work the user believed was saved. Now an amber banner appears
+  ("Autosave is off… your work lives only in this tab") with a one-click
+  "Save now (.json)" button, and disappears by itself the moment
+  autosave succeeds again. Settings additionally shows the current
+  document size next to the ~5 MB autosave ceiling, and flags a failing
+  autosave there too.
+- **Second-tab guard.** Opening KoralPaper in two tabs at once quietly
+  corrupted autosave (each tab overwrites the other) and split Claude's
+  commands between tabs. Every living tab now leaves a heartbeat in
+  storage; when a tab sees a fresh heartbeat that is not its own, it
+  shows a clear warning. Works even when the browser throttles or
+  freezes the other tab, and a plain reload never false-alarms.
+
 ## v3.28.0 — 2026-08-04
 - **KoralPaper is live on the web.** The repo now serves the app at
   https://karagos.github.io/koralpaper/ — open the link and draw, on any

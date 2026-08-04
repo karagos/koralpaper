@@ -380,6 +380,18 @@
 
   <div class="hint" id="hint"></div>
 
+  <!-- ── work-protection banners ───────────────────── -->
+  <div class="warnbanner hidden" id="storageWarn">
+    <b>Autosave is off:</b> this document is bigger than the browser can store.
+    Your work lives only in this tab until you save it.
+    <button class="minipill" id="storageWarnSave">Save now (.json)</button>
+  </div>
+  <div class="warnbanner tabwarn hidden" id="tabWarn">
+    <b>KoralPaper is already open in another tab.</b> Two tabs overwrite each
+    other's autosave, and Claude commands go to only one of them. Best to close one.
+    <button class="minipill" id="tabWarnOk">I understand</button>
+  </div>
+
   <!-- ── presentation controls ─────────────────────── -->
   <div class="presentbar hidden" id="presentBar">
     <button id="presPrev" title="Previous page — ←">‹</button>
@@ -555,6 +567,7 @@
       <div class="setactions">
         <button class="minipill" id="setShowWelcome">Show the welcome screen again</button>
       </div>
+      <p class="docsize" id="setDocSize"></p>
     </div>
     <p class="credit"><b>KoralPaper</b> is a creation by <b>Stefanos Karagos</b>, CAIO Group ·
       <a href="https://wearecaio.com" target="_blank" rel="noopener">wearecaio.com</a></p>
