@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.26.3 — 2026-08-04
+- **Fixed for real: ⇧-drag with Shift already held.** The natural
+  gesture — shift-click to build a selection, keep Shift down, drag —
+  never started a drag at all: the press was consumed as another
+  shift-click toggle. Now a ⇧-press on an already-selected element
+  starts the axis-locked move of the whole selection, and only counts
+  as a deselect-click if the mouse releases without moving (the Figma
+  behavior). Shift-clicking to add and remove elements works exactly
+  as before.
+
 ## v3.26.2 — 2026-08-04
 - **Fixed: ⇧-drag axis lock.** Holding Shift while dragging a selection
   is supposed to lock the move to the horizontal or vertical axis, but

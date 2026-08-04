@@ -839,14 +839,20 @@ function onPointerDown(ev){
     }
     const hit = topElementAt(sx, sy);
     if (hit){
-      let ids;
+      // ⇧-press on an element: if it is NOT selected yet, add it right
+      // away (classic shift-click). If it IS selected, don't toggle yet —
+      // the user may be starting a ⇧-drag (axis-locked move of the whole
+      // selection). The toggle happens on pointerup only if nothing moved.
+      let shiftPendingRemove = null;
       if (ev.shiftKey){
-        ids = new Set(state.selection);
         const grp = expandGroups(new Set([hit.id]));
-        const already = state.selection.has(hit.id);
-        for (const id of grp) already ? ids.delete(id) : ids.add(id);
-        setSelection(ids);
-        return;
+        if (!state.selection.has(hit.id)){
+          const ids = new Set(state.selection);
+          for (const id of grp) ids.add(id);
+          setSelection(ids);
+        } else {
+          shiftPendingRemove = grp;
+        }
       }
       if (!state.selection.has(hit.id)) setSelection(new Set([hit.id]));
       let movingEls = selected();
@@ -859,6 +865,7 @@ function onPointerDown(ev){
         bbox: selectionBounds(),
         ids: new Set(movingEls.map(e => e.id)),
         orig: movingEls.map(e => ({ id: e.id, x: e.x, y: e.y })),
+        shiftPendingRemove,
       };
       return;
     }
@@ -1246,6 +1253,12 @@ function onPointerUp(ev){
 
   if (it.kind === 'move'){
     if (it.moved){ updateBoundArrows(state.elements); commit(); }
+    else if (it.shiftPendingRemove){
+      // it was a plain ⇧-click after all — toggle the element out
+      const ids = new Set(state.selection);
+      for (const id of it.shiftPendingRemove) ids.delete(id);
+      setSelection(ids);
+    }
     requestRender();
     return;
   }
