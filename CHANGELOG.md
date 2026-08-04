@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.32.0 — 2026-08-04 (bridge 1.2.0 — update the extension)
+- **The Claude bridge now trusts only KoralPaper.** Browser requests to
+  the local bridge are accepted only from the app's own homes — a
+  file:// copy, localhost, or the official karagos.github.io page — and
+  must carry the app's identifying header. Any other website you might
+  visit gets a hard 403 and no CORS approval, so a malicious page can
+  no longer read your document or scribble on your paper through the
+  local port. Native Claude processes are unaffected.
+  **Action needed once: double-click the new `mcp/koralpaper.mcpb`**
+  (bridge 1.2.0) so the extension and app speak the same handshake.
+- Friendlier error when opening a file that isn't a KoralPaper sketch:
+  it now says what the app can open and why the file was rejected.
+
 ## v3.31.0 — 2026-08-04
 - **Windows and Linux see their own keys.** Every shortcut already
   worked with Ctrl and Alt; now the labels say so too. On non-Mac

@@ -39,25 +39,47 @@ function dispatch(action, args){
 }
 function flushQueue(res){
   const batch = queue.splice(0, queue.length);
-  res.writeHead(200, corsHeaders({ 'Content-Type': 'application/json' }));
+  res.writeHead(200, corsHeaders(res.kpOrigin, { 'Content-Type': 'application/json' }));
   res.end(JSON.stringify(batch));
 }
 
-/* ── the localhost bridge the app talks to ── */
-function corsHeaders(extra){
-  return Object.assign({
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Cache-Control': 'no-store',
-  }, extra || {});
+/* ── the localhost bridge the app talks to ────────────
+   Origin hardening: browsers attach an Origin header to cross-origin
+   requests, and only KoralPaper's own homes are allowed — a file://
+   page (Origin "null"), localhost, or the official GitHub Pages app.
+   Any other website gets no CORS approval AND a 403, and the working
+   endpoints additionally require the X-Koralpaper header, which forces
+   a preflight that unknown origins can never pass. */
+function originAllowed(o){
+  return !o || o === 'null'
+    || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o)
+    || o === 'https://karagos.github.io';
+}
+function corsHeaders(origin, extra){
+  const h = { 'Cache-Control': 'no-store' };
+  if (originAllowed(origin)){
+    h['Access-Control-Allow-Origin'] = origin || '*';
+    h['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
+    h['Access-Control-Allow-Headers'] = 'Content-Type, X-Koralpaper';
+    h['Vary'] = 'Origin';
+  }
+  return Object.assign(h, extra || {});
 }
 const server = http.createServer((req, res) => {
+  const origin = req.headers.origin;
+  if (origin && !originAllowed(origin)){
+    res.writeHead(403, { 'Cache-Control': 'no-store' }); res.end(); return;
+  }
+  const guarded = req.url.startsWith('/poll') || req.url.startsWith('/result') || req.url.startsWith('/dispatch');
+  if (origin && guarded && req.method !== 'OPTIONS' && !req.headers['x-koralpaper']){
+    res.writeHead(403, corsHeaders(origin)); res.end(); return;
+  }
   appLastSeen = Date.now();
   if (req.method === 'OPTIONS'){
-    res.writeHead(204, corsHeaders()); res.end(); return;
+    res.writeHead(204, corsHeaders(origin)); res.end(); return;
   }
   if (req.method === 'GET' && req.url.startsWith('/poll')){
+    res.kpOrigin = origin;
     if (queue.length){ flushQueue(res); return; }
     if (pollWaiter){ try { flushQueue(pollWaiter); } catch (e){} }
     pollWaiter = res;
@@ -76,13 +98,13 @@ const server = http.createServer((req, res) => {
         const p = pending.get(id);
         if (p){ clearTimeout(p.timer); pending.delete(id); p.resolve(result); }
       } catch (e){}
-      res.writeHead(200, corsHeaders({ 'Content-Type': 'application/json' }));
+      res.writeHead(200, corsHeaders(origin, { 'Content-Type': 'application/json' }));
       res.end('{"ok":true}');
     });
     return;
   }
   if (req.method === 'GET' && req.url.startsWith('/status')){
-    res.writeHead(200, corsHeaders({ 'Content-Type': 'application/json' }));
+    res.writeHead(200, corsHeaders(origin, { 'Content-Type': 'application/json' }));
     res.end(JSON.stringify({ bridge: 'koralpaper', app: appConnected() }));
     return;
   }
@@ -98,12 +120,12 @@ const server = http.createServer((req, res) => {
       } catch (e){
         out = { error: String(e && e.message || e) };
       }
-      res.writeHead(200, corsHeaders({ 'Content-Type': 'application/json' }));
+      res.writeHead(200, corsHeaders(origin, { 'Content-Type': 'application/json' }));
       res.end(JSON.stringify(out));
     });
     return;
   }
-  res.writeHead(404, corsHeaders()); res.end();
+  res.writeHead(404, corsHeaders(origin)); res.end();
 });
 /* ── multi-instance: two Claude apps, one bridge ────
    The connector may run in Claude Desktop AND Claude Code at the same
@@ -305,7 +327,7 @@ function onMessage(msg){
     reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'koralpaper', version: '1.1.0' },
+      serverInfo: { name: 'koralpaper', version: '1.2.0' },
       instructions: 'These tools draw directly in the KoralPaper app (hand-drawn diagram studio) running in the user\'s browser. Workflow: koralpaper_status → koralpaper_read_document (if editing) → create/add/update → koralpaper_render_page to visually check the result, and iterate until the layout is clean.',
     });
     return;

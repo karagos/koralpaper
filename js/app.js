@@ -3529,7 +3529,10 @@ fileInput.addEventListener('change', () => {
       updateBoundArrows(state.elements);
       commit(); zoomToFit(); syncPanel();
     } catch (e){
-      alert('That file does not look like a KoralPaper sketch (.json).');
+      alert('KoralPaper could not open that file.\n\n' +
+        'It opens: .json sketches saved by KoralPaper, and .excalidraw files.\n' +
+        'If this file came from KoralPaper, it may be damaged — the technical reason: ' +
+        (e && e.message ? e.message : 'unknown') + '.');
     }
   };
   reader.readAsText(f);
@@ -4843,7 +4846,7 @@ async function claudePollLoop(){
       const s = await fetch(CLAUDE_BRIDGE + '/status');
       if (!s.ok) throw new Error('bridge');
       setClaudeLinked(true);
-      const r = await fetch(CLAUDE_BRIDGE + '/poll');
+      const r = await fetch(CLAUDE_BRIDGE + '/poll', { headers: { 'X-Koralpaper': '1' } });
       if (!r.ok) throw new Error('bridge');
       const cmds = await r.json();
       for (const c of cmds){
@@ -4851,7 +4854,7 @@ async function claudePollLoop(){
         try { result = await claudeExecute(c.action, c.args); }
         catch (e){ result = { error: String(e && e.message || e) }; }
         await fetch(CLAUDE_BRIDGE + '/result', {
-          method: 'POST', headers: { 'Content-Type': 'text/plain' },
+          method: 'POST', headers: { 'Content-Type': 'text/plain', 'X-Koralpaper': '1' },
           body: JSON.stringify({ id: c.id, result }),
         });
       }
