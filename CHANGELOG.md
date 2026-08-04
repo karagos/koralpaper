@@ -1,5 +1,19 @@
 # KoralPaper — Changelog
 
+## v3.33.0 — 2026-08-04
+- **Mind-map folding.** Right-click any shape → "Mark as mind-map root"
+  and the diagram becomes a foldable mind map: every node with children
+  grows a small badge — **−** folds the branch, a coral **+N** shows how
+  many nodes a click reveals. Visibility is derived live from the glued
+  arrows, so cross-links behave correctly: a shared child stays visible
+  while any expanded path still reaches it, and folded branches
+  remember their own inner folds. Works mid-presentation (tap the badge
+  to unfold while talking; anywhere else still turns the page), every
+  fold is one undo step, the folded state saves with the document, and
+  exports show exactly what you see. Folded elements are never deleted
+  — unmark the root and everything returns. Claude reads and can set
+  the folded state through the bridge too.
+
 ## v3.32.0 — 2026-08-04 (bridge 1.2.0 — update the extension)
 - **The Claude bridge now trusts only KoralPaper.** Browser requests to
   the local bridge are accepted only from the app's own homes — a

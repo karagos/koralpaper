@@ -211,7 +211,7 @@ function renderInteractionCached(it, dpr, w, h){
     off.width = Math.max(1, w * dpr); off.height = Math.max(1, h * dpr);
     const octx = off.getContext('2d');
     octx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    renderScene(octx, state.elements.filter(e => !moving.has(e.id)), sceneOpts(w, h, state.camera));
+    renderScene(octx, visibleEls(state.elements).filter(e => !moving.has(e.id)), sceneOpts(w, h, state.camera));
     staticCache = { c: off, it, camKey, movKey };
   }
   ctx.drawImage(staticCache.c, 0, 0, w, h);
@@ -234,7 +234,7 @@ function renderPanCached(dpr, w, h){
     off.width = (w + 2 * M) * dpr; off.height = (h + 2 * M) * dpr;
     const octx = off.getContext('2d');
     octx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    renderScene(octx, state.elements,
+    renderScene(octx, visibleEls(state.elements),
       sceneOpts(w + 2 * M, h + 2 * M, { x: cam.x + M, y: cam.y + M, z: cam.z }));
     staticCache = { kind: 'pan', c: off, cam: { x: cam.x, y: cam.y }, z: cam.z, it: interaction };
   }
@@ -259,7 +259,7 @@ function render(){
     return renderInteractionCached(it, dpr, w, h);
   }
   staticCache = null;
-  renderScene(ctx, state.elements, sceneOpts(w, h, state.camera));
+  renderScene(ctx, visibleEls(state.elements), sceneOpts(w, h, state.camera));
   drawOverlay();
 }
 
@@ -449,6 +449,27 @@ function drawOverlay(){
       ctx.stroke();
     }
     ctx.setLineDash([]);
+  }
+
+  // mind-map fold badges: − on expanded parents, +N on folded ones
+  const badges = mindBadgesFor(state.elements);
+  if (badges.length){
+    const pnow = pal();
+    ctx.lineWidth = 1.5 / z;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const bd of badges){
+      ctx.beginPath();
+      ctx.arc(bd.x, bd.y, bd.r, 0, Math.PI * 2);
+      ctx.fillStyle = bd.folded ? pnow.select : (state.theme === 'light' ? '#FBF9F2' : '#2C2924');
+      ctx.fill();
+      ctx.strokeStyle = pnow.stroke.ink;
+      ctx.stroke();
+      ctx.fillStyle = bd.folded ? '#FBF6EE' : pnow.stroke.ink;
+      const label = bd.folded ? (bd.count > 0 ? '+' + bd.count : '+') : '−';
+      ctx.font = `700 ${Math.max(8, bd.r * (label.length > 2 ? 0.75 : 1.0))}px ${FONTS.sans.stack}`;
+      ctx.fillText(label, bd.x, bd.y + 0.5 / z);
+    }
   }
   ctx.restore();
 }
@@ -699,8 +720,9 @@ function setSelection(ids){
   syncPanel(); requestRender();
 }
 function topElementAt(sx, sy){
-  for (let i = state.elements.length - 1; i >= 0; i--){
-    if (hitTest(state.elements[i], sx, sy, state.camera.z)) return state.elements[i];
+  const els = visibleEls(state.elements);
+  for (let i = els.length - 1; i >= 0; i--){
+    if (hitTest(els[i], sx, sy, state.camera.z)) return els[i];
   }
   return null;
 }
@@ -828,6 +850,8 @@ function onPointerDown(ev){
   }
 
   if (state.tool === 'select'){
+    const badge = mindBadgeAt(sx, sy);
+    if (badge){ mindToggle(badge.id); return; }
     const sel = selected();
     if (sel.length){
       const sb = selectionBounds();
@@ -1077,7 +1101,7 @@ function onPointerMove(ev){
     const rx = Math.min(it.x0, it.x1), ry = Math.min(it.y0, it.y1);
     const rw = Math.abs(it.x1 - it.x0), rh = Math.abs(it.y1 - it.y0);
     const ids = new Set(it.keep);
-    for (const el of state.elements){
+    for (const el of visibleEls(state.elements)){
       const b = boundsWithRotation(el);
       if (b.x < rx + rw && b.x + b.w > rx && b.y < ry + rh && b.y + b.h > ry) ids.add(el.id);
     }
@@ -1284,7 +1308,12 @@ function onPointerUp(ev){
         performance.now() - presTapStart.t < 400;
       if (wasTap) laserStrokes.pop();   // a click is a page turn, not a dot
       laserLive = null;
-      if (wasTap) presentGo(1);
+      if (wasTap){
+        const [tx, ty] = toScene(ev.clientX, ev.clientY);
+        const badge = mindBadgeAt(tx, ty);
+        if (badge) mindToggle(badge.id);   // unfold live while presenting
+        else presentGo(1);
+      }
     }
     presTapStart = null;
     return;
@@ -1814,6 +1843,24 @@ function openCtxMenu(ev){
         sel[0].elbowPts = null;
         commit(); requestRender();
       });
+    if (sel.length === 1 && !isLinear(sel[0]) && sel[0].type !== 'text'){
+      const one = sel[0];
+      const pageRoot = state.elements.find(e => e.mindRoot);
+      if (one.mindRoot){
+        add('Mind map: unmark root (show everything)', mindClearPage);
+      } else if (!pageRoot){
+        add('Mark as mind-map root', () => {
+          one.mindRoot = true;
+          commit(); requestRender();
+          showHint('Mind map on — click the − / + badges to fold and unfold branches');
+        });
+      }
+      if (pageRoot){
+        const info = mindInfoFor(state.elements);
+        if (info && (info.out.get(one.id) || []).length)
+          add(one.folded ? 'Unfold this branch' : 'Fold this branch', () => mindToggle(one.id));
+      }
+    }
     add('Duplicate', duplicateSelection);
     add('Copy', copySelection);
     add('Copy style', copyStyle);
@@ -3546,7 +3593,7 @@ function exportPNG(transparent){
   if (board){
     // exact preset pixels; the grid ships with the artboard (unless transparent)
     off.width = board.w; off.height = board.h;
-    renderScene(octx, state.elements, {
+    renderScene(octx, visibleEls(state.elements), {
       width: board.w, height: board.h,
       camera: { x: -board.x, y: -board.y, z: 1 },
       pal: pal(), transparent, bg: effectiveBg(),
@@ -3555,7 +3602,7 @@ function exportPNG(transparent){
     });
     name = `koralpaper-${board.w}x${board.h}`;
   } else {
-    const b = sceneBounds(state.elements);
+    const b = sceneBounds(visibleEls(state.elements));
     if (!b){ alert('Nothing to export yet — draw something first.'); return; }
     const pad = 72;
     const maxDim = 8000;
@@ -3563,7 +3610,7 @@ function exportPNG(transparent){
     scale = Math.min(scale, maxDim / (b.w + pad*2), maxDim / (b.h + pad*2));
     const w = Math.ceil((b.w + pad*2) * scale), h = Math.ceil((b.h + pad*2) * scale);
     off.width = w; off.height = h;
-    renderScene(octx, state.elements, {
+    renderScene(octx, visibleEls(state.elements), {
       width: w, height: h,
       camera: { x: (pad - b.x) * scale, y: (pad - b.y) * scale, z: scale },
       pal: pal(), grid: false, transparent, bg: effectiveBg(),
@@ -4367,7 +4414,7 @@ async function exportAllPages(){
   const files = [];
   const pad = state.pages.length > 9 ? 2 : 1;
   for (let i = 0; i < state.pages.length; i++){
-    const blob = await renderPagePNGBlob(state.pages[i].elements, false);
+    const blob = await renderPagePNGBlob(visibleEls(state.pages[i].elements), false);
     if (!blob) continue; // empty page — skipped
     files.push({
       name: `${String(i + 1).padStart(pad, '0')}-${(state.pages[i].name || 'page').replace(/[\/\\:*?"<>|]/g, '-')}.png`,
@@ -4381,7 +4428,7 @@ async function exportAllPages(){
 
 /* ── copy to clipboard: selection (or page) as PNG / SVG ── */
 async function copyAsPNG(){
-  const els = state.selection.size ? selected() : state.elements;
+  const els = state.selection.size ? selected() : visibleEls(state.elements);
   if (!els.length){ showHint('Nothing to copy — the page is empty'); return; }
   try {
     const b = sceneBounds(els);
@@ -4403,7 +4450,7 @@ async function copyAsPNG(){
   }
 }
 async function copyAsSVG(){
-  const els = state.selection.size ? selected() : state.elements;
+  const els = state.selection.size ? selected() : visibleEls(state.elements);
   if (!els.length){ showHint('Nothing to copy — the page is empty'); return; }
   const svg = renderSceneSVG(els, {
     pal: pal(), transparent: true, bg: effectiveBg(), board: null, grid: false,
@@ -4419,7 +4466,7 @@ async function copyAsSVG(){
 
 function exportSVG(transparent){
   const board = state.board;
-  const svg = renderSceneSVG(state.elements, {
+  const svg = renderSceneSVG(visibleEls(state.elements), {
     pal: pal(), transparent, bg: effectiveBg(),
     board, grid: board && !transparent ? state.grid : false,
     gridColor: effectiveGridColor(), gridSize: gsize(),
@@ -4458,7 +4505,7 @@ window.addEventListener('keydown', ev => {
 
   if (mod && k === 'z'){ ev.preventDefault(); ev.shiftKey ? redo() : undo(); return; }
   if (mod && k === 'y'){ ev.preventDefault(); redo(); return; }
-  if (mod && k === 'a'){ ev.preventDefault(); setSelection(new Set(state.elements.map(e => e.id))); setTool('select'); return; }
+  if (mod && k === 'a'){ ev.preventDefault(); setSelection(new Set(visibleEls(state.elements).map(e => e.id))); setTool('select'); return; }
   if (mod && ev.altKey && k === 'c'){ ev.preventDefault(); copyStyle(); return; }
   if (mod && ev.altKey && k === 'v'){ ev.preventDefault(); pasteStyle(); return; }
   if (mod && ev.altKey && k === 'n'){ ev.preventDefault(); newDocument(); return; }
@@ -4641,6 +4688,123 @@ document.addEventListener('pointerdown', hideTip, true);
 window.addEventListener('blur', hideTip);
 document.addEventListener('wheel', hideTip, { passive: true, capture: true });
 
+/* ── mind map: fold & unfold branches ───────────────
+   Right-click a shape → "Mark as mind-map root". Two persisted flags
+   only (el.mindRoot, el.folded); everything else is DERIVED from the
+   glued arrows at render time, so cross-links, shared children and
+   later edits can never leave stale state. Rule: a node is hidden iff
+   it is unreachable from the root once folded branches are cut — a
+   shared child stays visible while any expanded path reaches it.
+   Fold badges: − to fold, +N shows how many nodes a click reveals. */
+function mindChildrenMap(els){
+  const shapes = new Set(els.filter(e => !isLinear(e)).map(e => e.id));
+  const out = new Map();
+  for (const a of els)
+    if (a.type === 'arrow' && a.startBind && a.endBind && a.startBind !== a.endBind &&
+        shapes.has(a.startBind) && shapes.has(a.endBind)){
+      if (!out.has(a.startBind)) out.set(a.startBind, []);
+      out.get(a.startBind).push(a.endBind);
+    }
+  return out;
+}
+function mindInfoFor(els){
+  const root = els.find(e => e.mindRoot);
+  if (!root) return null;
+  const byIdL = new Map(els.map(e => [e.id, e]));
+  const out = mindChildrenMap(els);
+  const bfs = stopAtFolded => {
+    const seen = new Set([root.id]);
+    const q = [root.id];
+    while (q.length){
+      const id = q.shift();
+      const el = byIdL.get(id);
+      if (stopAtFolded && el && el.folded) continue;
+      for (const c of out.get(id) || [])
+        if (!seen.has(c)){ seen.add(c); q.push(c); }
+    }
+    return seen;
+  };
+  const visible = bfs(true);
+  const component = bfs(false);
+  const hidden = new Set();
+  for (const id of component) if (!visible.has(id)) hidden.add(id);
+  for (const a of els){
+    if (!(a.type === 'arrow' || a.type === 'line')) continue;
+    if (hidden.has(a.startBind) || hidden.has(a.endBind)) hidden.add(a.id);
+    else if (a.type === 'arrow' && a.startBind && a.endBind){
+      const src = byIdL.get(a.startBind);
+      if (src && src.folded && component.has(a.endBind)) hidden.add(a.id);
+    }
+  }
+  return { root, out, hidden, byIdL, component, visible };
+}
+function visibleEls(els){
+  const info = mindInfoFor(els);
+  if (!info || !info.hidden.size) return els;
+  return els.filter(e => !info.hidden.has(e.id));
+}
+function mindRevealCount(info, nodeId){
+  // how many nodes appear if THIS node unfolds (not descending into
+  // still-folded descendants — their branches stay put, as remembered)
+  const seen = new Set([nodeId]);
+  const q = [nodeId];
+  let count = 0;
+  while (q.length){
+    const id = q.shift();
+    const el = info.byIdL.get(id);
+    if (id !== nodeId && el && el.folded) continue;
+    for (const c of info.out.get(id) || [])
+      if (!seen.has(c)){
+        seen.add(c);
+        if (info.hidden.has(c)) count++;
+        q.push(c);
+      }
+  }
+  return count;
+}
+function mindBadgesFor(els){
+  const info = mindInfoFor(els);
+  if (!info) return [];
+  const z = state.camera.z;
+  const r = Math.max(9 / z, 7);
+  const badges = [];
+  for (const el of els){
+    if (isLinear(el) || info.hidden.has(el.id)) continue;
+    const kids = info.out.get(el.id) || [];
+    if (!kids.length) continue;
+    // badge sits just outside the edge the branch leaves from
+    let dx = 0, dy = 0;
+    for (const cid of kids){
+      const c = info.byIdL.get(cid);
+      if (c){ dx += (c.x + c.w / 2) - (el.x + el.w / 2); dy += (c.y + c.h / 2) - (el.y + el.h / 2); }
+    }
+    const horiz = Math.abs(dx) >= Math.abs(dy);
+    const b = boundsOf(el);
+    const bx = horiz ? (dx >= 0 ? b.x + b.w + r + 5 / z : b.x - r - 5 / z) : b.x + b.w / 2;
+    const by = horiz ? b.y + b.h / 2 : (dy >= 0 ? b.y + b.h + r + 5 / z : b.y - r - 5 / z);
+    badges.push({ id: el.id, x: bx, y: by, r,
+      folded: !!el.folded,
+      count: el.folded ? mindRevealCount(info, el.id) : 0 });
+  }
+  return badges;
+}
+function mindBadgeAt(sx, sy){
+  for (const b of mindBadgesFor(state.elements))
+    if (Math.hypot(sx - b.x, sy - b.y) <= b.r * 1.5) return b;
+  return null;
+}
+function mindToggle(id){
+  const el = byId(id);
+  if (!el) return;
+  el.folded = !el.folded;
+  commit(); requestRender();
+}
+function mindClearPage(){
+  for (const el of state.elements){ delete el.mindRoot; delete el.folded; }
+  commit(); requestRender();
+  showHint('Mind map unmarked — every branch is visible again');
+}
+
 /* ── Claude link: the MCP bridge client ─────────────
    When the KoralPaper MCP extension runs inside Claude Desktop it
    opens a tiny bridge on 127.0.0.1:8137. The app long-polls it;
@@ -4726,6 +4890,8 @@ function claudeCompact(el){
   }
   if (el.type === 'icon') c.icon = el.kind;
   if (el.textColor) c.textColor = el.textColor;
+  if (el.mindRoot) c.mindRoot = true;
+  if (el.folded) c.folded = true;
   return c;
 }
 
@@ -4801,6 +4967,12 @@ async function claudeExecute(action, args){
       if (u.font !== undefined && FONTS[u.font]) el.font = u.font;
       if (u.align !== undefined && ['left','center','right'].includes(u.align)) el.align = u.align;
       if (u.textColor !== undefined) el.textColor = (!u.textColor || u.textColor === 'auto') ? null : claudeColor(u.textColor, STROKE_KEYS, el.textColor);
+      if (u.folded !== undefined) el.folded = !!u.folded;
+      if (u.mindRoot !== undefined){
+        if (u.mindRoot) for (const other of state.elements) delete other.mindRoot;
+        el.mindRoot = !!u.mindRoot;
+        if (!u.mindRoot) delete el.mindRoot;
+      }
       if (u.sketch !== undefined) el.sketch = u.sketch === 0 ? 0 : 1;
       if (el.type === 'text') autosizeText(el);
       delete el._prims; delete el._pkey;
@@ -4878,7 +5050,7 @@ function shareHTML(){
   const docname = (localStorage.getItem('asterisk.docname') || 'koralpaper-sketch');
   const pages = [];
   for (const p of state.pages){
-    const svg = renderSceneSVG(p.elements, {
+    const svg = renderSceneSVG(visibleEls(p.elements), {
       pal: pal(), transparent: false, bg: effectiveBg(),
       board: state.board, grid: state.board ? state.grid : false,
       gridColor: effectiveGridColor(), gridSize: gsize(),
@@ -5169,8 +5341,9 @@ function startReplay(record){
   closeMenus();
   setSelection(new Set());
   zoomToFit();
-  const { times, total } = rpSchedule(state.elements);
-  replaying = { els: state.elements, times, total,
+  const replayEls = visibleEls(state.elements);
+  const { times, total } = rpSchedule(replayEls);
+  replaying = { els: replayEls, times, total,
     t0: performance.now() + 400, raf: null, rec: null };
   if (record){
     try {

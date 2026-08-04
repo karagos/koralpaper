@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.32.0)
+# KoralPaper — *Draw your thinking* (v3.33.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -111,6 +111,13 @@ and Settings.
   Desktop there is a fallback: the same tab copies a **design prompt** you
   can paste into any Claude — the .json it answers with opens straight in
   the app
+- **Mind-map folding:** right-click a shape → "Mark as mind-map root"
+  and branches become foldable — **−** badges fold, coral **+N** badges
+  unfold and show how many nodes are hidden. Cross-links behave
+  correctly (a shared child stays while any open path reaches it),
+  folds are undoable, save with the document, respect exports, and can
+  be toggled live **during a presentation** by tapping the badge —
+  reveal your structure branch by branch while you talk
 - **Tab-to-create flows:** select a shape and press **Tab** — a connected
   twin appears to the right (⇧Tab: below), same style, glued arrow, text
   editor already open. It works mid-typing too, so "type, Tab, type, Tab"
