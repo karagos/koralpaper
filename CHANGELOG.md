@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.40.0
+
+- Templates are now organized in categories: Carousels, Presentations, Infographics, Diagrams, plus any category you create yourself. Built-ins and your own saves live together under coral group headers; your templates carry a coral star.
+- Saving a template is a proper form inside the dialog: type a name (or keep the page name), pick a category or choose "New category" to create one, then Save this page / Save all pages. No more chained popups.
+- The rename action (pencil) now also lets you move a template to a different category.
+- Dialog buttons cleaned up: primary coral pill for the main action, right-aligned secondary buttons, separated footer. This is the standard action-row pattern for all app dialogs going forward.
+- Removed em dashes from all on-screen hint texts and template descriptions.
+
 ## v3.39.0 — 2026-08-04
 - **A real font picker.** The Font dropdown was a native browser
   control, which is why its group labels could not match the app's

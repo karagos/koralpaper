@@ -118,7 +118,7 @@ body.dark .menu button.danger{color:#F09070;}
 .menu hr{border:none; border-top:1.5px solid var(--line-soft); margin:5px 8px;}
 .menu.right{left:auto; right:0;}
 .menu.up{top:auto; bottom:calc(100% + 8px); min-width:250px; max-height:62vh; overflow-y:auto;}
-.menu .menuhead, .iconmenu .menuhead{
+.menu .menuhead, .iconmenu .menuhead, .tpldialog .menuhead{
   font-size:10.5px; font-weight:800; letter-spacing:1.1px; text-transform:uppercase;
   color:var(--coral); padding:8px 11px 3px;
 }
@@ -424,6 +424,28 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 .tplrow .tplmini{padding:7px 9px; min-width:30px;}
 .tplrow .tpldel{padding:7px 10px;}
 .tpldialog .actions{flex-wrap:wrap; gap:6px;}
+#tplList .menuhead{padding:6px 2px 1px;}
+#tplList .menuhead:first-child{padding-top:0;}
+.tplinfo b .star{color:var(--coral);}
+.tplsave{
+  margin-top:10px; padding-top:10px; border-top:1.5px solid var(--line-soft);
+  display:flex; flex-direction:column; gap:7px;
+}
+.tplsave .menuhead{padding:0 2px;}
+.tplsaverow{display:flex; gap:7px;}
+.tplsaverow input, .tplsaverow select{
+  font-family:var(--sans); font-size:13px; font-weight:500;
+  padding:7px 9px; border:1.5px solid var(--line-soft); border-radius:8px;
+  background:var(--card); color:var(--ink); min-width:0;
+}
+.tplsaverow input{flex:1;}
+.tplsaverow select{flex:0 0 auto; max-width:45%; cursor:pointer;}
+.tplsaverow input:focus, .tplsaverow select:focus{outline:none; border-color:var(--coral);}
+/* standard dialog action rows: auto-width buttons, right-aligned */
+.tpldialog .row.actions{display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; margin-top:2px;}
+.tpldialog .row.actions .minipill{flex:0 0 auto; padding:8px 14px;}
+.tpldialog .row.actions .pill{flex:0 0 auto; font-size:12.5px; padding:8px 16px; margin:0;}
+.tplfoot{margin-top:8px; padding-top:9px; border-top:1.5px solid var(--line-soft);}
 
 .menukey{float:right; font-size:11px; color:var(--ink-soft); letter-spacing:.4px;}
 #expTransToggle{font-weight:650;}

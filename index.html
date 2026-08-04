@@ -435,13 +435,22 @@
   <!-- ── templates dialog ──────────────────────────── -->
   <div class="island pdfdialog tpldialog hidden" id="tplDialog">
     <h3>Templates</h3>
-    <p>Add ready-made pages — everything stays fully editable. Save your own designs
-      (with their canvas size and paper color), and reshape any template:
-      <b>✎</b> rename · <b>↻</b> replace with your current design · <b>✕</b> delete.</p>
+    <p>Add ready-made pages, everything stays fully editable. Templates are grouped by
+      category. Your own saves are marked ★ and can be reshaped anytime:
+      <b>✎</b> rename or move category · <b>↻</b> replace with your current design · <b>✕</b> delete.</p>
     <div id="tplList"></div>
-    <div class="row actions">
-      <button class="minipill" id="tplSaveBtn" title="Save the active page (with canvas size and paper color) to your library">Save this page…</button>
-      <button class="minipill" id="tplSaveAllBtn" title="Save every page of the document as one multi-page template">Save all pages…</button>
+    <div class="tplsave">
+      <div class="menuhead">Save the current design</div>
+      <div class="tplsaverow">
+        <input type="text" id="tplName" placeholder="Template name" autocomplete="off">
+        <select id="tplCat" title="Which category the template will appear under"></select>
+      </div>
+      <div class="row actions">
+        <button class="pill" id="tplSaveBtn" title="Save the active page (with canvas size and paper color) to your library">Save this page</button>
+        <button class="minipill" id="tplSaveAllBtn" title="Save every page of the document as one multi-page template">Save all pages</button>
+      </div>
+    </div>
+    <div class="row actions tplfoot">
       <button class="minipill hidden" id="tplRestoreBtn" title="Bring back deleted or customized built-in templates">Restore built-ins</button>
       <button class="minipill" id="tplCloseBtn">Close</button>
     </div>

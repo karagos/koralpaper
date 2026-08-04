@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.39.0';
+const APP_VERSION = '3.40.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */

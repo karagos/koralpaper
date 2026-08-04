@@ -1009,7 +1009,7 @@ function onPointerDown(ev){
     // path not cached yet — fill it in as soon as the fetch lands
     miFetch(el.glyphName)
       .then(d => { el.mpath = d; requestRender(); scheduleAutosave(); })
-      .catch(() => showHint('Could not load that icon — internet is needed once per icon'));
+      .catch(() => showHint('Could not load that icon: internet is needed once per icon'));
   }
   if (isLinear(el)){
     el.curve = (el.type === 'arrow') ? defaults.curve : 0;
@@ -1717,7 +1717,7 @@ function copyStyle(){
   styleClipboard = {};
   for (const k of STYLE_PROPS)
     if (src[k] !== undefined) styleClipboard[k] = src[k];
-  showHint('Style copied — select elements and press ⌥⌘V to paste it');
+  showHint('Style copied: select elements and press ⌥⌘V to paste it');
 }
 function pasteStyle(){
   const sel = selected();
@@ -1854,7 +1854,7 @@ function openCtxMenu(ev){
         add('Mark as mind-map root', () => {
           one.mindRoot = true;
           commit(); requestRender();
-          showHint('Mind map on — click the − / + badges to fold and unfold branches');
+          showHint('Mind map on: click the − / + badges to fold and unfold branches');
         });
       }
       if (pageRoot){
@@ -2591,7 +2591,7 @@ function miTogglePin(name){
   const p = miPinned();
   const next = p.includes(name) ? p.filter(n => n !== name) : [...p, name].slice(-18);
   try { localStorage.setItem('koralpaper.mi.pinned', JSON.stringify(next)); } catch (e){}
-  showHint(next.includes(name) ? `“${name.replace(/_/g,' ')}” pinned — it now leads the icon grid`
+  showHint(next.includes(name) ? `“${name.replace(/_/g,' ')}” pinned: it now leads the icon grid`
                                : `“${name.replace(/_/g,' ')}” unpinned`);
   miRefresh(false);
 }
@@ -2651,7 +2651,7 @@ function pickMaterial(name){
   materialName = name;
   iconKind = 'material';
   miRemember(name);
-  miFetch(name).catch(() => showHint('Could not load that icon — internet is needed once per icon'));
+  miFetch(name).catch(() => showHint('Could not load that icon: internet is needed once per icon'));
   markIconMenu();
   setTool('icon');
   $('iconMenu').classList.add('hidden');
@@ -2888,7 +2888,7 @@ $('paperInput').addEventListener('input', ev => {
 });
 $('paperInput').addEventListener('change', () => {
   scheduleAutosave();
-  showHint('Paper color set — ☰ menu → “Reset paper color” to go back');
+  showHint('Paper color set: ☰ menu → “Reset paper color” to go back');
 });
 function normalizedPaperHex(){
   let v = $('paperHex').value.trim();
@@ -2921,7 +2921,7 @@ function startCrop(el){
   setTool('select');
   setSelection(new Set([el.id]));
   canvas.style.cursor = CROP_CURSOR;
-  showHint('✂ Crop mode: drag across the image to keep that area — Esc cancels');
+  showHint('✂ Crop mode: drag across the image to keep that area: Esc cancels');
   requestRender();
 }
 function endCropMode(){
@@ -3005,7 +3005,7 @@ function insertImageFiles(files, sx, sy){
         setTool('select');
         setSelection(new Set([el.id]));
         commit(); requestRender();
-        showHint('Image added — pick an Art style in the panel to vectorize it ✳');
+        showHint('Image added: pick an Art style in the panel to vectorize it ✳');
       };
       probe.src = dataURL;
     });
@@ -3054,7 +3054,7 @@ function addPage(){
   state.elements = state.pages[state.pageIndex].elements;
   state.selection = new Set();
   commit(); buildPageStrip(); syncPanel(); requestRender();
-  showHint('New page — right-click a page tab for rename, duplicate, delete');
+  showHint('New page: right-click a page tab for rename, duplicate, delete');
 }
 function deletePage(i){
   if (state.pages.length <= 1){ showHint('This is the only page'); return; }
@@ -3275,7 +3275,7 @@ function setBoard(name, w, h){
       x: Math.round((cx - w/2) / gsize()) * gsize(),   // edges land on grid lines
       y: Math.round((cy - h/2) / gsize()) * gsize(),
     };
-    showHint(`${name} — exports will be exactly ${w} × ${h}px, grid included`);
+    showHint(`${name}: exports will be exactly ${w} × ${h}px, grid included`);
   }
   syncBoardBtn(); buildBoardMenuSel(); zoomToFit(); scheduleAutosave();
 }
@@ -3393,7 +3393,7 @@ MY REQUEST: `;
 $('copyPromptBtn').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(DESIGN_PROMPT);
-    showHint('Design prompt copied — paste it into any Claude, add your request');
+    showHint('Design prompt copied: paste it into any Claude, add your request');
   } catch (e){
     prompt('Copy this prompt:', DESIGN_PROMPT);
   }
@@ -3477,7 +3477,7 @@ function exportSettings(){
   };
   const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
   download(`koralpaper-settings-${new Date().toISOString().slice(0, 10)}.json`, URL.createObjectURL(blob));
-  showHint('Settings exported — keep the .json to reload these values anytime');
+  showHint('Settings exported: keep the .json to reload these values anytime');
 }
 function importSettingsData(data){
   const s = data.settings || {};
@@ -3500,7 +3500,7 @@ function importSettingsData(data){
   defaults.size = sizes.m;
   defaults.lh = typo.lh; defaults.pgap = typo.pgap; defaults.lspace = typo.lspace;
   saveSettings(); syncSettingsUI(); applyWidthPresets();
-  showHint(`Settings imported — widths ${widths.fine}/${widths.medium}/${widths.thick}, sizes ${sizes.s}/${sizes.m}/${sizes.l}/${sizes.xl}, spacing ×${typo.lh}/${typo.pgap}px/${typo.lspace}px`);
+  showHint(`Settings imported: widths ${widths.fine}/${widths.medium}/${widths.thick}, sizes ${sizes.s}/${sizes.m}/${sizes.l}/${sizes.xl}, spacing ×${typo.lh}/${typo.pgap}px/${typo.lspace}px`);
 }
 $('setExportBtn').addEventListener('click', exportSettings);
 $('setImportBtn').addEventListener('click', () => $('settingsInput').click());
@@ -3592,7 +3592,7 @@ function newDocument(){
   buildPageStrip();
   syncPaperUI(); syncBoardBtn(); buildBoardMenuSel(); syncZoomLabel();
   commit(); syncPanel(); requestRender();
-  showHint('New document — ⌘Z brings the previous pages back');
+  showHint('New document: ⌘Z brings the previous pages back');
 }
 /* one Transparent-background toggle drives PNG & SVG exports */
 const EXPT_KEY = 'koralpaper.exportT';
@@ -3970,11 +3970,11 @@ function tplBlackCarousel(){
 }
 
 const TEMPLATES = [
-  { id: 'li-carousel', name: 'LinkedIn carousel', desc: '5 slides: cover, two content, photo, CTA — header & footer on every slide', build: tplLinkedInCarousel },
-  { id: 'black-carousel', name: 'Black carousel', desc: 'Stats, Highlight word & Numbered steps — 1080×1350, black paper + electric yellow (sets the paper color)', build: tplBlackCarousel },
-  { id: 'flowchart', name: 'Flowchart kit', desc: 'Start, steps, decision diamond, labeled glued arrows', build: tplFlowchart },
-  { id: 'versus', name: 'Comparison / Versus', desc: 'Two columns with pros & cons and a verdict sticky', build: tplVersus },
-  { id: 'quote', name: 'Quote card', desc: '1080×1080 square with a big serif quote', build: tplQuoteCard },
+  { id: 'li-carousel', cat: 'Carousels', name: 'LinkedIn carousel', desc: '5 slides: cover, two content, photo, CTA. Header & footer on every slide', build: tplLinkedInCarousel },
+  { id: 'black-carousel', cat: 'Carousels', name: 'Black carousel', desc: 'Stats, Highlight word & Numbered steps. 1080×1350, black paper + electric yellow (sets the paper color)', build: tplBlackCarousel },
+  { id: 'flowchart', cat: 'Diagrams', name: 'Flowchart kit', desc: 'Start, steps, decision diamond, labeled glued arrows', build: tplFlowchart },
+  { id: 'versus', cat: 'Infographics', name: 'Comparison / Versus', desc: 'Two columns with pros & cons and a verdict sticky', build: tplVersus },
+  { id: 'quote', cat: 'Presentations', name: 'Quote card', desc: '1080×1080 square with a big serif quote', build: tplQuoteCard },
 ];
 function clonePageElements(els){
   const idMap = new Map(), gidMap = new Map();
@@ -4010,7 +4010,7 @@ function applyTemplate(def){
   syncBoardBtn(); buildBoardMenuSel();
   commit(); buildPageStrip(); zoomToFit(); syncPanel();
   $('tplDialog').classList.add('hidden');
-  showHint(`Template added — ${built.pages.length} page${built.pages.length > 1 ? 's' : ''}, fully editable`);
+  showHint(`Template added: ${built.pages.length} page${built.pages.length > 1 ? 's' : ''}, fully editable`);
 }
 
 /* ── template store: user templates + built-in overrides/hides ──────
@@ -4050,6 +4050,28 @@ function tplSnapshot(name, scope){
     bg: state.bgColor || null,
   };
 }
+const TPL_SUGGESTED_CATS = ['Carousels', 'Presentations', 'Infographics', 'Diagrams'];
+function tplCatOf(t){ return (t.cat || 'Other'); }
+function tplAllCats(){
+  const found = new Set(TPL_SUGGESTED_CATS);
+  const store = tplStore();
+  for (const t of TEMPLATES) if (!store.hidden.includes(t.id)) found.add(tplCatOf(store.overrides[t.id] || t));
+  for (const t of store.user) found.add(tplCatOf(t));
+  return [...TPL_SUGGESTED_CATS, ...[...found].filter(c => !TPL_SUGGESTED_CATS.includes(c)).sort()];
+}
+function tplFillCatSelect(current){
+  const sel = $('tplCat');
+  sel.replaceChildren();
+  for (const c of tplAllCats()){
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  }
+  const nw = document.createElement('option');
+  nw.value = '__new'; nw.textContent = 'New category…';
+  sel.appendChild(nw);
+  sel.value = current && [...sel.options].some(o => o.value === current) ? current : tplAllCats()[0];
+}
 function tplAskScope(){
   // 'all' | 'page' | null (cancelled) — only asks when it matters
   if (state.pages.length <= 1) return 'page';
@@ -4057,15 +4079,18 @@ function tplAskScope(){
     ? 'all' : 'page';
 }
 function saveUserTemplate(scope){
-  const sc = scope || tplAskScope();
-  if (!sc) return;
-  const name = prompt('Template name:', state.pages[state.pageIndex].name || 'My template');
-  if (!name || !name.trim()) return;
+  const sc = scope || 'page';
+  const name = (($('tplName').value || '').trim()) || $('tplName').placeholder.trim();
+  if (!name){ $('tplName').focus(); showHint('Give the template a name first'); return; }
+  const cat = $('tplCat').value === '__new' ? 'Other' : $('tplCat').value;
   const store = tplStore();
-  store.user.push(tplSnapshot(name.trim(), sc));
+  const snap = tplSnapshot(name, sc);
+  snap.cat = cat;
+  store.user.push(snap);
   if (!tplSave(store)) return;
+  $('tplName').value = '';
   buildTplList();
-  showHint(`\u201C${name.trim()}\u201D saved \u2014 ${sc === 'all' ? state.pages.length + ' pages' : '1 page'}${state.board ? ' \u00B7 ' + state.board.w + '\u00D7' + state.board.h : ''}`);
+  showHint(`\u201C${name}\u201D saved to ${cat}: ${sc === 'all' ? state.pages.length + ' pages' : '1 page'}${state.board ? ' \u00B7 ' + state.board.w + '\u00D7' + state.board.h : ''}`);
 }
 function tplUpdate(kind, id, currentName){
   const sc = tplAskScope();
@@ -4073,6 +4098,8 @@ function tplUpdate(kind, id, currentName){
   if (!confirm(`Replace \u201C${currentName}\u201D with the ${sc === 'all' ? 'whole current document' : 'current page'}?`)) return;
   const store = tplStore();
   const snap = tplSnapshot(currentName, sc);
+  const prev = kind === 'user' ? store.user.find(t => t.id === id) : (store.overrides[id] || TEMPLATES.find(t => t.id === id));
+  if (prev) snap.cat = prev.cat || 'Other';
   if (kind === 'user'){
     const i = store.user.findIndex(t => t.id === id);
     if (i < 0) return;
@@ -4088,11 +4115,13 @@ function tplUpdate(kind, id, currentName){
 }
 function tplRename(kind, id, oldName){
   const name = prompt('New name:', oldName);
-  if (!name || !name.trim() || name.trim() === oldName) return;
+  if (!name || !name.trim()) return;
   const store = tplStore();
   const t = kind === 'user' ? store.user.find(t => t.id === id) : store.overrides[id];
   if (!t) return;
   t.name = name.trim();
+  const cat = prompt('Category (' + tplAllCats().join(', ') + ' — or type a new one):', t.cat || 'Other');
+  if (cat && cat.trim()) t.cat = cat.trim();
   if (tplSave(store)) buildTplList();
 }
 function tplDelete(kind, id, name){
@@ -4125,52 +4154,66 @@ function buildTplList(){
     b.addEventListener('click', fn);
     return b;
   };
-  const addRow = (name, desc, actions) => {
-    const row = document.createElement('div');
-    row.className = 'tplrow';
-    const info = document.createElement('div');
-    info.className = 'tplinfo';
-    const nm = document.createElement('b'); nm.textContent = name;
-    const ds = document.createElement('span'); ds.textContent = desc;
-    info.appendChild(nm); info.appendChild(ds);
-    row.appendChild(info);
-    for (const a of actions) row.appendChild(a);
-    list.appendChild(row);
-  };
+  // one merged, category-grouped list: built-ins and your own together
+  const rows = [];
   for (const t of TEMPLATES){
     if (store.hidden.includes(t.id)) continue;
     const ov = store.overrides[t.id];
-    if (ov){
-      addRow(ov.name, meta(ov) + ' \u00B7 customized', [
-        mini('Add', 'Add these pages to the document', () => applyTemplate(ov)),
-        mini('\u270E', 'Rename', () => tplRename('builtin', t.id, ov.name)),
-        mini('\u21BB', 'Update with the current design', () => tplUpdate('builtin', t.id, ov.name)),
-        mini('\u2715', 'Delete', () => tplDelete('builtin', t.id, ov.name), 'danger tpldel'),
-      ]);
-    } else {
-      addRow(t.name, t.desc, [
-        mini('Add', 'Add these pages to the document', () => applyTemplate(t)),
-        mini('\u21BB', 'Replace this built-in with your current design', () => tplUpdate('builtin', t.id, t.name)),
-        mini('\u2715', 'Remove from the list (restorable)', () => tplDelete('builtin', t.id, t.name), 'danger tpldel'),
-      ]);
-    }
+    const shown = ov || t;
+    rows.push({ cat: tplCatOf(shown), name: shown.name,
+      desc: ov ? meta(ov) + ' \u00B7 customized' : t.desc,
+      actions: ov
+        ? [ mini('Add', 'Add these pages to the document', () => applyTemplate(ov)),
+            mini('\u270E', 'Rename / change category', () => tplRename('builtin', t.id, ov.name)),
+            mini('\u21BB', 'Update with the current design', () => tplUpdate('builtin', t.id, ov.name)),
+            mini('\u2715', 'Delete', () => tplDelete('builtin', t.id, ov.name), 'danger tpldel') ]
+        : [ mini('Add', 'Add these pages to the document', () => applyTemplate(t)),
+            mini('\u21BB', 'Replace this built-in with your current design', () => tplUpdate('builtin', t.id, t.name)),
+            mini('\u2715', 'Remove from the list (restorable)', () => tplDelete('builtin', t.id, t.name), 'danger tpldel') ] });
   }
-  if (store.user.length){
+  for (const t of store.user)
+    rows.push({ cat: tplCatOf(t), name: t.name, desc: meta(t), yours: true,
+      actions: [ mini('Add', 'Add these pages to the document', () => applyTemplate(t)),
+        mini('\u270E', 'Rename / change category', () => tplRename('user', t.id, t.name)),
+        mini('\u21BB', 'Update with the current design', () => tplUpdate('user', t.id, t.name)),
+        mini('\u2715', 'Delete', () => tplDelete('user', t.id, t.name), 'danger tpldel') ] });
+  const cats = tplAllCats().filter(c => rows.some(r => r.cat === c));
+  for (const cat of cats){
     const head = document.createElement('div');
     head.className = 'menuhead';
-    head.textContent = 'Your templates';
+    head.textContent = cat;
     list.appendChild(head);
-    for (const t of store.user)
-      addRow(t.name, meta(t), [
-        mini('Add', 'Add these pages to the document', () => applyTemplate(t)),
-        mini('\u270E', 'Rename', () => tplRename('user', t.id, t.name)),
-        mini('\u21BB', 'Update with the current design', () => tplUpdate('user', t.id, t.name)),
-        mini('\u2715', 'Delete', () => tplDelete('user', t.id, t.name), 'danger tpldel'),
-      ]);
+    for (const r of rows.filter(r => r.cat === cat)){
+      const row = document.createElement('div');
+      row.className = 'tplrow';
+      const info = document.createElement('div');
+      info.className = 'tplinfo';
+      const nm = document.createElement('b');
+      nm.textContent = r.name;
+      if (r.yours){ const st = document.createElement('span'); st.className = 'star'; st.textContent = ' \u2605'; nm.appendChild(st); }
+      const ds = document.createElement('span'); ds.textContent = r.desc;
+      info.appendChild(nm); info.appendChild(ds);
+      row.appendChild(info);
+      for (const a of r.actions) row.appendChild(a);
+      list.appendChild(row);
+    }
   }
   const dirty = store.hidden.length || Object.keys(store.overrides).length;
   $('tplRestoreBtn').classList.toggle('hidden', !dirty);
+  // save form defaults
+  if (!$('tplName').value) $('tplName').value = '';
+  $('tplName').placeholder = state.pages[state.pageIndex].name || 'Template name';
+  tplFillCatSelect($('tplCat').value !== '__new' ? $('tplCat').value : null);
+  $('tplSaveAllBtn').classList.toggle('hidden', state.pages.length <= 1);
 }
+$('tplCat').addEventListener('change', () => {
+  if ($('tplCat').value !== '__new') return;
+  const c = prompt('New category name:', '');
+  if (c && c.trim()){ const cc = c.trim(); tplFillCatSelect(null);
+    const o = document.createElement('option'); o.value = cc; o.textContent = cc;
+    $('tplCat').insertBefore(o, $('tplCat').lastElementChild); $('tplCat').value = cc;
+  } else tplFillCatSelect(null);
+});
 $('tplSaveBtn').addEventListener('click', () => saveUserTemplate('page'));
 $('tplSaveAllBtn').addEventListener('click', () => saveUserTemplate('all'));
 $('tplRestoreBtn').addEventListener('click', tplRestoreBuiltins);
@@ -4295,7 +4338,7 @@ function exportExcalidraw(){
   const blob = new Blob([JSON.stringify(doc, null, 1)], { type: 'application/json' });
   const name = (state.pages[state.pageIndex].name || 'page').replace(/[^\w-]+/g, '-').toLowerCase();
   download(`koralpaper-${name}.excalidraw`, URL.createObjectURL(blob));
-  if (skipped) showHint(`${skipped} icon/art element(s) skipped — Excalidraw has no equivalent (photos export as photos)`);
+  if (skipped) showHint(`${skipped} icon/art element(s) skipped: Excalidraw has no equivalent (photos export as photos)`);
 }
 function importExcalidraw(data){
   const els = [];
@@ -4568,7 +4611,7 @@ async function exportAllPages(){
 /* ── copy to clipboard: selection (or page) as PNG / SVG ── */
 async function copyAsPNG(){
   const els = state.selection.size ? selected() : visibleEls(state.elements);
-  if (!els.length){ showHint('Nothing to copy — the page is empty'); return; }
+  if (!els.length){ showHint('Nothing to copy: the page is empty'); return; }
   try {
     const b = sceneBounds(els);
     const pad = 24, maxDim = 8000;
@@ -4583,21 +4626,21 @@ async function copyAsPNG(){
     });
     const blob = await new Promise(res => off.toBlob(res, 'image/png'));
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-    showHint(state.selection.size ? 'Selection copied as PNG — paste it anywhere' : 'Page copied as PNG — paste it anywhere');
+    showHint(state.selection.size ? 'Selection copied as PNG: paste it anywhere' : 'Page copied as PNG: paste it anywhere');
   } catch (e){
     showHint('Clipboard image copy is not available in this browser');
   }
 }
 async function copyAsSVG(){
   const els = state.selection.size ? selected() : visibleEls(state.elements);
-  if (!els.length){ showHint('Nothing to copy — the page is empty'); return; }
+  if (!els.length){ showHint('Nothing to copy: the page is empty'); return; }
   const svg = renderSceneSVG(els, {
     pal: pal(), transparent: true, bg: effectiveBg(), board: null, grid: false,
   });
-  if (!svg){ showHint('Nothing to copy — the page is empty'); return; }
+  if (!svg){ showHint('Nothing to copy: the page is empty'); return; }
   try {
     await navigator.clipboard.writeText(svg);
-    showHint('Copied as SVG markup — paste into Figma, a code editor, or a .svg file');
+    showHint('Copied as SVG markup: paste into Figma, a code editor, or a .svg file');
   } catch (e){
     showHint('Clipboard copy is not available in this browser');
   }
@@ -4727,7 +4770,7 @@ function loadDemo(){
   preloadDocFonts();
   syncToggles(); syncBoardBtn(); buildBoardMenuSel();
   commit(); buildPageStrip(); zoomToFit(); syncPanel();
-  showHint('The KoralPaper tour — every feature on this page is real');
+  showHint('The KoralPaper tour: every feature on this page is real');
 }
 
 /* ── platform-aware shortcut labels ─────────────────
@@ -4941,7 +4984,7 @@ function mindToggle(id){
 function mindClearPage(){
   for (const el of state.elements){ delete el.mindRoot; delete el.folded; }
   commit(); requestRender();
-  showHint('Mind map unmarked — every branch is visible again');
+  showHint('Mind map unmarked: every branch is visible again');
 }
 
 /* ── Claude link: the MCP bridge client ─────────────
@@ -5067,7 +5110,7 @@ async function claudeExecute(action, args){
     preloadDocFonts();
     syncToggles(); syncBoardBtn(); buildBoardMenuSel(); syncPaperUI();
     commit(); buildPageStrip(); zoomToFit(); syncPanel();
-    showHint('Claude drew a new page — every element is fully editable');
+    showHint('Claude drew a new page: every element is fully editable');
     return { ok: true, page: state.pages[state.pageIndex].name,
       ids: Object.fromEntries(idMap), elements: state.elements.length };
   }
@@ -5254,7 +5297,7 @@ show(0);
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const safe = docname.replace(/[\/\\:*?"<>|]/g, '-');
   download(`${safe}.html`, URL.createObjectURL(blob));
-  showHint(`Shared ${pages.length} page${pages.length > 1 ? 's' : ''} as one self-contained .html — send it to anyone`);
+  showHint(`Shared ${pages.length} page${pages.length > 1 ? 's' : ''} as one self-contained .html: send it to anyone`);
 }
 
 /* ── Tab-to-create flow diagramming ─────────────────
@@ -5320,7 +5363,7 @@ function tidyLayout(){
     e.startBind && e.endBind && ids.has(e.startBind) && ids.has(e.endBind) &&
     e.startBind !== e.endBind);
   if (!edges.length){
-    showHint('Tidy arranges shapes connected with glued arrows — none found');
+    showHint('Tidy arranges shapes connected with glued arrows: none found');
     return;
   }
   const inFlow = new Set();
@@ -5475,7 +5518,7 @@ function stopReplay(){
 function startReplay(record){
   if (replaying) stopReplay();
   if (presenting) return;
-  if (!state.elements.length){ showHint('Nothing to replay — the page is empty'); return; }
+  if (!state.elements.length){ showHint('Nothing to replay: the page is empty'); return; }
   if (editing) commitTextEdit();
   closeMenus();
   setSelection(new Set());
@@ -5502,7 +5545,7 @@ function startReplay(record){
       replaying.rec = rec;
       showHint('Recording the replay… it saves automatically when done');
     } catch (e){
-      showHint('Video recording is not available in this browser — playing the replay instead');
+      showHint('Video recording is not available in this browser: playing the replay instead');
     }
   }
   replaying.raf = requestAnimationFrame(replayTick);
