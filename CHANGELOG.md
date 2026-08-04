@@ -1,5 +1,10 @@
 # KoralPaper — Changelog
 
+## v3.56.0
+
+- SVG assets are now recolorable: place a gallery SVG and the Outline row becomes "Tint". Pick any color and the whole mark recolors (transparency preserved), vector-crisp on canvas and in SVG export, where the original SVG source is kept and tinted with a real SVG filter. "None" restores the original artwork colors. To be clear about the reported concern: gallery SVGs were always stored and exported as SVG; what was missing was color control, and now it exists.
+- README: a full badge wall (platforms, offline, privacy, Claude, charts, fonts, brand kit, security) and a 12-feature visual showcase grid, ready for screenshots.
+
 ## v3.55.0
 
 The three completing features.

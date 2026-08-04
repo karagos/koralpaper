@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.55.0';
+const APP_VERSION = '3.56.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -2073,7 +2073,36 @@ function drawImageEl(ctx, el, pal){
   }
   const A = getAdjusted(el);
   if (!el.artStyle || el.artStyle === 'photo'){
-    const src = A.canvas;
+    let src = A.canvas;
+    /* SVG tint: recolor the whole mark (alpha preserved) with the Outline
+       color — logos become brandable while staying vector-sharp */
+    const tintCol = (el.tint && el._src.startsWith('data:image/svg'))
+      ? resolveStroke(pal, el.stroke) : null;
+    if (tintCol){
+      const key = tintCol + '|' + Math.round(b.w) + 'x' + Math.round(b.h) + '|' + (el.crop || '');
+      if (el._tintKey !== key){
+        const tc = document.createElement('canvas');
+        tc.width = Math.max(2, Math.round(b.w * 2));
+        tc.height = Math.max(2, Math.round(b.h * 2));
+        const t2 = tc.getContext('2d');
+        const nw0 = src.naturalWidth || src.width, nh0 = src.naturalHeight || src.height;
+        if (el.crop){
+          const c0 = el.crop;
+          t2.drawImage(src, c0[0] * nw0, c0[1] * nh0,
+            Math.max(1, (c0[2] - c0[0]) * nw0), Math.max(1, (c0[3] - c0[1]) * nh0),
+            0, 0, tc.width, tc.height);
+        } else {
+          t2.drawImage(src, 0, 0, tc.width, tc.height);
+        }
+        t2.globalCompositeOperation = 'source-in';
+        t2.fillStyle = tintCol;
+        t2.fillRect(0, 0, tc.width, tc.height);
+        el._tintCv = tc; el._tintKey = key;
+      }
+      ctx.drawImage(el._tintCv, b.x, b.y, b.w, b.h);
+      drawImageFrame(ctx, el, pal, b);
+      return;
+    }
     const nw = src.naturalWidth || src.width, nh = src.naturalHeight || src.height;
     const c = el.crop;
     if (c){
@@ -2560,6 +2589,15 @@ function renderSceneSVG(elements, opts){
         ? A.canvas.toDataURL(el._src.startsWith('data:image/png') ? 'image/png' : 'image/jpeg', 0.9)
         : el._src;
       if (!el.artStyle || el.artStyle === 'photo' || !baseEntry.ready){
+        let tintAttr = '';
+        if (el.tint && el._src.startsWith('data:image/svg')){
+          const tcol = resolveStroke(pal, el.stroke);
+          if (tcol){
+            const fid = 'tint' + (clipN++);
+            defs.push(`<filter id="${fid}"><feFlood flood-color="${tcol}"/><feComposite in2="SourceAlpha" operator="in"/></filter>`);
+            tintAttr = ` filter="url(#${fid})"`;
+          }
+        }
         if (el.crop){
           // scale the full image so the crop window fills the element, clipped
           const c = el.crop;
@@ -2567,9 +2605,9 @@ function renderSceneSVG(elements, opts){
           const fh = eb.h / Math.max(0.001, c[3] - c[1]);
           const id = 'imclip' + (clipN++);
           defs.push(`<clipPath id="${id}"><rect x="${svgNum(eb.x)}" y="${svgNum(eb.y)}" width="${svgNum(eb.w)}" height="${svgNum(eb.h)}"/></clipPath>`);
-          parts.push(`<g clip-path="url(#${id})"><image x="${svgNum(eb.x - c[0] * fw)}" y="${svgNum(eb.y - c[1] * fh)}" width="${svgNum(fw)}" height="${svgNum(fh)}" href="${photoHref()}" preserveAspectRatio="none"/></g>`);
+          parts.push(`<g clip-path="url(#${id})"${tintAttr}><image x="${svgNum(eb.x - c[0] * fw)}" y="${svgNum(eb.y - c[1] * fh)}" width="${svgNum(fw)}" height="${svgNum(fh)}" href="${photoHref()}" preserveAspectRatio="none"/></g>`);
         } else {
-          parts.push(`<image x="${svgNum(eb.x)}" y="${svgNum(eb.y)}" width="${svgNum(eb.w)}" height="${svgNum(eb.h)}" href="${photoHref()}" preserveAspectRatio="none"/>`);
+          parts.push(`<image x="${svgNum(eb.x)}" y="${svgNum(eb.y)}" width="${svgNum(eb.w)}" height="${svgNum(eb.h)}" href="${photoHref()}" preserveAspectRatio="none"${tintAttr}/>`);
         }
       } else {
         const prims = artPrims(el, A.entry);

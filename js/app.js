@@ -2225,11 +2225,20 @@ function rememberDefaults(patch){
   Object.assign(defaults, patch);
   if (patch.fill !== undefined && state.tool in defaults.fillByType) defaults.fillByType[state.tool] = patch.fill;
 }
+/* picking an Outline color on an SVG asset turns the tint on; None restores
+   the original artwork colors */
+function svgTintHook(el, patch){
+  if (el.type !== 'image' || !('stroke' in patch)) return;
+  const src = el._src || (el.imgId && state.images[el.imgId]) || '';
+  if (!src.startsWith('data:image/svg')) return;
+  el.tint = patch.stroke !== 'none';
+  delete el._tintKey; delete el._tintCv;
+}
 function applyStyle(patch){
   const sel = targetsForStyle();
   rememberDefaults(patch);
   if (sel){
-    for (const el of sel) applyPatchTo(el, patch);
+    for (const el of sel){ applyPatchTo(el, patch); svgTintHook(el, patch); }
     updateBoundArrows(state.elements);
     commit();
   }
@@ -2238,7 +2247,7 @@ function applyStyle(patch){
 /* live preview while a color picker drags — no history entry per tick */
 function applyStyleLive(patch){
   rememberDefaults(patch);
-  for (const el of selected()) applyPatchTo(el, patch);
+  for (const el of selected()){ applyPatchTo(el, patch); svgTintHook(el, patch); }
   requestRender();
 }
 
@@ -2260,7 +2269,9 @@ function syncPanel(){
   const onlyText = sel.length > 0 && sel.every(e => e.type === 'text');
   const onlyLinear = sel.length > 0 && sel.every(e => isLinear(e));
   show('rowStroke', !onlyText);   // for text, "Text color" is the one truth
-  $('strokeLabel').textContent = onlyLinear ? 'Line color' : 'Outline';
+  const onlySvgImg = sel.length > 0 && sel.every(e => e.type === 'image'
+    && ((e._src || (e.imgId && state.images[e.imgId]) || '').startsWith('data:image/svg')));
+  $('strokeLabel').textContent = onlySvgImg ? 'Tint' : onlyLinear ? 'Line color' : 'Outline';
   show('rowArt', has('image'));
   const imgDuo = sel.some(e => e.type === 'image' && e.artStyle === 'duotone');
   show('rowFill', ((shapeish || has('draw')) && !has('image')) || imgDuo);
@@ -2995,6 +3006,7 @@ function insertAsset(a){
   const target = 240 / state.camera.z;
   const s = target / Math.max(a.w, a.h);
   const el = newElement('image', 0, 0, {});
+  if (a.svg) el.stroke = 'none'; // original colors until a Tint color is picked
   el._src = a.src;
   internImage(el);
   el.w = Math.max(20, a.w * s);

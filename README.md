@@ -1,10 +1,45 @@
-# KoralPaper — *Draw your thinking* (v3.55.0)
+# KoralPaper — *Draw your thinking* (v3.56.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
+## What it looks like
+
+<table>
+<tr>
+<td align="center" width="33%"><b>Claude draws on your paper</b><br><sub>Describe it in Claude Desktop, edit it here</sub><br><img src="docs/shots/01-claude-draws.png" alt="Claude drawing an editable diagram through the MCP bridge"></td>
+<td align="center" width="33%"><b>Replica: image → editable page</b><br><sub>Attach a poster, get it back as elements</sub><br><img src="docs/shots/02-replica.png" alt="A poster recreated as an editable KoralPaper page"></td>
+<td align="center" width="33%"><b>Charts from a spreadsheet paste</b><br><sub>8 types, Sketchy or Clean</sub><br><img src="docs/shots/03-charts.png" alt="Hand-drawn bar chart and donut made from pasted data"></td>
+</tr>
+<tr>
+<td align="center" width="33%"><b>Brand kit</b><br><sub>Your colors and fonts, everywhere — Claude too</sub><br><img src="docs/shots/04-brand-kit.png" alt="Brand kit settings and an on-brand chart"></td>
+<td align="center" width="33%"><b>All of Google Fonts</b><br><sub>Search, load, 9 weights, letter colors</sub><br><img src="docs/shots/05-fonts.png" alt="Font search and weight picker with poster type"></td>
+<td align="center" width="33%"><b>Templates in categories</b><br><sub>Built-ins plus your own saves</sub><br><img src="docs/shots/06-templates.png" alt="The templates dialog with foldable categories"></td>
+</tr>
+<tr>
+<td align="center" width="33%"><b>Mind-map folding</b><br><sub>Collapse and expand branches live</sub><br><img src="docs/shots/07-mind-map.png" alt="A mind map with folded branches and +N badges"></td>
+<td align="center" width="33%"><b>Present & replay</b><br><sub>Laser pen, draw-on replay, .webm export</sub><br><img src="docs/shots/08-present.png" alt="Presentation mode with the laser pen"></td>
+<td align="center" width="33%"><b>Photos become art</b><br><sub>13 algorithmic styles, tintable SVG logos</sub><br><img src="docs/shots/09-photo-art.png" alt="A photo rendered as stipple art next to a tinted SVG logo"></td>
+</tr>
+<tr>
+<td align="center" width="33%"><b>Social-size artboards</b><br><sub>LinkedIn, IG, per-page paper colors</sub><br><img src="docs/shots/10-artboards.png" alt="A 1080x1350 artboard with its own paper color"></td>
+<td align="center" width="33%"><b>Merge & tidy tools</b><br><sub>Texts into paragraphs, texts into shapes</sub><br><img src="docs/shots/11-merge.png" alt="Merging selected text lines into one element"></td>
+<td align="center" width="33%"><b>Snapshots & sharing</b><br><sub>Named checkpoints, single-file HTML share</sub><br><img src="docs/shots/12-snapshots.png" alt="The snapshots dialog with named checkpoints"></td>
+</tr>
+</table>
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-![Platform: any browser, offline](https://img.shields.io/badge/Platform-any%20browser%20·%20offline-1F1E1B)
+![Works on: Mac, Windows, Linux, iPad](https://img.shields.io/badge/Works%20on-Mac%20·%20Windows%20·%20Linux%20·%20iPad-1F1E1B)
+![Offline: 100%](https://img.shields.io/badge/Offline-100%25-2ea44f)
+![Privacy: no account, no server](https://img.shields.io/badge/Privacy-no%20account%20·%20no%20server-2ea44f)
 ![Dependencies: zero](https://img.shields.io/badge/Dependencies-zero-2ea44f)
+![Install: PWA or double click](https://img.shields.io/badge/Install-PWA%20·%20or%20just%20double--click-5B72C9)
+[![Claude: draws on your paper (MCP)](https://img.shields.io/badge/Claude-draws%20on%20your%20paper%20(MCP)-D97757?logo=anthropic&logoColor=white)](https://claude.ai/download)
+![Replica: image to editable page](https://img.shields.io/badge/Replica-image%20%E2%86%92%20editable%20page-D97757)
+![Charts: 8 hand-drawn types](https://img.shields.io/badge/Charts-8%20hand--drawn%20types-C96442)
+![Fonts: all of Google Fonts, 9 weights](https://img.shields.io/badge/Fonts-all%20of%20Google%20Fonts%20·%209%20weights-5B72C9)
+![Brand kit: your colors everywhere](https://img.shields.io/badge/Brand%20kit-your%20colors%20everywhere-7C5AA0)
+![Security: CSP hardened](https://img.shields.io/badge/Security-CSP%20hardened-2ea44f)
+![Excalidraw: import and export](https://img.shields.io/badge/Excalidraw-import%20%26%20export-6E9E63)
 [![Built with: Claude](https://img.shields.io/badge/Built%20with-Claude-D97757?logo=anthropic&logoColor=white)](https://claude.com)
 [![Made by: CAIO Group](https://img.shields.io/badge/Made%20by-CAIO%20Group-C96442)](https://wearecaio.com)
 [![GitHub stars](https://img.shields.io/github/stars/karagos/koralpaper?style=social)](https://github.com/karagos/koralpaper/stargazers)
