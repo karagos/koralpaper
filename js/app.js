@@ -1836,6 +1836,8 @@ function openCtxMenu(ev){
   if (sel.length){
     if (sel.length === 1 && canHaveText(sel[0]))
       add('Edit text', () => openTextEditor(sel[0], false));
+    if (sel[0].chart)
+      add('Edit chart data…', () => chartOpen(sel[0]));
     if (sel.length === 1 && sel[0].type === 'image'){
       add('Crop image', () => startCrop(sel[0]));
       if (sel[0].crop) add('Uncrop', () => resetCrop(sel[0]));
@@ -2103,7 +2105,7 @@ function syncPanel(){
   $('strokeLabel').textContent = onlyLinear ? 'Line color' : 'Outline';
   show('rowArt', has('image'));
   const imgDuo = sel.some(e => e.type === 'image' && e.artStyle === 'duotone');
-  show('rowFill', (shapeish && !has('image')) || imgDuo);
+  show('rowFill', ((shapeish || has('draw')) && !has('image')) || imgDuo);
   show('rowFillStyle', has('rect','diamond','ellipse','chip','icon'));
   show('rowWidth', shapeish || linear || has('image'));
   show('rowSketch', shapeish || linear || has('image'));
@@ -4269,6 +4271,511 @@ $('tplSaveAllBtn').addEventListener('click', () => saveUserTemplate('all'));
 $('tplRestoreBtn').addEventListener('click', tplRestoreBuiltins);
 $('tplCloseBtn').addEventListener('click', () => $('tplDialog').classList.add('hidden'));
 
+
+/* ── charts & tables ─────────────────────────────────
+   The dialog turns pasted numbers into ORDINARY elements (rects, draw
+   paths, lines, text) in one group. Every piece stays editable with the
+   normal tools; each piece carries el.chart = the recipe, so right-click
+   → "Edit chart data" can rebuild the group in place. */
+const CHART_FILLS = ['coral', 'periwinkle', 'sage', 'butter', 'blush', 'sky', 'terracotta', 'cream'];
+const CHART_STROKES = ['coral', 'blue', 'green', 'plum', 'gdark', 'ink'];
+
+function chartNum(c){
+  const v = parseFloat(String(c).replace(/\s/g, '').replace(/^\+/, ''));
+  return isNaN(v) ? null : v;
+}
+function chartRows(txt){
+  const lines = String(txt || '').trim().split('\n').map(l => l.replace(/\r/g, '')).filter(l => l.trim().length);
+  if (!lines.length) throw 'Type or paste some data first';
+  return lines.map(l => l.split(/\t|;|,/).map(c => c.trim()));
+}
+function chartParseData(txt){
+  const rows = chartRows(txt);
+  const width = Math.max(...rows.map(r => r.length));
+  if (width === 1){
+    const vals = rows.map((r, i) => {
+      const v = chartNum(r[0]);
+      if (v === null) throw `Row ${i + 1}: "${r[0]}" is not a number`;
+      return v;
+    });
+    return { series: ['Values'], cats: vals.map((_, i) => String(i + 1)), vals: vals.map(v => [v]) };
+  }
+  const headed = rows[0].slice(1).some(c => c !== '' && chartNum(c) === null);
+  const series = [];
+  for (let j = 1; j < width; j++)
+    series.push(headed && rows[0][j] ? rows[0][j] : (width === 2 ? 'Values' : 'Series ' + j));
+  const body = headed ? rows.slice(1) : rows;
+  if (!body.length) throw 'Add at least one data row';
+  if (body.length > 40) throw 'That is a lot of rows: keep it under 40';
+  if (series.length > 8) throw 'Keep it under 8 series (value columns)';
+  const cats = [], vals = [];
+  body.forEach((r, i) => {
+    cats.push(r[0] !== '' && r[0] !== undefined ? r[0] : 'Row ' + (i + 1));
+    const row = [];
+    for (let j = 1; j < width; j++){
+      const raw = r[j];
+      if (raw === undefined || raw === '') { row.push(0); continue; }
+      const v = chartNum(raw);
+      if (v === null) throw `Row ${i + (headed ? 2 : 1)}: "${raw}" is not a number`;
+      row.push(v);
+    }
+    vals.push(row);
+  });
+  return { series, cats, vals };
+}
+/* measured text element; position by (x, y) top-left after checking .w/.h */
+function chartText(txt, size, stroke, opts){
+  const el = newElement('text', 0, 0, Object.assign({ size, stroke, align: 'left', sw: 3.3 }, opts || {}));
+  el.text = String(txt);
+  const m = measureText(el.text, el.font, el.size, el);
+  el.w = m.w; el.h = m.h;
+  return el;
+}
+function chartLine(x1, y1, x2, y2, stroke, sw, dash2){
+  const el = newElement('line', Math.min(x1, x2), Math.min(y1, y2), { stroke, sw, dash: dash2 || 'solid', sketch: 1 });
+  el.w = Math.abs(x2 - x1); el.h = Math.abs(y2 - y1);
+  el.points = [[x1 - el.x, y1 - el.y], [x2 - el.x, y2 - el.y]];
+  return el;
+}
+function chartFmt(v){
+  return String(Math.round(v * 100) / 100);
+}
+function chartStep(range){
+  const raw = range / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+  const n = raw / mag;
+  return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * mag;
+}
+/* title + legend header shared by bar and line charts; returns next free y */
+function chartHeader(els, spec, d, plotX, plotW, lineMode){
+  let ty = 0;
+  if (spec.title){
+    const t = chartText(spec.title, 26, 'ink', { font: 'serif' });
+    t.x = plotX + plotW / 2 - t.w / 2; t.y = ty;
+    els.push(t); ty += t.h + 14;
+  }
+  if (d.series.length > 1){
+    let lx = plotX;
+    d.series.forEach((name, j) => {
+      const sw2 = newElement('rect', lx, ty + 2, {
+        fill: lineMode ? 'white' : CHART_FILLS[j % CHART_FILLS.length],
+        stroke: lineMode ? CHART_STROKES[j % CHART_STROKES.length] : 'ink',
+        sw: lineMode ? 2.6 : 1.8, round: 0, sketch: 1,
+      });
+      sw2.w = 14; sw2.h = 14;
+      els.push(sw2);
+      const t = chartText(name, 13, 'ink');
+      t.x = lx + 20; t.y = ty + 9 - t.h / 2;
+      els.push(t);
+      lx += 20 + t.w + 20;
+    });
+    ty += 26;
+  }
+  return ty;
+}
+/* value axis scale for bars and lines */
+function chartScale(d){
+  let vmin = 0, vmax = 0;
+  for (const row of d.vals) for (const v of row){ vmin = Math.min(vmin, v); vmax = Math.max(vmax, v); }
+  if (vmax === 0 && vmin === 0) vmax = 1;
+  const step = chartStep(vmax - vmin);
+  vmax = Math.ceil((vmax - 1e-9) / step) * step;
+  if (vmin < 0) vmin = Math.floor((vmin + 1e-9) / step) * step;
+  return { vmin, vmax, step };
+}
+function chartBuildBars(d, spec, horizontal){
+  const els = [];
+  const { vmin, vmax, step } = chartScale(d);
+  const plotW = horizontal ? 460 : 520, plotH = horizontal ? Math.max(220, d.cats.length * 44) : 300;
+  const plotX = 0;
+  const plotY = chartHeader(els, spec, d, plotX, plotW, false);
+  const nS = d.series.length, nC = d.cats.length;
+  if (!horizontal){
+    const y = v => plotY + plotH * (vmax - v) / (vmax - vmin);
+    for (let v = vmin; v <= vmax + 1e-9; v += step){
+      if (Math.abs(v) > 1e-9)
+        els.push(chartLine(plotX, y(v), plotX + plotW, y(v), 'glight', 1.3));
+      const t = chartText(chartFmt(v), 12, 'gmid');
+      t.x = plotX - 10 - t.w; t.y = y(v) - t.h / 2;
+      els.push(t);
+    }
+    const y0 = y(0);
+    const slot = plotW / nC, groupW = slot * 0.72, barW = groupW / nS;
+    d.cats.forEach((cat, i) => {
+      d.vals[i].forEach((v, j) => {
+        const by = Math.min(y(v), y0), bh = Math.max(2, Math.abs(y(v) - y0));
+        const bar = newElement('rect', plotX + slot * i + (slot - groupW) / 2 + barW * j, by, {
+          fill: CHART_FILLS[j % CHART_FILLS.length], stroke: 'ink', sw: 2, round: 0, sketch: 1,
+        });
+        bar.w = Math.max(4, barW - 3); bar.h = bh;
+        els.push(bar);
+      });
+      const t = chartText(cat, 13, 'gdark');
+      t.x = plotX + slot * i + slot / 2 - t.w / 2; t.y = plotY + plotH + 10;
+      els.push(t);
+    });
+    els.push(chartLine(plotX, plotY, plotX, plotY + plotH, 'ink', 2.5));
+    els.push(chartLine(plotX, y0, plotX + plotW, y0, 'ink', 2.5));
+    if (spec.xl){
+      const t = chartText(spec.xl, 15, 'gdark');
+      t.x = plotX + plotW / 2 - t.w / 2; t.y = plotY + plotH + 34;
+      els.push(t);
+    }
+    if (spec.yl){
+      const t = chartText(spec.yl, 15, 'gdark', { angle: -Math.PI / 2 });
+      t.x = plotX - 58 - t.w / 2; t.y = plotY + plotH / 2 - t.h / 2;
+      els.push(t);
+    }
+  } else {
+    const x = v => plotX + plotW * (v - vmin) / (vmax - vmin);
+    for (let v = vmin; v <= vmax + 1e-9; v += step){
+      if (Math.abs(v) > 1e-9)
+        els.push(chartLine(x(v), plotY, x(v), plotY + plotH, 'glight', 1.3));
+      const t = chartText(chartFmt(v), 12, 'gmid');
+      t.x = x(v) - t.w / 2; t.y = plotY + plotH + 8;
+      els.push(t);
+    }
+    const x0 = x(0);
+    const slot = plotH / nC, groupH = slot * 0.72, barH = groupH / nS;
+    d.cats.forEach((cat, i) => {
+      d.vals[i].forEach((v, j) => {
+        const bx = Math.min(x(v), x0), bw = Math.max(2, Math.abs(x(v) - x0));
+        const bar = newElement('rect', bx, plotY + slot * i + (slot - groupH) / 2 + barH * j, {
+          fill: CHART_FILLS[j % CHART_FILLS.length], stroke: 'ink', sw: 2, round: 0, sketch: 1,
+        });
+        bar.w = bw; bar.h = Math.max(4, barH - 3);
+        els.push(bar);
+      });
+      const t = chartText(cat, 13, 'gdark');
+      t.x = plotX - 10 - t.w; t.y = plotY + slot * i + slot / 2 - t.h / 2;
+      els.push(t);
+    });
+    els.push(chartLine(plotX, plotY + plotH, plotX + plotW, plotY + plotH, 'ink', 2.5));
+    els.push(chartLine(x0, plotY, x0, plotY + plotH, 'ink', 2.5));
+    if (spec.xl){
+      const t = chartText(spec.xl, 15, 'gdark');
+      t.x = plotX + plotW / 2 - t.w / 2; t.y = plotY + plotH + 32;
+      els.push(t);
+    }
+    if (spec.yl){
+      const t = chartText(spec.yl, 15, 'gdark', { angle: -Math.PI / 2 });
+      const catW = Math.max(...d.cats.map(c => measureText(c, 'sans', 13).w));
+      t.x = plotX - catW - 40 - t.w / 2; t.y = plotY + plotH / 2 - t.h / 2;
+      els.push(t);
+    }
+  }
+  return els;
+}
+function chartBuildLine(d, spec){
+  const els = [];
+  const { vmin, vmax, step } = chartScale(d);
+  const plotW = 520, plotH = 300, plotX = 0;
+  const plotY = chartHeader(els, spec, d, plotX, plotW, true);
+  const nC = d.cats.length;
+  const y = v => plotY + plotH * (vmax - v) / (vmax - vmin);
+  for (let v = vmin; v <= vmax + 1e-9; v += step){
+    if (Math.abs(v) > 1e-9)
+      els.push(chartLine(plotX, y(v), plotX + plotW, y(v), 'glight', 1.3));
+    const t = chartText(chartFmt(v), 12, 'gmid');
+    t.x = plotX - 10 - t.w; t.y = y(v) - t.h / 2;
+    els.push(t);
+  }
+  const slot = plotW / nC;
+  const px = i => plotX + slot * i + slot / 2;
+  d.series.forEach((name, j) => {
+    const abs = d.vals.map((row, i) => [px(i), y(row[j])]);
+    const minX = Math.min(...abs.map(p => p[0])), minY = Math.min(...abs.map(p => p[1]));
+    const ln = newElement('draw', minX, minY, {
+      stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 3, sketch: 1, fill: 'none',
+    });
+    ln.points = abs.map(p => [p[0] - minX, p[1] - minY]);
+    ln.w = Math.max(...ln.points.map(p => p[0]));
+    ln.h = Math.max(...ln.points.map(p => p[1]));
+    els.push(ln);
+    if (nC <= 14) abs.forEach(pt => {
+      const dot = newElement('ellipse', pt[0] - 4.5, pt[1] - 4.5, {
+        fill: 'white', stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 2.4, sketch: 1,
+      });
+      dot.w = 9; dot.h = 9;
+      els.push(dot);
+    });
+  });
+  d.cats.forEach((cat, i) => {
+    const t = chartText(cat, 13, 'gdark');
+    t.x = px(i) - t.w / 2; t.y = plotY + plotH + 10;
+    els.push(t);
+  });
+  const y0 = vmin < 0 ? y(0) : plotY + plotH;
+  els.push(chartLine(plotX, plotY, plotX, plotY + plotH, 'ink', 2.5));
+  els.push(chartLine(plotX, y0, plotX + plotW, y0, 'ink', 2.5));
+  if (spec.xl){
+    const t = chartText(spec.xl, 15, 'gdark');
+    t.x = plotX + plotW / 2 - t.w / 2; t.y = plotY + plotH + 34;
+    els.push(t);
+  }
+  if (spec.yl){
+    const t = chartText(spec.yl, 15, 'gdark', { angle: -Math.PI / 2 });
+    t.x = plotX - 58 - t.w / 2; t.y = plotY + plotH / 2 - t.h / 2;
+    els.push(t);
+  }
+  return els;
+}
+function chartBuildPie(d, spec, donut){
+  const els = [];
+  const vals = d.vals.map(r => Math.abs(r[0]));
+  const total = vals.reduce((a, v) => a + v, 0);
+  if (total <= 0) throw 'A pie needs at least one number above zero';
+  const r = 150, rIn = donut ? r * 0.55 : 0, cx = 0, cy = 0;
+  let a = -Math.PI / 2;
+  vals.forEach((v, i) => {
+    if (!v) return;
+    const a2 = a + (v / total) * Math.PI * 2;
+    const pts = [];
+    const steps = Math.max(3, Math.ceil((a2 - a) / 0.09));
+    if (donut){
+      for (let k = 0; k <= steps; k++){
+        const ang = a + (a2 - a) * k / steps;
+        pts.push([cx + Math.cos(ang) * r, cy + Math.sin(ang) * r]);
+      }
+      for (let k = steps; k >= 0; k--){
+        const ang = a + (a2 - a) * k / steps;
+        pts.push([cx + Math.cos(ang) * rIn, cy + Math.sin(ang) * rIn]);
+      }
+      pts.push(pts[0].slice());
+    } else {
+      pts.push([cx, cy]);
+      for (let k = 0; k <= steps; k++){
+        const ang = a + (a2 - a) * k / steps;
+        pts.push([cx + Math.cos(ang) * r, cy + Math.sin(ang) * r]);
+      }
+      pts.push([cx, cy]);
+    }
+    const minX = Math.min(...pts.map(pp => pp[0])), minY = Math.min(...pts.map(pp => pp[1]));
+    const slice = newElement('draw', minX, minY, {
+      fill: CHART_FILLS[i % CHART_FILLS.length], stroke: 'ink', sw: 2.5, sketch: 1,
+    });
+    slice.points = pts.map(pp => [pp[0] - minX, pp[1] - minY]);
+    slice.w = Math.max(...slice.points.map(pp => pp[0]));
+    slice.h = Math.max(...slice.points.map(pp => pp[1]));
+    els.push(slice);
+    const mid = (a + a2) / 2, lr = r + 18;
+    const pct = Math.round(v / total * 100);
+    const t = chartText(`${d.cats[i]} · ${pct}%`, 14, 'ink');
+    const lx = cx + Math.cos(mid) * lr, ly = cy + Math.sin(mid) * lr;
+    t.x = Math.cos(mid) >= 0.06 ? lx : Math.cos(mid) <= -0.06 ? lx - t.w : lx - t.w / 2;
+    t.y = ly - t.h / 2;
+    els.push(t);
+    a = a2;
+  });
+  if (spec.title){
+    const t = chartText(spec.title, 26, 'ink', { font: 'serif' });
+    t.x = cx - t.w / 2; t.y = cy - r - 70;
+    els.push(t);
+  }
+  return els;
+}
+function chartBuildTable(spec){
+  const rows = chartRows(spec.data);
+  if (rows.length < 2) throw 'A table needs a header row plus at least one data row';
+  if (rows.length > 30) throw 'Keep tables under 30 rows';
+  const nCols = Math.max(...rows.map(rr => rr.length));
+  if (nCols > 8) throw 'Keep tables under 8 columns';
+  const els = [];
+  const headH = 42, rowH = 37, padX = 13;
+  const colW = [];
+  for (let c = 0; c < nCols; c++){
+    let mw = 0;
+    rows.forEach((rr, i) => {
+      const m = measureText(String(rr[c] ?? ''), 'sans', i ? 14 : 15);
+      mw = Math.max(mw, m.w);
+    });
+    colW.push(clamp(Math.ceil(mw) + padX * 2 + 4, 64, 250));
+  }
+  const totalW = colW.reduce((acc, w) => acc + w, 0);
+  const totalH = headH + (rows.length - 1) * rowH;
+  let ty = 0;
+  if (spec.title){
+    const t = chartText(spec.title, 26, 'ink', { font: 'serif' });
+    t.x = totalW / 2 - t.w / 2; t.y = 0;
+    els.push(t); ty = t.h + 16;
+  }
+  const head = newElement('rect', 0, ty, { fill: 'coral', stroke: 'none', round: 0, sketch: 1 });
+  head.w = totalW; head.h = headH;
+  els.push(head);
+  for (let i = 2; i < rows.length; i += 2){
+    const stripe = newElement('rect', 0, ty + headH + (i - 1) * rowH, { fill: 'cream', stroke: 'none', round: 0, sketch: 0 });
+    stripe.w = totalW; stripe.h = rowH;
+    els.push(stripe);
+  }
+  let cxx = 0;
+  for (let c = 0; c < nCols - 1; c++){
+    cxx += colW[c];
+    els.push(chartLine(cxx, ty, cxx, ty + totalH, 'glight', 1.4));
+  }
+  els.push(chartLine(0, ty + headH, totalW, ty + headH, 'ink', 2));
+  const frame = newElement('rect', 0, ty, { fill: 'none', stroke: 'ink', sw: 2.5, round: 0, sketch: 1 });
+  frame.w = totalW; frame.h = totalH;
+  els.push(frame);
+  rows.forEach((rr, i) => {
+    const isHead = i === 0;
+    const rowY = isHead ? ty : ty + headH + (i - 1) * rowH;
+    const rh = isHead ? headH : rowH;
+    let colX = 0;
+    for (let c = 0; c < nCols; c++){
+      const raw = String(rr[c] ?? '');
+      if (raw !== ''){
+        const t = chartText(raw, isHead ? 15 : 14, isHead ? 'white' : 'ink');
+        if (isHead) t.runs = [{ s: 0, e: raw.length, b: true, i: false, hl: null, co: null }];
+        const numeric = !isHead && chartNum(raw) !== null;
+        t.x = numeric ? colX + colW[c] - padX - t.w : colX + padX;
+        t.y = rowY + (rh - t.h) / 2;
+        els.push(t);
+      }
+      colX += colW[c];
+    }
+  });
+  return els;
+}
+function chartBuild(spec){
+  let els;
+  if (spec.type === 'table') els = chartBuildTable(spec);
+  else {
+    const d = chartParseData(spec.data);
+    if (spec.type === 'bars') els = chartBuildBars(d, spec, false);
+    else if (spec.type === 'hbars') els = chartBuildBars(d, spec, true);
+    else if (spec.type === 'line') els = chartBuildLine(d, spec);
+    else els = chartBuildPie(d, spec, spec.type === 'donut');
+  }
+  const b = sceneBounds(els);
+  for (const el of els){ el.x -= b.x; el.y -= b.y; }
+  return { els, w: b.w, h: b.h };
+}
+
+/* ── chart dialog ── */
+let chartType = 'bars', chartDirty = false, chartEditCtx = null, chartPrevTimer = null;
+const CHART_SAMPLES = {
+  bars: 'Quarter\tSales\tCosts\nQ1\t42\t31\nQ2\t55\t40\nQ3\t38\t45\nQ4\t61\t52',
+  hbars: 'Quarter\tSales\tCosts\nQ1\t42\t31\nQ2\t55\t40\nQ3\t38\t45\nQ4\t61\t52',
+  line: 'Month\tVisitors\tSignups\nJan\t120\t30\nFeb\t180\t42\nMar\t150\t55\nApr\t210\t70\nMay\t260\t85',
+  pie: 'Consulting\t45\nTraining\t30\nProducts\t15\nOther\t10',
+  donut: 'Consulting\t45\nTraining\t30\nProducts\t15\nOther\t10',
+  table: 'Product\tQ1\tQ2\tGrowth\nAlpha\t120\t135\t+12%\nBeta\t80\t95\t+19%\nGamma\t45\t60\t+33%',
+};
+const CHART_INTROS = {
+  chart: 'Paste rows straight from Excel or Numbers, or type them: one row per line, columns split by Tab, comma or semicolon. First column: labels. First row: series names (optional). Negative numbers work.',
+  pie: 'One row per slice: a label, then its value. Percentages are computed for you.',
+  table: 'Every cell becomes a table cell. The first row is the header; numbers align right on their own.',
+};
+function chartSpecFromUI(){
+  return {
+    type: chartType,
+    data: $('chartData').value,
+    title: $('chartTitle').value.trim(),
+    xl: $('chartXLabel').value.trim(),
+    yl: $('chartYLabel').value.trim(),
+  };
+}
+function chartSyncTypeUI(){
+  document.querySelectorAll('#chartTypeSeg button').forEach(b => b.classList.toggle('sel', b.dataset.ct === chartType));
+  $('chartAxisRow').classList.toggle('hidden', chartType === 'pie' || chartType === 'donut' || chartType === 'table');
+  $('chartIntro').textContent = chartType === 'table' ? CHART_INTROS.table
+    : (chartType === 'pie' || chartType === 'donut') ? CHART_INTROS.pie : CHART_INTROS.chart;
+}
+function chartSetType(t){
+  chartType = t;
+  chartSyncTypeUI();
+  if (!chartDirty) $('chartData').value = CHART_SAMPLES[t];
+  chartPreviewRefresh();
+}
+function chartPreviewRefresh(){
+  clearTimeout(chartPrevTimer);
+  chartPrevTimer = setTimeout(() => {
+    const cv = $('chartPreview'), err = $('chartErr');
+    const cw = cv.clientWidth || 400, chh = cv.clientHeight || 200;
+    cv.width = cw * 2; cv.height = chh * 2;
+    const ctx2 = cv.getContext('2d');
+    try {
+      const { els, w, h } = chartBuild(chartSpecFromUI());
+      err.classList.add('hidden');
+      const pad = Math.max(w, h) * 0.05;
+      const z = Math.min(cv.width / (w + pad * 2), cv.height / (h + pad * 2));
+      renderScene(ctx2, els, {
+        width: cv.width, height: cv.height,
+        camera: { x: (cv.width - w * z) / 2, y: (cv.height - h * z) / 2, z },
+        pal: pal(), grid: false, bg: effectiveBg(), hideBoardFrame: true,
+      });
+    } catch (e){
+      ctx2.clearRect(0, 0, cv.width, cv.height);
+      err.textContent = typeof e === 'string' ? e : 'Could not read the data';
+      err.classList.remove('hidden');
+      if (typeof e !== 'string') console.warn('chart build', e);
+    }
+  }, 200);
+}
+function chartOpen(fromEl){
+  closeMenus();
+  chartEditCtx = null;
+  if (fromEl && fromEl.chart){
+    const c = fromEl.chart;
+    chartEditCtx = { chartId: c.id, groupId: fromEl.groupId };
+    chartType = c.type;
+    $('chartData').value = c.data || '';
+    $('chartTitle').value = c.title || '';
+    $('chartXLabel').value = c.xl || '';
+    $('chartYLabel').value = c.yl || '';
+    chartDirty = true;
+  } else if (!chartDirty && !$('chartData').value){
+    $('chartData').value = CHART_SAMPLES[chartType];
+  }
+  $('chartAddBtn').textContent = chartEditCtx ? 'Update chart' : 'Add to page';
+  chartSyncTypeUI();
+  $('chartDialog').classList.remove('hidden');
+  chartPreviewRefresh();
+}
+function chartApply(){
+  let built;
+  try { built = chartBuild(chartSpecFromUI()); }
+  catch (e){ chartPreviewRefresh(); return; }
+  const spec = chartSpecFromUI();
+  let gid, ox, oy;
+  if (chartEditCtx){
+    const old = state.elements.filter(e => e.chart && e.chart.id === chartEditCtx.chartId);
+    const ob = old.length ? sceneBounds(old) : null;
+    gid = chartEditCtx.groupId || uid();
+    if (ob){ ox = ob.x; oy = ob.y; }
+    state.elements = state.elements.filter(e => !(e.chart && e.chart.id === chartEditCtx.chartId));
+    spec.id = chartEditCtx.chartId;
+  }
+  if (ox === undefined){
+    const [scx, scy] = toScene(window.innerWidth / 2, window.innerHeight / 2);
+    ox = scx - built.w / 2; oy = scy - built.h / 2;
+    gid = gid || uid();
+    spec.id = spec.id || uid();
+  }
+  for (const el of built.els){
+    el.x += ox; el.y += oy;
+    el.groupId = gid;
+    el.chart = spec;
+    state.elements.push(el);
+  }
+  setSelection(new Set(built.els.map(e => e.id)));
+  setTool('select');
+  commit(); requestRender();
+  $('chartDialog').classList.add('hidden');
+  showHint(chartEditCtx
+    ? 'Chart rebuilt with the new data'
+    : 'Added. Right-click it to edit the data; every bar and slice recolors like any shape');
+  chartEditCtx = null;
+}
+document.querySelectorAll('#chartTypeSeg button').forEach(b =>
+  b.addEventListener('click', () => chartSetType(b.dataset.ct)));
+$('chartData').addEventListener('input', () => { chartDirty = true; chartPreviewRefresh(); });
+['chartTitle', 'chartXLabel', 'chartYLabel'].forEach(id =>
+  $(id).addEventListener('input', chartPreviewRefresh));
+$('chartAddBtn').addEventListener('click', chartApply);
+$('chartCloseBtn').addEventListener('click', () => { $('chartDialog').classList.add('hidden'); chartEditCtx = null; });
+$('chartToolBtn').addEventListener('click', () => chartOpen(null));
+
 /* ── Excalidraw interop ────────────────────────────── */
 function excalFont(font){
   const f = FONTS[font];
@@ -4792,6 +5299,7 @@ window.addEventListener('keydown', ev => {
     return;
   }
   if (k === 'i' && !ev.shiftKey){ $('imgInput').click(); return; }
+  if (k === 'b' && !ev.shiftKey){ chartOpen(null); return; }
   if (TOOL_KEYS[k] && !ev.shiftKey){ setTool(TOOL_KEYS[k]); return; }
 });
 window.addEventListener('keyup', ev => {

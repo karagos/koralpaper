@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.41.0';
+const APP_VERSION = '3.42.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -2143,13 +2143,22 @@ function drawElement(ctx, el, pal, bg){
     return;
   }
   if (isLinear(el)){
-    if (!strokeColor){ ctx.restore(); return; }
+    const drawFill = el.type === 'draw' ? resolveFill(pal, el.fill) : null;
+    if (!strokeColor && !drawFill){ ctx.restore(); return; }
     const pts = linearPathPoints(el);
     ctx.setLineDash(dash || []);
     if (el.type === 'draw'){
       const rnd = new Rand(el.seed);
       const jpts = el.sketch === 2 ? pts.map(p => [p[0] + rnd.jitter(1), p[1] + rnd.jitter(1)]) : pts;
-      strokePolyline(ctx, jpts);
+      if (drawFill){
+        // a filled draw path renders as a closed polygon under its stroke
+        ctx.beginPath();
+        jpts.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py));
+        ctx.closePath();
+        ctx.fillStyle = drawFill;
+        ctx.fill();
+      }
+      if (strokeColor) strokePolyline(ctx, jpts);
     } else {
       sketchStroke(ctx, pts, false, el, el.sketch);
       ctx.setLineDash([]); // arrowheads stay solid
@@ -2616,12 +2625,16 @@ function renderSceneSVG(elements, opts){
         parts.push(textLinesSVG(el, layoutText(el, null), eb));
     }
     else if (isLinear(el)){
-      if (!resolveStroke(pal, el.stroke)){ body.push(''); continue; }
+      const drawFillSVG = el.type === 'draw' ? resolveFill(pal, el.fill) : null;
+      if (!resolveStroke(pal, el.stroke) && !drawFillSVG){ body.push(''); continue; }
       const pts = linearPathPoints(el);
       if (el.type === 'draw'){
         const rnd = new Rand(el.seed);
         const jpts = el.sketch === 2 ? pts.map(p => [p[0] + rnd.jitter(1), p[1] + rnd.jitter(1)]) : pts;
-        parts.push(`<path d="${dSmoothOpen(jpts)}" ${strokeAttrs(el)}/>`);
+        if (drawFillSVG)
+          parts.push(`<path d="${dSmoothOpen(jpts)}Z" fill="${drawFillSVG}" stroke="none"/>`);
+        if (resolveStroke(pal, el.stroke))
+          parts.push(`<path d="${dSmoothOpen(jpts)}" ${strokeAttrs(el)}/>`);
       } else {
         for (const poly of sketchPolylines(pts, false, el, el.sketch))
           parts.push(`<path d="${dForPoly(poly)}" ${strokeAttrs(el)}/>`);

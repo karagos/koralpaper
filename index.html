@@ -107,6 +107,9 @@
         PNG keeps transparency. Click to place · right-click to remove.</p>
       <button class="minipill" id="assetAddBtn">Add SVG / PNG…</button>
     </div>
+    <button class="toolbtn" id="chartToolBtn" title="Chart or table — B">
+      <svg viewBox="0 0 20 20"><path d="M3 16.6 Q10 16.3 17 16.6 M5 15.8 L5.1 11 Q5.1 10 6.1 10 L6.9 10 Q7.9 10 7.9 11 L8 15.8 M9.4 15.8 L9.5 5.4 Q9.5 4.4 10.5 4.4 L11.3 4.4 Q12.3 4.4 12.3 5.4 L12.4 15.8 M13.9 15.8 L14 8.4 Q14 7.4 15 7.4 L15.8 7.4 Q16.8 7.4 16.8 8.4 L16.9 15.8"/></svg>
+    </button>
   </div>
 
   <!-- ── Quick toggles ─────────────────────────────── -->
@@ -456,6 +459,38 @@
     </div>
   </div>
 
+  <!-- ── Chart & table dialog ─────────────────────── -->
+  <div class="island pdfdialog chartdialog hidden" id="chartDialog">
+    <h3>Chart &amp; table</h3>
+    <div class="segment chartseg" id="chartTypeSeg">
+      <button data-ct="bars" class="sel">Bars</button>
+      <button data-ct="hbars">Bars sideways</button>
+      <button data-ct="line">Lines</button>
+      <button data-ct="pie">Pie</button>
+      <button data-ct="donut">Donut</button>
+      <button data-ct="table">Table</button>
+    </div>
+    <p class="chartintro" id="chartIntro">Paste rows straight from Excel or Numbers, or type them:
+      one row per line, columns split by Tab, comma or semicolon. First column: labels.
+      First row: series names (optional). Negative numbers work.</p>
+    <textarea id="chartData" rows="6" spellcheck="false" placeholder="Quarter&#9;Sales&#9;Costs&#10;Q1&#9;42&#9;31&#10;Q2&#9;55&#9;40"></textarea>
+    <div class="tplsaverow chartmeta">
+      <input type="text" id="chartTitle" placeholder="Title (optional)" autocomplete="off">
+    </div>
+    <div class="tplsaverow chartmeta" id="chartAxisRow">
+      <input type="text" id="chartXLabel" placeholder="X axis label (optional)" autocomplete="off">
+      <input type="text" id="chartYLabel" placeholder="Y axis label (optional)" autocomplete="off">
+    </div>
+    <div class="chartprevwrap">
+      <canvas id="chartPreview"></canvas>
+      <div id="chartErr" class="charterr hidden"></div>
+    </div>
+    <div class="row actions">
+      <button class="pill" id="chartAddBtn">Add to page</button>
+      <button class="minipill" id="chartCloseBtn">Close</button>
+    </div>
+  </div>
+
   <!-- ── PDF page picker ───────────────────────────── -->
   <div class="island pdfdialog hidden" id="pdfDialog">
     <h3>Export PDF</h3>
@@ -519,6 +554,10 @@
       <tr><td><b>Color single letters:</b> while typing, select the characters and pick a
         Text color in the left panel. Works with the custom color wheel too; the
         <b>auto</b> dot puts them back</td></tr>
+      <tr><td><b>B</b> opens Chart &amp; table: paste numbers from a spreadsheet, pick bars,
+        lines, pie, donut or a table, and it lands as normal sketchy elements.
+        Right-click a chart later to <b>edit its data</b>; every bar and slice
+        recolors like any other shape</td></tr>
       <tr><td><b>Tab</b> grows a flow: a connected twin appears to the right (<b>⇧Tab</b> below),
         editor open: works mid-typing too. Right-click the canvas → <b>Tidy the flow</b> lines it all up</td></tr>
       <tr><td><b>Mind map:</b> right-click a shape → <b>Mark as mind-map root</b>, then click the

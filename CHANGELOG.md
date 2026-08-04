@@ -1,5 +1,12 @@
 # KoralPaper — Changelog
 
+## v3.42.0
+
+- New: Charts & tables. Press B or click the new toolbar button, paste numbers straight from Excel or Numbers (or type them), pick a type, and it appears on the page: vertical or sideways bars (multi-series, negative numbers supported, zero line included), line charts with markers, pies, donuts, and elegant striped tables with a coral header. Title, X and Y axis labels, legend and value gridlines are generated for you, with a live preview in the dialog.
+- Charts are made of normal KoralPaper elements in one group: every bar, slice, line and label recolors, restyles, moves and exports exactly like anything else you draw.
+- Right-click any part of a chart and choose "Edit chart data" to reopen the dialog with your numbers and rebuild it in place (one undo step).
+- Freehand draw paths can now carry a fill color (this is what pie slices are made of), and the Fill row in the panel appears for them.
+
 ## v3.41.0
 
 - Color single letters: while typing in any text, select some characters and pick a Text color in the left panel. Only that range changes color; the auto dot puts it back. Works with the custom color wheel, combines freely with bold, italic and highlights, and carries through PNG, SVG, PDF and shared HTML exports.
