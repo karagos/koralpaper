@@ -3273,7 +3273,7 @@ $('exportMenuBtn').addEventListener('click', ev => {
 $('exportMenu').addEventListener('click', ev => {
   const b = ev.target.closest('button');
   if (!b) return;
-  closeMenus();
+  if (b.dataset.act !== 'expT') closeMenus();
   runFileAction(b.dataset.act);
 });
 $('helpBtn').addEventListener('click', () => $('shortcutsCard').classList.toggle('hidden'));
@@ -3505,7 +3505,8 @@ function closeMenus(){
   $('ctxMenu').classList.add('hidden');
 }
 document.addEventListener('click', ev => {
-  if (!ev.target.closest('#brandIsland')) closeMenus();
+  if (!ev.target.closest('#brandIsland') &&
+      !ev.target.closest('#exportMenu') && !ev.target.closest('#exportMenuBtn')) closeMenus();
 });
 $('fileMenu').addEventListener('click', ev => {
   const b = ev.target.closest('button');
@@ -3530,16 +3531,29 @@ function newDocument(){
   commit(); syncPanel(); requestRender();
   showHint('New document — ⌘Z brings the previous pages back');
 }
+/* one Transparent-background toggle drives PNG & SVG exports */
+const EXPT_KEY = 'koralpaper.exportT';
+const exportT = () => { try { return localStorage.getItem(EXPT_KEY) === '1'; } catch (e){ return false; } };
+function syncExpToggle(){
+  const on = exportT();
+  $('expTransToggle').classList.toggle('sel', on);
+  $('expTransMark').textContent = on ? '✓' : '';
+}
 function runFileAction(act){
+  if (act === 'expT'){
+    try { localStorage.setItem(EXPT_KEY, exportT() ? '0' : '1'); } catch (e){}
+    syncExpToggle();
+    return;
+  }
   if (act === 'new') newDocument();
   if (act === 'open') fileInput.click();
   if (act === 'save') saveJSON();
   if (act === 'image') $('imgInput').click();
   if (act === 'excal') exportExcalidraw();
   if (act === 'templates'){ buildTplList(); $('tplDialog').classList.remove('hidden'); }
-  if (act === 'png') exportPNG(false);
+  if (act === 'png') exportPNG(exportT());
   if (act === 'pngT') exportPNG(true);
-  if (act === 'svg') exportSVG(false);
+  if (act === 'svg') exportSVG(exportT());
   if (act === 'svgT') exportSVG(true);
   if (act === 'pdf') exportPDFFlow();
   if (act === 'pngAll') exportAllPages();
@@ -5657,6 +5671,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
 /* ── boot ──────────────────────────────────────────── */
 function boot(){
   $('menuVersion').textContent = `KoralPaper v${APP_VERSION}`;
+  syncExpToggle();
   document.querySelector('.brand .name').title = `KoralPaper v${APP_VERSION}`;
   buildSwatches();
   buildPaperSwatches();

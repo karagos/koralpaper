@@ -39,28 +39,16 @@
       <svg viewBox="0 0 20 20"><path d="M3.2 5.4 Q10 4.8 16.8 5.3 M3 10.1 Q10 9.6 17 10 M3.3 14.8 Q10 14.4 16.7 14.9"/></svg>
     </button>
     <div id="fileMenu" class="menu hidden">
-      <button data-act="new">New document</button>
-      <button data-act="open">Open sketch (.json)…</button>
-      <button data-act="save">Save sketch (.json)</button>
-      <button data-act="image">Import image…</button>
+      <button data-act="new">New document &nbsp;<span class="menukey">⌥⌘N</span></button>
+      <button data-act="open">Open sketch… &nbsp;<span class="menukey">⌘O</span></button>
+      <button data-act="save">Save sketch… &nbsp;<span class="menukey">⌘S</span></button>
+      <button data-act="image">Import image… &nbsp;<span class="menukey">I</span></button>
       <button data-act="templates">Templates…</button>
-      <button data-act="excal">Export page to Excalidraw</button>
-      <hr>
-      <button data-act="png">Export PNG</button>
-      <button data-act="pngT">Export PNG — transparent</button>
-      <button data-act="svg">Export SVG</button>
-      <button data-act="svgT">Export SVG — transparent</button>
-      <button data-act="pdf">Export PDF…</button>
-      <button data-act="pngAll">Export all pages as PNGs (.zip)</button>
-      <button data-act="shareHtml">Share as web page (.html)</button>
-      <hr>
-      <button data-act="copyPng">Copy as PNG &nbsp;<span class="menukey">⇧⌘C</span></button>
-      <button data-act="copySvg">Copy as SVG</button>
       <hr>
       <button data-act="present">Present &nbsp;<span class="menukey">⇧⌘P</span></button>
       <button data-act="replay">Replay the drawing</button>
-      <button data-act="replayVid">Export replay as video (.webm)</button>
       <button data-act="demo">Load the KoralPaper tour</button>
+      <hr>
       <button data-act="paperReset">Reset paper color</button>
       <button data-act="clear" class="danger">Clear page…</button>
       <div class="menuver" id="menuVersion"></div>
@@ -157,18 +145,18 @@
       <svg viewBox="0 0 20 20"><path d="M10 3.2 Q10.2 8 10 12.4 M6.4 9.2 L10 12.8 L13.6 9.2 M4 16.4 Q10 16.9 16 16.4"/></svg>
     </button>
     <div id="exportMenu" class="menu right hidden">
+      <button data-act="expT" id="expTransToggle">Transparent background <span class="menucheck" id="expTransMark"></span></button>
+      <div class="menuhead">This page</div>
       <button data-act="png">Export PNG</button>
-      <button data-act="pngT">Export PNG — transparent</button>
       <button data-act="svg">Export SVG</button>
-      <button data-act="svgT">Export SVG — transparent</button>
-      <button data-act="pdf">Export PDF…</button>
-      <button data-act="pngAll">Export all pages as PNGs (.zip)</button>
-      <button data-act="shareHtml">Share as web page (.html)</button>
-      <hr>
       <button data-act="copyPng">Copy as PNG &nbsp;<span class="menukey">⇧⌘C</span></button>
       <button data-act="copySvg">Copy as SVG</button>
-      <hr>
-      <button data-act="save">Save sketch (.json)</button>
+      <div class="menuhead">Whole document</div>
+      <button data-act="pdf">Export PDF…</button>
+      <button data-act="pngAll">All pages as PNGs (.zip)</button>
+      <button data-act="shareHtml">Share as web page (.html)</button>
+      <button data-act="replayVid">Replay as video (.webm)</button>
+      <button data-act="excal">Excalidraw file (.excalidraw)</button>
     </div>
     <button class="iconbtn claudelink hidden" id="claudeLinkBtn" title="Claude is linked and can draw on this paper, click for details">
       <svg viewBox="0 0 20 20" class="filled"><g><path d="M10 2 L11.1 8.3 L8.9 8.3 Z"/><path d="M10 18 L8.9 11.7 L11.1 11.7 Z"/><path d="M18 10 L11.7 11.1 L11.7 8.9 Z"/><path d="M2 10 L8.3 8.9 L8.3 11.1 Z"/><path d="M15.7 4.3 L11.3 8.9 L10.3 7.2 Z"/><path d="M4.3 15.7 L8.7 11.1 L9.7 12.8 Z"/><path d="M15.7 15.7 L10.3 12.8 L11.3 11.1 Z"/><path d="M4.3 4.3 L9.7 7.2 L8.7 8.9 Z"/></g></svg>

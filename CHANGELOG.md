@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.36.0 — 2026-08-04
+- **Two menus, two jobs.** The ☰ menu now holds only the document and
+  the show: New / Open / Save / Import / Templates, then Present /
+  Replay / Tour, then paper housekeeping — ten items with their
+  shortcuts shown, instead of twenty-four. Everything about getting
+  work OUT lives in the ⬇ export menu, grouped under "This page"
+  (PNG, SVG, copy to clipboard) and "Whole document" (PDF, PNG zip,
+  web page, replay video, Excalidraw).
+- **One Transparent-background toggle** at the top of the export menu
+  replaces the four "± transparent" rows: tick it once (it is
+  remembered) and every PNG and SVG export honors it. The menu stays
+  open while you flip it.
+
 ## v3.35.0 — 2026-08-04
 - **The style panel speaks human now.** Section titles renamed for
   first-time users: Stroke → **Outline** (and **Line color** when an

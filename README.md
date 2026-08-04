@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.35.0)
+# KoralPaper — *Draw your thinking* (v3.36.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -262,9 +262,11 @@ and Settings.
   Open replaces the whole document and adopts the file's name — export
   PNG (2×) or **SVG** — each with background or transparent — autosave
   to localStorage
-- Press **?** in the app for shortcuts, tips, and Settings. The ☰ menu has
-  New/Open/Save/Templates/Export/Tour/Reset-paper/Clear; the ⬇ button
-  (top right) is a quick export menu (PNG/SVG ± background, Save).
+- Press **?** in the app for shortcuts, tips, and Settings. The ☰ menu
+  holds the document (New/Open/Save/Import/Templates) and the show
+  (Present/Replay/Tour); the ⬇ button (top right) is the export menu,
+  grouped into "This page" and "Whole document", with one **Transparent
+  background** toggle that drives PNG and SVG exports.
 
 ## Files
 
