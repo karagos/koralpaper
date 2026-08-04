@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.54.0
+
+- Brand Kit: define your identity once in Settings: a name, four accent colors, a paper color, and a heading + body font (any Google font). When the kit is active:
+  - charts color their series with your accents, and chart titles use your heading font
+  - built-in template headlines switch to your heading font
+  - new documents start on your brand paper
+  - the four accents appear as extra swatches in the Outline, Fill and Text color rows
+  - Claude reads the kit through the bridge and designs on brand automatically
+- Export the kit as a .json file and import it anywhere: give a whole team the same look with one small file. Turning the kit off restores every default instantly.
+
 ## v3.53.1
 
 - Fix: merging kept every text's color wrong when the target had its own color logic. A black text merged into a yellow shape stays black now. Each merged line keeps its exact original color (as letter colors where needed), in both "Merge texts into one" and "Merge text into the shape", and existing letter colors are never overwritten.

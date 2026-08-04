@@ -644,6 +644,26 @@
     </div>
     <div id="settingsPane" class="hidden">
       <h3>Settings</h3>
+      <p class="setdesc"><b>Brand kit.</b> Your identity in one place: when active, charts use the
+        accent colors, chart and template headlines use the heading font, new documents start on
+        the brand paper, and the accents appear as extra color swatches. Claude reads the kit too
+        and designs on brand. Export the kit as a file to give your whole team the same look.</p>
+      <div class="setrow"><label>Active</label><input type="checkbox" id="brandActiveChk" class="brandchk"></div>
+      <div class="setrow"><label>Name</label><input type="text" id="brandName" class="brandtextinput" placeholder="e.g. CAIO" autocomplete="off"></div>
+      <div class="setrow"><label>Accents</label><div class="brandaccents" id="brandAccents">
+        <input type="color" id="brandC1"><input type="color" id="brandC2">
+        <input type="color" id="brandC3"><input type="color" id="brandC4">
+      </div></div>
+      <div class="setrow"><label>Paper</label><input type="color" id="brandPaper">
+        <label class="chartcheck" title="New documents start with this paper color"><input type="checkbox" id="brandPaperOn"> use for new documents</label></div>
+      <div class="setrow"><label>Headings</label><select id="brandHeadFont" class="brandselect"></select></div>
+      <div class="setrow"><label>Body</label><select id="brandBodyFont" class="brandselect"></select></div>
+      <div class="setactions">
+        <button class="minipill" id="brandExportBtn">Export kit (.json)</button>
+        <button class="minipill" id="brandImportBtn">Import kit…</button>
+        <button class="minipill danger" id="brandResetBtn">Reset kit</button>
+      </div>
+      <p class="setdesc" style="margin-top:14px"></p>
       <p class="setdesc">Line width presets: these values power the Fine / Medium / Thick
         buttons in the style panel and every new element you draw.</p>
       <div class="setrow"><label>Fine</label>
@@ -714,6 +734,7 @@
 <input type="file" id="fileInput" accept=".json,.excalidraw,application/json" hidden>
 <input type="file" id="imgInput" accept="image/*" multiple hidden>
 <input type="file" id="settingsInput" accept=".json,application/json" hidden>
+<input type="file" id="brandInput" accept=".json,application/json" hidden>
 <input type="file" id="assetInput" accept=".svg,image/svg+xml,image/png,image/jpeg" multiple hidden>
 
 <script src="js/core.js"></script>

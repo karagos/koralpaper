@@ -2037,8 +2037,20 @@ canvas.addEventListener('contextmenu', ev => {
 });
 
 /* ── style panel ───────────────────────────────────── */
+function brandSwatchesInto(container, prop){
+  if (!brandActive()) return;
+  brand.accents.forEach((hx, i) => {
+    const b = document.createElement('button');
+    b.className = 'swatch brandsw';
+    b.dataset[prop] = hx;
+    b.style.background = hx;
+    b.title = (brand.name || 'Brand') + ' accent ' + (i + 1);
+    container.appendChild(b);
+  });
+}
 function buildSwatches(){
   const sEl = $('strokeSwatches');
+  sEl.replaceChildren();
   for (const key of STROKE_KEYS){
     const b = document.createElement('button');
     b.className = 'swatch' + (key === 'none' ? ' none' : '');
@@ -2046,8 +2058,10 @@ function buildSwatches(){
     b.title = key === 'none' ? 'no stroke — fill only' : (COLOR_TITLES[key] || key);
     sEl.appendChild(b);
   }
+  brandSwatchesInto(sEl, 'stroke');
   addCustomSwatch(sEl, 'stroke');
   const fEl = $('fillSwatches');
+  fEl.replaceChildren();
   for (const key of FILL_KEYS){
     const b = document.createElement('button');
     b.className = 'swatch' + (key === 'none' ? ' none' : '');
@@ -2055,8 +2069,10 @@ function buildSwatches(){
     b.title = key === 'none' ? 'no fill' : (COLOR_TITLES[key] || key);
     fEl.appendChild(b);
   }
+  brandSwatchesInto(fEl, 'fill');
   addCustomSwatch(fEl, 'fill');
   const tEl = $('textSwatches');
+  tEl.replaceChildren();
   const auto = document.createElement('button');
   auto.className = 'swatch tauto';
   auto.dataset.textcolor = 'auto';
@@ -2071,6 +2087,7 @@ function buildSwatches(){
     b.title = 'Text in ' + (COLOR_TITLES[key] || key);
     tEl.appendChild(b);
   }
+  brandSwatchesInto(tEl, 'textcolor');
   addCustomSwatch(tEl, 'textColor');
   paintSwatches();
 }
@@ -2176,14 +2193,16 @@ function setCustomSwatchState(prop, hex){
 function paintSwatches(){
   const p = pal();
   document.querySelectorAll('#strokeSwatches .swatch').forEach(b => {
-    b.style.background = p.stroke[b.dataset.stroke];
+    const k = b.dataset.stroke;
+    if (k) b.style.background = p.stroke[k] || (k[0] === '#' ? k : '');
   });
   document.querySelectorAll('#fillSwatches .swatch').forEach(b => {
-    if (b.dataset.fill !== 'none') b.style.background = p.fill[b.dataset.fill];
+    const k = b.dataset.fill;
+    if (k && k !== 'none') b.style.background = p.fill[k] || (k[0] === '#' ? k : '');
   });
   document.querySelectorAll('#textSwatches .swatch').forEach(b => {
-    if (b.dataset.textcolor && b.dataset.textcolor !== 'auto')
-      b.style.background = p.stroke[b.dataset.textcolor];
+    const k = b.dataset.textcolor;
+    if (k && k !== 'auto') b.style.background = p.stroke[k] || (k[0] === '#' ? k : '');
   });
 }
 
@@ -2727,6 +2746,93 @@ function openFontMenu(){
   if (curBtn) curBtn.scrollIntoView({ block: 'center' });
 }
 function closeFontMenu(){ $('fontMenu').classList.add('hidden'); }
+/* ── brand kit UI (Settings tab) ── */
+function brandDefaults(){
+  return normalizeBrand({ active: false, name: '', paper: '#f6ece1', usePaper: false,
+    accents: ['#d97757', '#5b72c9', '#6e9e63', '#7c5aa0'], headFont: 'serif', bodyFont: 'sans' });
+}
+function brandFontOptions(sel, current){
+  sel.replaceChildren();
+  const add = (key, label) => {
+    const o = document.createElement('option');
+    o.value = key; o.textContent = label;
+    sel.appendChild(o);
+  };
+  for (const [key, f] of Object.entries(FONTS)) if (!f.custom) add(key, f.label);
+  for (const fam of savedGFonts()) add('cg:' + fam, fam + ' (Google)');
+  sel.value = (current && [...sel.options].some(o => o.value === current)) ? current : 'sans';
+}
+function brandSyncUI(){
+  const b = brand || brandDefaults();
+  $('brandActiveChk').checked = !!b.active;
+  $('brandName').value = b.name || '';
+  ['brandC1', 'brandC2', 'brandC3', 'brandC4'].forEach((id, i) => {
+    $(id).value = b.accents[i] || '#d97757';
+  });
+  $('brandPaper').value = b.paper || '#f6ece1';
+  $('brandPaperOn').checked = !!b.usePaper;
+  brandFontOptions($('brandHeadFont'), b.headFont);
+  brandFontOptions($('brandBodyFont'), b.bodyFont);
+}
+function brandFromUI(){
+  brand = normalizeBrand({
+    active: $('brandActiveChk').checked,
+    name: $('brandName').value.trim(),
+    paper: $('brandPaper').value,
+    usePaper: $('brandPaperOn').checked,
+    accents: ['brandC1', 'brandC2', 'brandC3', 'brandC4'].map(id => $(id).value),
+    headFont: $('brandHeadFont').value,
+    bodyFont: $('brandBodyFont').value,
+  });
+  saveBrand();
+  brandEnsureFonts();
+  buildSwatches();
+  syncPanel();
+}
+function initBrandUI(){
+  brandSyncUI();
+  ['brandActiveChk', 'brandName', 'brandPaper', 'brandPaperOn',
+   'brandC1', 'brandC2', 'brandC3', 'brandC4', 'brandHeadFont', 'brandBodyFont']
+    .forEach(id => $(id).addEventListener('change', brandFromUI));
+  $('brandActiveChk').addEventListener('change', () => {
+    if ($('brandActiveChk').checked){
+      defaults.font = $('brandBodyFont').value;
+      showHint('Brand kit on: charts, swatches, headlines and new documents follow it now');
+    }
+  });
+  $('brandExportBtn').addEventListener('click', () => {
+    brandFromUI();
+    const blob = new Blob([JSON.stringify({ app: 'koralpaper-brand', v: 1, ...brand }, null, 2)],
+      { type: 'application/json' });
+    download((brand.name ? brand.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'brand') + '-kit.json',
+      URL.createObjectURL(blob));
+  });
+  $('brandImportBtn').addEventListener('click', () => $('brandInput').click());
+  $('brandInput').addEventListener('change', () => {
+    const f = $('brandInput').files[0];
+    $('brandInput').value = '';
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        const nb = normalizeBrand(data);
+        if (!nb){ alert('This does not look like a KoralPaper brand kit file.'); return; }
+        nb.active = true;
+        brand = nb;
+        saveBrand(); brandEnsureFonts(); brandSyncUI(); buildSwatches(); syncPanel();
+        showHint('Brand kit "' + (brand.name || 'imported') + '" is active');
+      } catch (e){ alert('Could not read this file as a brand kit.'); }
+    };
+    reader.readAsText(f);
+  });
+  $('brandResetBtn').addEventListener('click', () => {
+    if (!confirm('Reset the brand kit to defaults and turn it off?')) return;
+    brand = brandDefaults();
+    saveBrand(); brandSyncUI(); buildSwatches(); syncPanel();
+  });
+  if (brandActive()) brandEnsureFonts();
+}
 function registerSavedGFonts(){
   for (const fam of savedGFonts()){
     ensureCustomFont('cg:' + fam);
@@ -4017,7 +4123,7 @@ function newDocument(){
   state.elements = state.pages[0].elements;
   state.selection = new Set();
   state.board = null;
-  state.bgColor = null;
+  state.bgColor = (brandActive() && brand.usePaper && brand.paper) ? brand.paper : null;
   state.images = {};
   state.camera = { x: 0, y: 0, z: 1 };
   try { localStorage.removeItem('asterisk.docname'); } catch (e){}
@@ -4244,7 +4350,7 @@ function tplLinkedInCarousel(){
   swipe.endHead = 'arrow'; swipe.text = 'swipe';
   pages.push({ name: 'Cover', elements: [
     ...header(),
-    txt(60, 380, 'Your bold statement', 80, { font: 'serif' }),
+    txt(60, 380, 'Your bold statement', 80, { font: brandActive() ? brand.headFont : 'serif' }),
     txt(60, 490, 'goes right here.', 80, { font: 'serif', stroke: 'coral' }),
     txt(62, 660, 'A one-line promise of what the reader gets\nby swiping through these slides.', 30, { stroke: 'gmid' }),
     swipe,
@@ -4254,7 +4360,7 @@ function tplLinkedInCarousel(){
   for (let i = 0; i < 2; i++){
     pages.push({ name: `Point 0${i + 1}`, elements: [
       ...header(), pageNo(`0${i + 1}`),
-      txt(60, 220, 'One idea per slide', 52, { font: 'serif' }),
+      txt(60, 220, 'One idea per slide', 52, { font: brandActive() ? brand.headFont : 'serif' }),
       txt(60, 380, 'Open with the claim in a single sentence —\nno warm-up, no hedging.', 28),
       txt(60, 560, 'Then back it with one concrete example\nor number your audience will remember.', 28, { stroke: 'gmid' }),
       mk('rect', 60, 820, 960, 150, {
@@ -4270,7 +4376,7 @@ function tplLinkedInCarousel(){
   });
   pages.push({ name: 'Photo', elements: [
     ...header(), pageNo('03'),
-    txt(60, 210, 'Show, don’t tell', 52, { font: 'serif' }),
+    txt(60, 210, 'Show, don’t tell', 52, { font: brandActive() ? brand.headFont : 'serif' }),
     ph,
     txt(60, 980, 'A caption that tells the reader what to notice.', 26, { stroke: 'gmid' }),
     ...footer(),
@@ -4287,7 +4393,7 @@ function tplLinkedInCarousel(){
 }
 function tplFlowchart(){
   const { mk, txt } = tplHelpers();
-  const els = [txt(80, 60, 'Process name', 42, { font: 'serif' })];
+  const els = [txt(80, 60, 'Process name', 42, { font: brandActive() ? brand.headFont : 'serif' })];
   const start = mk('chip', 80, 180, 170, 52, { text: 'Start', fill: 'sage', size: 18 });
   const step = mk('rect', 360, 160, 240, 90, { fill: 'cream', text: 'First step', size: 21 });
   const dec = mk('diamond', 720, 140, 230, 130, { fill: 'periwinkle', text: 'Decision?', size: 21 });
@@ -4307,7 +4413,7 @@ function tplFlowchart(){
 function tplVersus(){
   const { mk, txt } = tplHelpers();
   const els = [
-    txt(90, 60, 'Option A vs Option B', 46, { font: 'serif' }),
+    txt(90, 60, 'Option A vs Option B', 46, { font: brandActive() ? brand.headFont : 'serif' }),
     mk('rect', 80, 180, 420, 460, { fill: 'periwinkle', fillStyle: 'hachure', stroke: 'blue' }),
     mk('rect', 560, 180, 420, 460, { fill: 'blush', fillStyle: 'hachure', stroke: 'coral' }),
     mk('chip', 200, 210, 180, 50, { text: 'Option A', fill: 'periwinkle', size: 18 }),
@@ -4322,7 +4428,7 @@ function tplQuoteCard(){
   const { mk, txt } = tplHelpers();
   const els = [
     mk('icon', 80, 90, 110, 110, { kind: 'asterisk', stroke: 'none', fill: 'coral' }),
-    txt(80, 320, '“AI is an intelligence to\ncommunicate with, not a\ntool to operate.”', 64, { font: 'serif' }),
+    txt(80, 320, '“AI is an intelligence to\ncommunicate with, not a\ntool to operate.”', 64, { font: brandActive() ? brand.headFont : 'serif' }),
     txt(82, 720, '— Stefanos Karagos, CAIO Group', 28, { stroke: 'gmid' }),
     txt(82, 950, 'wearecaio.com', 22, { stroke: 'coral' }),
   ];
@@ -4699,8 +4805,45 @@ $('tplCloseBtn').addEventListener('click', () => $('tplDialog').classList.add('h
    paths, lines, text) in one group. Every piece stays editable with the
    normal tools; each piece carries el.chart = the recipe, so right-click
    → "Edit chart data" can rebuild the group in place. */
+/* ── brand kit ──────────────────────────────────────
+   One small identity object that recolors charts, seeds swatches and
+   paper, and is exposed to Claude so designs come back on brand. */
+const BRAND_KEY = 'koralpaper.brand';
+function normalizeBrand(b){
+  if (!b || typeof b !== 'object') return null;
+  const hex = v => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ? v.toLowerCase() : null;
+  const accents = (Array.isArray(b.accents) ? b.accents : []).map(hex).filter(Boolean).slice(0, 6);
+  const fontKey = (k, fb) => (typeof k === 'string' && (FONTS[k] || ensureCustomFont(k))) ? k : fb;
+  return {
+    active: !!b.active,
+    name: typeof b.name === 'string' ? b.name.slice(0, 40) : '',
+    paper: hex(b.paper),
+    usePaper: !!b.usePaper,
+    accents: accents.length ? accents : ['#d97757', '#5b72c9', '#6e9e63', '#7c5aa0'],
+    headFont: fontKey(b.headFont, 'serif'),
+    bodyFont: fontKey(b.bodyFont, 'sans'),
+  };
+}
+let brand = (() => {
+  try { return normalizeBrand(JSON.parse(localStorage.getItem(BRAND_KEY))); }
+  catch (e){ return null; }
+})();
+const brandActive = () => !!(brand && brand.active && brand.accents.length);
+function saveBrand(){
+  try { localStorage.setItem(BRAND_KEY, JSON.stringify(brand)); } catch (e){}
+}
+function brandEnsureFonts(){
+  if (!brand) return;
+  for (const k of [brand.headFont, brand.bodyFont]){
+    ensureCustomFont(k);
+    if (k.startsWith('cg:')) loadFontCssFor(k.slice(3).trim());
+    requestFontLoad(k);
+  }
+}
 const CHART_FILLS = ['coral', 'periwinkle', 'sage', 'butter', 'blush', 'sky', 'terracotta', 'cream'];
 const CHART_STROKES = ['coral', 'blue', 'green', 'plum', 'gdark', 'ink'];
+function chartFill(i){ const p = brandActive() ? brand.accents : CHART_FILLS; return p[i % p.length]; }
+function chartStroke(i){ const p = brandActive() ? brand.accents : CHART_STROKES; return p[i % p.length]; }
 
 function chartNum(c){
   const v = parseFloat(String(c).replace(/\s/g, '').replace(/^\+/, ''));
@@ -4747,7 +4890,9 @@ function chartParseData(txt){
 }
 /* measured text element; position by (x, y) top-left after checking .w/.h */
 function chartText(txt, size, stroke, opts){
-  const el = newElement('text', 0, 0, Object.assign({ size, stroke, align: 'left', sw: 3.3 }, opts || {}));
+  const o = Object.assign({ size, stroke, align: 'left', sw: 3.3 }, opts || {});
+  if (brandActive() && !o.font) o.font = brand.bodyFont;
+  const el = newElement('text', 0, 0, o);
   el.text = String(txt);
   const m = measureText(el.text, el.font, el.size, el);
   el.w = m.w; el.h = m.h;
@@ -4811,8 +4956,8 @@ function chartLegendEls(d, lineMode, vertical){
   let lx = 0, ly = 0;
   d.series.forEach((name, j) => {
     const sw2 = newElement('rect', lx, ly + 2, {
-      fill: lineMode ? 'white' : CHART_FILLS[j % CHART_FILLS.length],
-      stroke: lineMode ? CHART_STROKES[j % CHART_STROKES.length] : 'ink',
+      fill: lineMode ? 'white' : chartFill(j),
+      stroke: lineMode ? chartStroke(j) : 'ink',
       sw: lineMode ? 2.6 : 1.8, round: 0, sketch: 1,
     });
     sw2.w = 14; sw2.h = 14;
@@ -4856,7 +5001,7 @@ function chartBuildBars(d, spec, horizontal){
       d.vals[i].forEach((v, j) => {
         const by = Math.min(y(v), y0), bh = Math.max(2, Math.abs(y(v) - y0));
         const bar = newElement('rect', plotX + slot * i + (slot - groupW) / 2 + barW * j, by, {
-          fill: CHART_FILLS[j % CHART_FILLS.length], stroke: 'ink', sw: 2, round: 0, sketch: 1,
+          fill: chartFill(j), stroke: 'ink', sw: 2, round: 0, sketch: 1,
         });
         bar.w = Math.max(4, barW - 3); bar.h = bh;
         els.push(bar);
@@ -4898,7 +5043,7 @@ function chartBuildBars(d, spec, horizontal){
       d.vals[i].forEach((v, j) => {
         const bx = Math.min(x(v), x0), bw = Math.max(2, Math.abs(x(v) - x0));
         const bar = newElement('rect', bx, plotY + slot * i + (slot - groupH) / 2 + barH * j, {
-          fill: CHART_FILLS[j % CHART_FILLS.length], stroke: 'ink', sw: 2, round: 0, sketch: 1,
+          fill: chartFill(j), stroke: 'ink', sw: 2, round: 0, sketch: 1,
         });
         bar.w = bw; bar.h = Math.max(4, barH - 3);
         els.push(bar);
@@ -4949,7 +5094,7 @@ function chartBuildLine(d, spec){
     const dense = chartSpline(abs, spec.curve, false);
     const minX = Math.min(...dense.map(p => p[0])), minY = Math.min(...dense.map(p => p[1]));
     const ln = newElement('draw', minX, minY, {
-      stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 3, sketch: 1, fill: 'none',
+      stroke: chartStroke(j), sw: 3, sketch: 1, fill: 'none',
     });
     ln.points = dense.map(p => [p[0] - minX, p[1] - minY]);
     ln.w = Math.max(...ln.points.map(p => p[0]));
@@ -4959,13 +5104,13 @@ function chartBuildLine(d, spec){
     els.push(ln);
     if (spec.dots && nC <= 20) abs.forEach(pt => {
       const dot = newElement('ellipse', pt[0] - 4.5, pt[1] - 4.5, {
-        fill: 'white', stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 2.4, sketch: 1,
+        fill: 'white', stroke: chartStroke(j), sw: 2.4, sketch: 1,
       });
       dot.w = 9; dot.h = 9;
       els.push(dot);
     });
     if (spec.showVals) abs.forEach((pt, i) => {
-      const vt = chartText(chartFmt(d.vals[i][j]), 11.5, CHART_STROKES[j % CHART_STROKES.length]);
+      const vt = chartText(chartFmt(d.vals[i][j]), 11.5, chartStroke(j));
       vt.x = pt[0] - vt.w / 2;
       vt.y = pt[1] - vt.h - (spec.dots ? 9 : 5);
       els.push(vt);
@@ -5034,7 +5179,7 @@ function chartBuildPie(d, spec, donut){
     }
     const minX = Math.min(...pts.map(pp => pp[0])), minY = Math.min(...pts.map(pp => pp[1]));
     const slice = newElement('draw', minX, minY, {
-      fill: CHART_FILLS[i % CHART_FILLS.length], stroke: 'ink', sw: 2.5, sketch: 1,
+      fill: chartFill(i), stroke: 'ink', sw: 2.5, sketch: 1,
     });
     slice.points = pts.map(pp => [pp[0] - minX, pp[1] - minY]);
     slice.w = Math.max(...slice.points.map(pp => pp[0]));
@@ -5121,23 +5266,23 @@ function chartBuildSpider(d, spec){
     const verts = d.vals.map((row, i) => pt(i, row[j]));
     const dense = chartSpline(verts, spec.curve == null ? 0 : spec.curve, true);
     els.push(mkDraw(dense, {
-      fill: CHART_FILLS[j % CHART_FILLS.length], stroke: 'none', sketch: 1, opacity: 30,
+      fill: chartFill(j), stroke: 'none', sketch: 1, opacity: 30,
     }));
     const outline = mkDraw(dense, {
-      fill: 'none', stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 3, sketch: 1,
+      fill: 'none', stroke: chartStroke(j), sw: 3, sketch: 1,
     });
     outline.chartDots = verts.map(pp => [pp[0] - outline.x, pp[1] - outline.y]);
     els.push(outline);
     if (spec.dots) verts.forEach(pp => {
       const dot = newElement('ellipse', pp[0] - 4.5, pp[1] - 4.5, {
-        fill: 'white', stroke: CHART_STROKES[j % CHART_STROKES.length], sw: 2.4, sketch: 1,
+        fill: 'white', stroke: chartStroke(j), sw: 2.4, sketch: 1,
       });
       dot.w = 9; dot.h = 9;
       els.push(dot);
     });
     if (spec.showVals) verts.forEach((pp, i) => {
       const a = ang(i);
-      const vt = chartText(chartFmt(d.vals[i][j]), 11.5, CHART_STROKES[j % CHART_STROKES.length]);
+      const vt = chartText(chartFmt(d.vals[i][j]), 11.5, chartStroke(j));
       const lx2 = pp[0] + Math.cos(a) * 14, ly2 = pp[1] + Math.sin(a) * 14;
       vt.x = lx2 - vt.w / 2; vt.y = ly2 - vt.h / 2;
       els.push(vt);
@@ -5229,7 +5374,7 @@ function chartBuild(spec){
   /* title, centered above everything */
   if (spec.title){
     const tb = sceneBounds(els);
-    const t = chartText(spec.title, 26, 'ink', { font: 'serif' });
+    const t = chartText(spec.title, 26, 'ink', { font: brandActive() ? brand.headFont : 'serif' });
     t.x = tb.x + tb.w / 2 - t.w / 2;
     t.y = tb.y - t.h - 18;
     els.push(t);
@@ -6302,6 +6447,14 @@ async function claudeExecute(action, args){
     syncPageRef();
     return {
       board: state.board ? { w: state.board.w, h: state.board.h, name: state.board.name } : null,
+      brand: brandActive() ? {
+        name: brand.name || 'Brand',
+        accents: brand.accents,
+        paper: (brand.usePaper && brand.paper) || null,
+        headingFont: brand.headFont.replace(/^cg:/, ''),
+        bodyFont: brand.bodyFont.replace(/^cg:/, ''),
+        note: 'A brand kit is active: use these accent colors, this paper, and these fonts for anything new you design here.',
+      } : null,
       theme: state.theme,
       pages: state.pages.map((p, i) => ({
         name: p.name, current: i === state.pageIndex,
@@ -7004,6 +7157,7 @@ function boot(){
   registerSavedGFonts();
   buildFontSelect();
   buildWeightMenu();
+  initBrandUI();
   syncSettingsUI();
   applyWidthPresets();
   buildIconMenu();
