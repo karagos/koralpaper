@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.34.0 — 2026-08-04
+- **Drag pages to reorder.** Grab any thumbnail in the page strip and
+  drag it: a coral insertion mark shows where the page will land, and
+  the move is one undo step. A plain click still switches pages, and
+  the right-click menu keeps Move left/right.
+- **Arrange panel, one logic per line.** The Arrange section now groups
+  its buttons the way you think: horizontal aligns (left · center ·
+  right) on one line, vertical aligns (top · middle · bottom) on the
+  next, then distribute, match-size and Tidy together.
+
 ## v3.33.0 — 2026-08-04
 - **Mind-map folding.** Right-click any shape → "Mark as mind-map root"
   and the diagram becomes a foldable mind map: every node with children

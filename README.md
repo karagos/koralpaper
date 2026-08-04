@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.33.0)
+# KoralPaper — *Draw your thinking* (v3.34.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -167,8 +167,10 @@ and Settings.
   with your own design, remove it from the list, and "Restore built-ins"
   brings the originals back anytime. Applied templates arrive as fresh,
   fully editable pages
-- **Multi-page documents:** page strip at the bottom — click to switch, + to
-  add, right-click a tab to rename/duplicate/move/delete. Undo spans pages
+- **Multi-page documents:** page strip at the bottom — click to switch,
+  **drag a thumbnail to reorder pages** (a coral mark shows where it will
+  land), + to add, right-click a tab to rename/duplicate/move/delete.
+  Undo spans pages
 - **Presentation mode + laser pen:** ⇧⌘P (or ☰ → Present) hides every
   control, fits the page (or artboard) to the screen and goes fullscreen.
   Arrow keys, space or a click turn the pages; **dragging draws a glowing

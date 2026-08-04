@@ -406,6 +406,15 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 
 .menukey{float:right; font-size:11px; color:var(--ink-soft); letter-spacing:.4px;}
 
+/* ── arrange row: one logic per line ── */
+.segstack{display:flex; flex-direction:column; gap:4px;}
+
+/* ── page-thumb drag reorder ── */
+.pagethumb{cursor:grab; touch-action:none;}
+.pagethumb.dragsrc{opacity:.45; transform:scale(.94); cursor:grabbing;}
+.pagethumb.dropbefore{box-shadow:-3px 0 0 0 var(--coral);}
+.pagethumb.dropafter{box-shadow:3px 0 0 0 var(--coral);}
+
 /* ── work-protection banners ── */
 .warnbanner{
   position:fixed; left:50%; transform:translateX(-50%); bottom:78px;

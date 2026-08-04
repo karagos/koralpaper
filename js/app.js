@@ -3012,6 +3012,62 @@ function renamePage(i){
   const name = prompt('Page name:', state.pages[i].name);
   if (name && name.trim()){ state.pages[i].name = name.trim(); commit(); buildPageStrip(); }
 }
+/* ── drag a page thumbnail to reorder ───────────────
+   Press and drag a thumbnail: a coral insertion mark shows where the
+   page will land; release to move it (one undo step). A plain click
+   still switches pages, and the right-click menu keeps Move left/right
+   for keyboard-averse fingers. */
+let stripDragged = false;
+function attachThumbDrag(b, i, strip){
+  b.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0) return;
+    const startX = ev.clientX, startY = ev.clientY;
+    let dragging = false, slot = i;
+    const thumbs = () => [...strip.querySelectorAll('.pagethumb')];
+    const clearMarks = () => thumbs().forEach(t => t.classList.remove('dropbefore', 'dropafter', 'dragsrc'));
+    const onMove = mv => {
+      if (!dragging && Math.hypot(mv.clientX - startX, mv.clientY - startY) > 7){
+        dragging = true;
+        b.classList.add('dragsrc');
+      }
+      if (!dragging) return;
+      const ts = thumbs();
+      ts.forEach(t => t.classList.remove('dropbefore', 'dropafter'));
+      slot = ts.length;
+      for (let k = 0; k < ts.length; k++){
+        const rc = ts[k].getBoundingClientRect();
+        if (mv.clientX < rc.left + rc.width / 2){ slot = k; break; }
+      }
+      if (slot < ts.length) ts[slot].classList.add('dropbefore');
+      else ts[ts.length - 1].classList.add('dropafter');
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      clearMarks();
+      if (dragging){
+        stripDragged = true;
+        setTimeout(() => { stripDragged = false; }, 0);
+        movePageTo(i, slot);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  });
+}
+function movePageTo(from, slot){
+  if (slot === from || slot === from + 1) return;   // dropped where it already sits
+  syncPageRef();
+  const cur = state.pages[state.pageIndex];
+  const [pg] = state.pages.splice(from, 1);
+  const at = slot > from ? slot - 1 : slot;
+  state.pages.splice(at, 0, pg);
+  state.pageIndex = state.pages.indexOf(cur);
+  state.elements = state.pages[state.pageIndex].elements;
+  commit(); buildPageStrip();
+  showHint(`Moved "${pg.name || 'page'}" to position ${at + 1}`);
+}
+
 function movePage(i, dir){
   const j = i + dir;
   if (j < 0 || j >= state.pages.length) return;
@@ -3075,11 +3131,12 @@ function buildPageStrip(){
     num.className = 'pagenum';
     num.textContent = i + 1;
     b.appendChild(num);
-    b.addEventListener('click', () => switchPage(i));
+    b.addEventListener('click', () => { if (!stripDragged) switchPage(i); });
     b.addEventListener('contextmenu', ev => {
       ev.preventDefault(); ev.stopPropagation();
       openPageMenu(ev, i);
     });
+    attachThumbDrag(b, i, strip);
     strip.appendChild(b);
     renderThumbInto(cv, page);
   });
