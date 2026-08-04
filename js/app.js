@@ -1399,8 +1399,7 @@ function openTextEditor(el, isNew){
   // contributes the caret and the selection band
   editorEl.style.color = 'transparent';
   const pnow = pal();
-  editorEl.style.caretColor = (el.type !== 'text' && el.fill === 'ink')
-    ? pnow.bg : (resolveStroke(pnow, el.stroke) || pnow.stroke.ink);
+  editorEl.style.caretColor = textColorOf(pnow, el);
   editorEl.classList.remove('hidden');
   positionEditor();
   editorEl.focus();
@@ -1460,7 +1459,7 @@ function positionEditor(){
   const p = pal();
   // the canvas paints the text; the editor stays a transparent input layer
   editorEl.style.color = 'transparent';
-  editorEl.style.caretColor = (el.fill === 'ink') ? p.bg : (resolveStroke(p, el.stroke) || p.stroke.ink);
+  editorEl.style.caretColor = textColorOf(p, el);
 }
 editorEl.addEventListener('input', () => {
   if (!editing) return;
@@ -1624,7 +1623,7 @@ function reorder(mode){
 }
 
 /* ── copy / paste style ────────────────────────────── */
-const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign'];
+const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor'];
 let styleClipboard = null;
 function copyStyle(){
   const sel = selected();
@@ -1811,6 +1810,22 @@ function buildSwatches(){
     fEl.appendChild(b);
   }
   addCustomSwatch(fEl, 'fill');
+  const tEl = $('textSwatches');
+  const auto = document.createElement('button');
+  auto.className = 'swatch tauto';
+  auto.dataset.textcolor = 'auto';
+  auto.textContent = 'A';
+  auto.title = 'Auto: follows the stroke, flips to light on dark fills';
+  tEl.appendChild(auto);
+  for (const key of STROKE_KEYS){
+    if (key === 'none') continue;
+    const b = document.createElement('button');
+    b.className = 'swatch';
+    b.dataset.textcolor = key;
+    b.title = 'Text in ' + (COLOR_TITLES[key] || key);
+    tEl.appendChild(b);
+  }
+  addCustomSwatch(tEl, 'textColor');
   paintSwatches();
 }
 function addCustomSwatch(container, prop){
@@ -1840,7 +1855,7 @@ function openColorPop(prop, anchor){
     : (prop === 'fill' ? (defaults.fillByType[state.tool] || defaults.fill) : defaults[prop]);
   if (typeof cur !== 'string' || cur[0] !== '#'){
     const p = pal();
-    cur = (prop === 'stroke' ? resolveStroke(p, cur) : resolveFill(p, cur)) || '#D97757';
+    cur = (prop === 'fill' ? resolveFill(p, cur) : resolveStroke(p, cur)) || '#D97757';
   }
   if (!/^#[0-9a-fA-F]{6}$/.test(cur)) cur = '#D97757';
   $('popColor').value = cur.toLowerCase();
@@ -1910,6 +1925,10 @@ function paintSwatches(){
   document.querySelectorAll('#fillSwatches .swatch').forEach(b => {
     if (b.dataset.fill !== 'none') b.style.background = p.fill[b.dataset.fill];
   });
+  document.querySelectorAll('#textSwatches .swatch').forEach(b => {
+    if (b.dataset.textcolor && b.dataset.textcolor !== 'auto')
+      b.style.background = p.stroke[b.dataset.textcolor];
+  });
 }
 
 function targetsForStyle(){
@@ -1974,6 +1993,7 @@ function syncPanel(){
   show('rowCurve', has('arrow','line'));
   show('rowHeads', has('arrow','line'));
   show('rowFont', textish);
+  show('rowTextColor', textish);
   show('rowSize', textish);
   show('rowAlign', textish);
   show('rowRich', textish);
@@ -1998,6 +2018,8 @@ function syncPanel(){
   const strokeVal = val('stroke');
   const fillVal = sel.length ? val('fill') : (defaults.fillByType[tool] || defaults.fill);
   markSel('#strokeSwatches .swatch', b => b.dataset.stroke === strokeVal);
+  const tcVal = val('textColor') || 'auto';
+  markSel('#textSwatches .swatch', b => b.dataset.textcolor === tcVal);
   markSel('#fillSwatches .swatch', b => b.dataset.fill === fillVal);
   setCustomSwatchState('stroke', typeof strokeVal === 'string' && strokeVal[0] === '#' ? strokeVal : null);
   setCustomSwatchState('fill', typeof fillVal === 'string' && fillVal[0] === '#' ? fillVal : null);
@@ -2050,6 +2072,7 @@ document.addEventListener('click', ev => {
   const t = ev.target.closest('button');
   if (!t) return;
   if (t.dataset.stroke) applyStyle({ stroke: t.dataset.stroke });
+  if (t.dataset.textcolor) applyStyle({ textColor: t.dataset.textcolor === 'auto' ? null : t.dataset.textcolor });
   else if (t.dataset.fill) applyStyle({ fill: t.dataset.fill });
   else if (t.closest('#fillStyleSeg') && t.dataset.v) applyStyle({ fillStyle: t.dataset.v });
   else if (t.closest('#widthSeg') && t.dataset.v) applyStyle({ sw: Number(t.dataset.v) });
@@ -3122,6 +3145,7 @@ Element format (every field shown with a valid example):
 Rules:
 - ids: any unique short strings. seed: any random integer per element.
 - stroke colors: ink, gdark, gmid, glight, white, coral, blue, green, plum, or #hex
+- optional "textColor" on any element: same values — use white on dark fills (omit = auto: follows stroke, flips light on dark fills)
 - fill colors: none, cream, white, coral, terracotta, blush, periwinkle, sage, butter, sky, glight, gmid, gdark, ink, or #hex
 - Coordinates: y grows downward, origin top-left of the board. Typical box 190×92, gaps 100 to 120 px, keep 60 px margins.
 - "sketch":1 = hand-drawn wobble (default look), 0 = neat.
@@ -4556,6 +4580,7 @@ function claudeBuildElement(spec, idMap){
     align: ['left', 'center', 'right'].includes(spec.align) ? spec.align : (kind === 'text' ? 'left' : 'center'),
     lh: typo.lh, pgap: typo.pgap, lspace: typo.lspace, valign: 'middle',
   };
+  if (spec.textColor) style.textColor = claudeColor(spec.textColor, STROKE_KEYS, null);
   const x = Number(spec.x) || 0, y = Number(spec.y) || 0;
   const el = newElement(kind, x, y, style);
   el.x = x; el.y = y;
@@ -4595,6 +4620,7 @@ function claudeCompact(el){
     if (el.endBind) c.to = el.endBind;
   }
   if (el.type === 'icon') c.icon = el.kind;
+  if (el.textColor) c.textColor = el.textColor;
   return c;
 }
 
@@ -4669,6 +4695,7 @@ async function claudeExecute(action, args){
       if (u.size !== undefined && Number(u.size) > 0) el.size = clamp(Number(u.size), 8, 160);
       if (u.font !== undefined && FONTS[u.font]) el.font = u.font;
       if (u.align !== undefined && ['left','center','right'].includes(u.align)) el.align = u.align;
+      if (u.textColor !== undefined) el.textColor = (!u.textColor || u.textColor === 'auto') ? null : claudeColor(u.textColor, STROKE_KEYS, el.textColor);
       if (u.sketch !== undefined) el.sketch = u.sketch === 0 ? 0 : 1;
       if (el.type === 'text') autosizeText(el);
       delete el._prims; delete el._pkey;

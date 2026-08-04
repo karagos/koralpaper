@@ -172,6 +172,7 @@ const ELEMENT_SCHEMA = {
     text: { type: 'string', description: 'Text inside the shape, the free text, or the label riding an arrow.' },
     stroke: { type: 'string', description: 'Outline / text color: ' + STROKES },
     fill: { type: 'string', description: 'Fill color: ' + FILLS },
+    textColor: { type: 'string', description: 'Text color, independent of the outline — use a light color (white, glight) on dark fills. Values: ' + STROKES + '. Omit or "auto" = follows the stroke, auto-flips to light on dark fills.' },
     fillStyle: { type: 'string', enum: ['solid', 'hachure', 'dense', 'cross', 'dots', 'waves'] },
     dash: { type: 'string', enum: ['solid', 'dotted', 'dashed'] },
     size: { type: 'number', description: 'Font size in px (default 21; 16 for chips and arrow labels).' },

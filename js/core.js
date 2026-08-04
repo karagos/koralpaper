@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.26.3';
+const APP_VERSION = '3.27.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -206,6 +206,26 @@ function resolveStroke(pal, key){
 function resolveFill(pal, key){
   if (!key || key === 'none') return null;
   return pal.fill[key] || pal.stroke[key] || (typeof key === 'string' && key[0] === '#' ? key : null);
+}
+
+/* text color: explicit el.textColor wins; otherwise auto — dark fills
+   (the ink token or a dark custom hex) flip the text to paper/cream so
+   labels stay readable, else the text follows the stroke color. */
+function hexLuma(h){
+  const v = h.length === 4
+    ? [h[1] + h[1], h[2] + h[2], h[3] + h[3]]
+    : [h.slice(1, 3), h.slice(3, 5), h.slice(5, 7)];
+  const [r, g, b] = v.map(x => parseInt(x, 16) / 255);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+function textColorOf(pal, el){
+  if (el.textColor) return resolveStroke(pal, el.textColor) || pal.stroke.ink;
+  if (el.type !== 'text'){
+    if (el.fill === 'ink') return pal.bg;
+    if (typeof el.fill === 'string' && el.fill[0] === '#' && hexLuma(el.fill) < 0.42)
+      return '#FAF7EE';
+  }
+  return resolveStroke(pal, el.stroke) || pal.stroke.ink;
 }
 
 /* ── element model ─────────────────────────────────── */
@@ -1240,7 +1260,7 @@ function drawBoxText(ctx, el, pal, box){
   const lay = layoutText(el, maxW);
   applyTracking(ctx, el);
   ctx.textBaseline = 'middle';
-  const color = (el.fill === 'ink') ? pal.bg : (resolveStroke(pal, el.stroke) || pal.stroke.ink);
+  const color = textColorOf(pal, el);
   let ty = boxTextTop(el, box, lay.totalH, pad) + lay.lh / 2;
   for (const ln of lay.lines){
     if (ln.para) ty += lay.pgap;
@@ -1254,7 +1274,7 @@ function drawTextElement(ctx, el, pal){
   const lay = layoutText(el, null);
   applyTracking(ctx, el);
   ctx.textBaseline = 'middle';
-  const color = resolveStroke(pal, el.stroke) || pal.stroke.ink;
+  const color = textColorOf(pal, el);
   let ty = el.y + lay.lh/2;
   for (const ln of lay.lines){
     if (ln.para) ty += lay.pgap;
@@ -2126,7 +2146,7 @@ function drawElement(ctx, el, pal, bg){
           else ctx.rect(x0, y0, bw2, bh2);
           ctx.fill();
         }
-        const lcolor = resolveStroke(pal, el.stroke) || pal.stroke.ink;
+        const lcolor = textColorOf(pal, el);
         ctx.textBaseline = 'middle';
         let ly = y0 + padY + lay.lh/2;
         for (const ln of lay.lines){
@@ -2405,9 +2425,8 @@ function renderSceneSVG(elements, opts){
   const textLinesSVG = (el, lay, box) => {
     const out = [];
     const pad2 = el.type === 'chip' ? 10 : 12;
-    const color = (el.type !== 'text' && el.fill === 'ink')
-      ? (opts.bg || pal.bg)
-      : (resolveStroke(pal, el.stroke) || pal.stroke.ink);
+    let color = textColorOf(pal, el);
+    if (!el.textColor && el.type !== 'text' && el.fill === 'ink') color = opts.bg || pal.bg;
     const isText = el.type === 'text';
     const boxL = isText ? el.x : box.x + pad2;
     const boxR = isText ? el.x + el.w : box.x + box.w - pad2;

@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.26.3)
+# KoralPaper — *Draw your thinking* (v3.27.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -202,7 +202,9 @@ your first element lands. Press **?** inside the app for the full shortcuts card
   duplicate, ⌥-drag duplicate, layer order (front/back/forward/backward),
   opacity
 - **Styling:** Anthropic palette (ink, coral, periwinkle, sage, terracotta,
-  butter…) **plus a black→greys→white neutral ramp** opening both stroke and fill, a
+  butter…) **plus a black→greys→white neutral ramp** opening both stroke and fill,
+  an **independent text color** (Auto follows the stroke and flips to light
+  on dark fills; or pick any palette/custom color for the text alone), a
   **custom color picker** (rainbow swatch) with a hex field, a **no-stroke
   option** (fill-only shapes), **six fill styles** (solid, hatched, dense
   lines, cross-hatch, dots, waves — they work on icons too), 3 stroke

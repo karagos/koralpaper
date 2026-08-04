@@ -1,5 +1,16 @@
 # KoralPaper — Changelog
 
+## v3.27.0 — 2026-08-04
+- **Text color, independent of the outline.** A new "Text" row in the
+  style panel colors the text of shapes, labels and text elements
+  separately from the stroke: **A** = Auto (the default — follows the
+  stroke, and now automatically flips to a light cream on ANY dark
+  fill, custom hex included, not just black), the full palette, or a
+  custom hex. Dark card + black outline + white text finally works.
+  Carried everywhere: canvas, live editing caret, SVG/PNG/PDF exports,
+  copy/paste style, and the Claude tools (Claude can set "textColor"
+  and sees it when reading the page; the design prompt teaches it too).
+
 ## v3.26.3 — 2026-08-04
 - **Fixed for real: ⇧-drag with Shift already held.** The natural
   gesture — shift-click to build a selection, keep Shift down, drag —

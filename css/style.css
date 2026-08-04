@@ -193,6 +193,11 @@ body.dark .menu button.danger{color:#F09070;}
 }
 .swatch:hover{transform:scale(1.12);}
 .swatch.sel{border-color:var(--coral); box-shadow:0 0 0 2px var(--coral-soft);}
+.swatch.tauto{
+  background:transparent !important; color:var(--ink);
+  font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;
+  font-family:var(--serif); font-style:italic;
+}
 .swatch.none{
   background:
     linear-gradient(45deg, transparent 44%, #C25F43 44%, #C25F43 56%, transparent 56%),
