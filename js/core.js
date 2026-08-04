@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.36.1';
+const APP_VERSION = '3.37.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -1999,6 +1999,33 @@ function artPrims(el, entry){
   return prims;
 }
 
+/* a hand-drawn frame around an image — riding the element's outline
+   color, thickness and line style, and drawn on top of the photo AND
+   every art style, so light images keep a robust presence */
+function drawImageFrame(ctx, el, pal, b){
+  if (!el.frame || el.stroke === 'none') return;
+  const col = resolveStroke(pal, el.stroke) || pal.stroke.ink;
+  const base = roundedRectOutline(b.x, b.y, b.w, b.h, el.round ? 9 : 0);
+  ctx.save();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = el.sw;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (el.dash === 'dotted') ctx.setLineDash([Math.max(1.2, el.sw * 0.9), el.sw * 2.4]);
+  else if (el.dash === 'dashed') ctx.setLineDash([el.sw * 2.6, el.sw * 1.9]);
+  const passes = el.sketch >= 2 ? 2 : 1;
+  for (let p = 0; p < passes; p++){
+    const rnd = new Rand((el.seed || 7) + p * 131);
+    const pts = el.sketch ? wobblyPath(base, true, rnd, el.sketch >= 2 ? 2.6 : 1.4) : base;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    if (!el.sketch) ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
 function drawImageEl(ctx, el, pal){
   const b = boundsOf(el);
   if (!el._src) return;
@@ -2023,6 +2050,7 @@ function drawImageEl(ctx, el, pal){
     } else {
       ctx.drawImage(src, b.x, b.y, b.w, b.h);
     }
+    drawImageFrame(ctx, el, pal, b);
     return;
   }
   const prims = artPrims(el, A.entry);
@@ -2077,6 +2105,7 @@ function drawImageEl(ctx, el, pal){
     }
   }
   ctx.restore();
+  drawImageFrame(ctx, el, pal, b);
 }
 
 /* ── main element renderer ─────────────────────────── */
@@ -2535,6 +2564,19 @@ function renderSceneSVG(elements, opts){
         }
         // prims are element-local — translate into place
         parts.push(`<g transform="translate(${svgNum(eb.x)} ${svgNum(eb.y)})">${inner.join('')}</g>`);
+      }
+      if (el.frame && el.stroke !== 'none'){
+        const fcol = resolveStroke(pal, el.stroke) || pal.stroke.ink;
+        const base = roundedRectOutline(eb.x, eb.y, eb.w, eb.h, el.round ? 9 : 0);
+        const dashAttr = el.dash === 'dotted'
+          ? ` stroke-dasharray="${svgNum(Math.max(1.2, el.sw * 0.9))} ${svgNum(el.sw * 2.4)}"`
+          : el.dash === 'dashed' ? ` stroke-dasharray="${svgNum(el.sw * 2.6)} ${svgNum(el.sw * 1.9)}"` : '';
+        const passes = el.sketch >= 2 ? 2 : 1;
+        for (let fp = 0; fp < passes; fp++){
+          const rnd = new Rand((el.seed || 7) + fp * 131);
+          const fpts = el.sketch ? wobblyPath(base, true, rnd, el.sketch >= 2 ? 2.6 : 1.4) : base;
+          parts.push(`<path d="${dPolygon(fpts, true)}" fill="none" stroke="${fcol}" stroke-width="${svgNum(el.sw)}" stroke-linecap="round" stroke-linejoin="round"${dashAttr}/>`);
+        }
       }
     }
     else if (el.type === 'icon' && el.kind === 'material'){

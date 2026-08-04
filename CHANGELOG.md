@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.37.0 — 2026-08-04
+- **Frames for images.** Select a photo → the new **Frame** row (Off /
+  On): a hand-drawn border hugs the image, using the same Outline
+  color, Thickness and Line style controls you already know — sketchy
+  ink, neat dashed blue, thick coral, anything. The frame stays on
+  through every art style (halftone, lines, stipple…), so light-
+  background photos keep a robust presence on the page whatever look
+  they wear. Carried by copy/paste style, exports (PNG/SVG/PDF/share),
+  one undo step per toggle.
+
 ## v3.36.1 — 2026-08-04
 - Export menu visibility polish: the "This page" and "Whole document"
   group headers are now coral so the categories signpost clearly, and

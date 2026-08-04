@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.36.1)
+# KoralPaper — *Draw your thinking* (v3.37.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -205,6 +205,9 @@ and Settings.
 - **Your gallery:** a toolbar library for reusable SVG logos (pure vector,
   crisp at any zoom, vector in exports) and transparent PNG marks — click
   to place, right-click to remove, persisted in the browser
+- **Frames:** any image can wear a hand-drawn border (Frame → On) that
+  follows the Outline color, Thickness and Line style — and survives
+  every art style, so pale photos hold their ground on the page
 - **Images:** drag & drop or paste PNG/JPEG (toolbar 🖼 button, `I`, or
   ☰ → Import image); they act like any element — resize, rotate, glue
   arrows to them. **Crop** from the panel or right-click menu: drag across

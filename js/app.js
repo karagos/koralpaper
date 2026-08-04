@@ -1708,7 +1708,7 @@ function reorder(mode){
 }
 
 /* ── copy / paste style ────────────────────────────── */
-const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor'];
+const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor','frame'];
 let styleClipboard = null;
 function copyStyle(){
   const sel = selected();
@@ -1813,6 +1813,8 @@ $('distV').addEventListener('click', () => distributeSel('v'));
 $('matchW').addEventListener('click', () => matchSize('w'));
 $('matchH').addEventListener('click', () => matchSize('h'));
 $('tidyBtn').addEventListener('click', tidyLayout);
+$('frameOn').addEventListener('click', () => applyStyle({ frame: true }));
+$('frameOff').addEventListener('click', () => applyStyle({ frame: false }));
 
 /* ── right-click context menu ──────────────────────── */
 function openCtxMenu(ev){
@@ -2094,7 +2096,8 @@ function syncPanel(){
   show('rowFill', (shapeish && !has('image')) || imgDuo);
   show('rowFillStyle', has('rect','diamond','ellipse','chip','icon'));
   show('rowWidth', shapeish || linear || has('image'));
-  show('rowSketch', shapeish || linear);
+  show('rowSketch', shapeish || linear || has('image'));
+  show('rowFrame', has('image'));
   show('rowRound', has('rect'));
   show('rowCurve', has('arrow','line'));
   show('rowHeads', has('arrow','line'));
@@ -2125,6 +2128,9 @@ function syncPanel(){
   const strokeVal = val('stroke');
   const fillVal = sel.length ? val('fill') : (defaults.fillByType[tool] || defaults.fill);
   markSel('#strokeSwatches .swatch', b => b.dataset.stroke === strokeVal);
+  const frameVal = !!val('frame');
+  $('frameOn').classList.toggle('sel', frameVal);
+  $('frameOff').classList.toggle('sel', sel.some(e => e.type === 'image') && !frameVal);
   const tcVal = val('textColor') || 'auto';
   markSel('#textSwatches .swatch', b => b.dataset.textcolor === tcVal);
   markSel('#fillSwatches .swatch', b => b.dataset.fill === fillVal);
