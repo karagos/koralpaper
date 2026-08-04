@@ -1,5 +1,12 @@
 # KoralPaper — Changelog
 
+## v3.41.0
+
+- Color single letters: while typing in any text, select some characters and pick a Text color in the left panel. Only that range changes color; the auto dot puts it back. Works with the custom color wheel, combines freely with bold, italic and highlights, and carries through PNG, SVG, PDF and shared HTML exports.
+- Without a character selection the Text color dots keep coloring the whole text, exactly as before.
+- Template categories now expand and collapse: click a category header to fold it away. Each header shows how many templates it holds, and the folded state is remembered.
+- New Help card tip explaining letter coloring.
+
 ## v3.40.0
 
 - Templates are now organized in categories: Carousels, Presentations, Infographics, Diagrams, plus any category you create yourself. Built-ins and your own saves live together under coral group headers; your templates carry a coral star.

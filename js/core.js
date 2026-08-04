@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.40.0';
+const APP_VERSION = '3.41.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -127,8 +127,9 @@ function fontCSS(font, size, st){
 }
 
 /* ── rich text runs ─────────────────────────────────
-   el.runs = [{s, e, b, i, hl}] — character ranges carrying bold, italic
-   and a highlight color (hex or null). Plain text stays in el.text. */
+   el.runs = [{s, e, b, i, hl, co}] — character ranges carrying bold, italic,
+   a highlight color (hex or null) and a letter color (token/hex or null).
+   Plain text stays in el.text. */
 function styleAtChar(runs, idx){
   if (!runs) return null;
   for (const r of runs) if (idx >= r.s && idx < r.e) return r;
@@ -142,21 +143,22 @@ function setRangeStyle(el, a, b, patch){
   const chars = [];
   for (let idx = 0; idx < len; idx++){
     const r = styleAtChar(el.runs, idx);
-    chars.push(r ? { b: !!r.b, i: !!r.i, hl: r.hl || null } : { b: false, i: false, hl: null });
+    chars.push(r ? { b: !!r.b, i: !!r.i, hl: r.hl || null, co: r.co || null } : { b: false, i: false, hl: null, co: null });
   }
   for (let idx = a; idx < b; idx++){
     if (patch.b !== undefined) chars[idx].b = patch.b;
     if (patch.i !== undefined) chars[idx].i = patch.i;
     if (patch.hl !== undefined) chars[idx].hl = patch.hl;
+    if (patch.co !== undefined) chars[idx].co = patch.co;
   }
   const runs = [];
   for (let idx = 0; idx < len; idx++){
     const c = chars[idx];
-    if (!c.b && !c.i && !c.hl) continue;
+    if (!c.b && !c.i && !c.hl && !c.co) continue;
     const last = runs[runs.length - 1];
-    if (last && last.e === idx && !!last.b === c.b && !!last.i === c.i && (last.hl || null) === c.hl)
+    if (last && last.e === idx && !!last.b === c.b && !!last.i === c.i && (last.hl || null) === c.hl && (last.co || null) === c.co)
       last.e = idx + 1;
-    else runs.push({ s: idx, e: idx + 1, b: c.b, i: c.i, hl: c.hl });
+    else runs.push({ s: idx, e: idx + 1, b: c.b, i: c.i, hl: c.hl, co: c.co });
   }
   el.runs = runs.length ? runs : null;
 }
@@ -166,7 +168,7 @@ function rangeHasStyle(el, a, b, key, color){
   if (b <= a || !len) return false;
   for (let idx = a; idx < b; idx++){
     const r = styleAtChar(el.runs, idx);
-    if (key === 'hl'){ if (!r || (r.hl || null) !== color) return false; }
+    if (key === 'hl' || key === 'co'){ if (!r || (r[key] || null) !== color) return false; }
     else if (!r || !r[key]) return false;
   }
   return true;
@@ -330,16 +332,17 @@ function layoutText(el, maxW){
       let j = idx + 1;
       while (j < b){
         const st2 = styleAtChar(runs, charBase + j) || {};
-        if (!!st2.b !== !!st.b || !!st2.i !== !!st.i || (st2.hl || null) !== (st.hl || null)) break;
+        if (!!st2.b !== !!st.b || !!st2.i !== !!st.i || (st2.hl || null) !== (st.hl || null)
+          || (st2.co || null) !== (st.co || null)) break;
         j++;
       }
-      const seg = { text: raw.slice(idx, j), b: !!st.b, i: !!st.i, hl: st.hl || null };
+      const seg = { text: raw.slice(idx, j), b: !!st.b, i: !!st.i, hl: st.hl || null, co: st.co || null };
       _measureCtx.font = fontCSS(el.font, el.size, seg);
       seg.w = _measureCtx.measureText(seg.text).width;
       segs.push(seg);
       idx = j;
     }
-    if (!segs.length) segs.push({ text: '', b: false, i: false, hl: null, w: 0 });
+    if (!segs.length) segs.push({ text: '', b: false, i: false, hl: null, co: null, w: 0 });
     return segs;
   };
   const widthOf = (raw, a, b) => mkSegs(raw, a, b).reduce((acc, s) => acc + s.w, 0);
@@ -378,7 +381,7 @@ function layoutText(el, maxW){
   return { lines, lh, pgap, totalH, w };
 }
 /* draw one laid-out line's highlights + styled segments, left edge at x0 */
-function drawRichLine(ctx, el, line, x0, ty, color){
+function drawRichLine(ctx, el, line, x0, ty, color, pal){
   let x = x0;
   for (const seg of line.segs){
     if (seg.hl && seg.text){
@@ -389,10 +392,10 @@ function drawRichLine(ctx, el, line, x0, ty, color){
   }
   x = x0;
   ctx.textAlign = 'left';
-  ctx.fillStyle = color;
   for (const seg of line.segs){
     if (seg.text){
       ctx.font = fontCSS(el.font, el.size, seg);
+      ctx.fillStyle = (seg.co && pal) ? (resolveStroke(pal, seg.co) || color) : color;
       ctx.fillText(seg.text, x, ty);
     }
     x += seg.w;
@@ -1264,7 +1267,7 @@ function drawBoxText(ctx, el, pal, box){
   let ty = boxTextTop(el, box, lay.totalH, pad) + lay.lh / 2;
   for (const ln of lay.lines){
     if (ln.para) ty += lay.pgap;
-    drawRichLine(ctx, el, ln, lineLeft(el.align || 'center', box.x + pad, box.x + box.w - pad, ln.w), ty, color);
+    drawRichLine(ctx, el, ln, lineLeft(el.align || 'center', box.x + pad, box.x + box.w - pad, ln.w), ty, color, pal);
     ty += lay.lh;
   }
   applyTracking(ctx, null);
@@ -1278,7 +1281,7 @@ function drawTextElement(ctx, el, pal){
   let ty = el.y + lay.lh/2;
   for (const ln of lay.lines){
     if (ln.para) ty += lay.pgap;
-    drawRichLine(ctx, el, ln, lineLeft(el.align || 'left', el.x, el.x + el.w, ln.w), ty, color);
+    drawRichLine(ctx, el, ln, lineLeft(el.align || 'left', el.x, el.x + el.w, ln.w), ty, color, pal);
     ty += lay.lh;
   }
   applyTracking(ctx, null);
@@ -2180,7 +2183,7 @@ function drawElement(ctx, el, pal, bg){
         let ly = y0 + padY + lay.lh/2;
         for (const ln of lay.lines){
           if (ln.para) ly += lay.pgap;
-          drawRichLine(ctx, el, ln, mid[0] - ln.w / 2, ly, lcolor);
+          drawRichLine(ctx, el, ln, mid[0] - ln.w / 2, ly, lcolor, pal);
           ly += lay.lh;
         }
         applyTracking(ctx, null);
@@ -2443,7 +2446,8 @@ function renderSceneSVG(elements, opts){
         const f = FONTS[el.font] || FONTS.sans;
         const wgt = seg.b ? boldWeightOf(f) : f.weight;
         const sty = seg.i ? ' font-style="italic"' : '';
-        spans.push(`<tspan x="${svgNum(x)}" font-weight="${wgt}"${sty}>${svgEsc(seg.text)}</tspan>`);
+        const sco = seg.co ? ` fill="${resolveStroke(pal, seg.co) || color}"` : '';
+        spans.push(`<tspan x="${svgNum(x)}" font-weight="${wgt}"${sty}${sco}>${svgEsc(seg.text)}</tspan>`);
       }
       x += seg.w;
     }

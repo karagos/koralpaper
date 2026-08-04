@@ -1947,8 +1947,12 @@ function addCustomSwatch(container, prop){
 
 /* ── custom color popover: wheel + hex field ───────── */
 let colorPopProp = null;
+let colorPopRange = null; // {id, a, b} when coloring letters via the wheel
 function openColorPop(prop, anchor){
   colorPopProp = prop;
+  colorPopRange = (prop === 'textColor' && editingSelection())
+    ? { id: editing.el.id, a: editorEl.selectionStart, b: editorEl.selectionEnd }
+    : null;
   const pop = $('colorPop');
   pop.classList.remove('hidden');
   const r = anchor.getBoundingClientRect();
@@ -1969,6 +1973,7 @@ function openColorPop(prop, anchor){
 function closeColorPop(){
   $('colorPop').classList.add('hidden');
   colorPopProp = null;
+  colorPopRange = null;
 }
 function normalizedHex(){
   let v = $('popHex').value.trim();
@@ -1979,10 +1984,12 @@ $('popColor').addEventListener('input', () => {
   const v = $('popColor').value;
   $('popHex').value = v.toUpperCase();
   if (colorPopProp === 'hlColor') forceHighlight(v);
+  else if (colorPopRange) forceLetterColor(v);
   else if (colorPopProp) applyStyleLive({ [colorPopProp]: v });
 });
 $('popColor').addEventListener('change', () => {
   if (colorPopProp === 'hlColor'){ forceHighlight($('popColor').value); commit(); syncPanel(); }
+  else if (colorPopRange){ forceLetterColor($('popColor').value); commit(); syncPanel(); }
   else if (colorPopProp) applyStyle({ [colorPopProp]: $('popColor').value });
 });
 $('popHex').addEventListener('input', () => {
@@ -1990,6 +1997,7 @@ $('popHex').addEventListener('input', () => {
   if (v){
     $('popColor').value = v;
     if (colorPopProp === 'hlColor') forceHighlight(v);
+    else if (colorPopRange) forceLetterColor(v);
     else if (colorPopProp) applyStyleLive({ [colorPopProp]: v });
   }
 });
@@ -1999,6 +2007,7 @@ $('popHex').addEventListener('keydown', ev => {
     ev.preventDefault();
     const v = normalizedHex();
     if (v && colorPopProp === 'hlColor'){ forceHighlight(v); commit(); syncPanel(); }
+    else if (v && colorPopRange){ forceLetterColor(v); commit(); syncPanel(); }
     else if (v && colorPopProp) applyStyle({ [colorPopProp]: v });
     closeColorPop();
   }
@@ -2007,6 +2016,7 @@ $('popHex').addEventListener('keydown', ev => {
 $('popHex').addEventListener('blur', () => {
   const v = normalizedHex();
   if (v && colorPopProp === 'hlColor'){ forceHighlight(v); commit(); syncPanel(); }
+  else if (v && colorPopRange){ forceLetterColor(v); commit(); syncPanel(); }
   else if (v && colorPopProp) applyStyle({ [colorPopProp]: v });
 });
 document.addEventListener('pointerdown', ev => {
@@ -2187,7 +2197,11 @@ document.addEventListener('click', ev => {
   const t = ev.target.closest('button');
   if (!t) return;
   if (t.dataset.stroke) applyStyle({ stroke: t.dataset.stroke });
-  if (t.dataset.textcolor) applyStyle({ textColor: t.dataset.textcolor === 'auto' ? null : t.dataset.textcolor });
+  if (t.dataset.textcolor){
+    const tcv = t.dataset.textcolor === 'auto' ? null : t.dataset.textcolor;
+    if (editingSelection()) applyTextFormat('co', tcv);
+    else applyStyle({ textColor: tcv });
+  }
   else if (t.dataset.fill) applyStyle({ fill: t.dataset.fill });
   else if (t.closest('#fillStyleSeg') && t.dataset.v) applyStyle({ fillStyle: t.dataset.v });
   else if (t.closest('#widthSeg') && t.dataset.v) applyStyle({ sw: Number(t.dataset.v) });
@@ -2306,6 +2320,8 @@ function applyTextFormat(kind, color){
       if (!same) defaults.hlColor = color;
     } else if (kind === 'hloff'){
       setRangeStyle(el, a, b, { hl: null });
+    } else if (kind === 'co'){
+      setRangeStyle(el, a, b, { co: color || null });
     }
     if (el.type === 'text') autosizeText(el);
   }
@@ -2317,6 +2333,19 @@ function applyTextFormat(kind, color){
    that fixed text placement in v3.5.1) */
 document.querySelectorAll('#rowRich button').forEach(b =>
   b.addEventListener('pointerdown', ev => ev.preventDefault()));
+/* letter coloring: while editing with characters selected, the text color
+   dots color just that range (runs), not the whole element */
+function editingSelection(){
+  return !!(editing && editing.el && editorEl.selectionStart !== editorEl.selectionEnd);
+}
+$('textSwatches').addEventListener('pointerdown', ev => { if (editing) ev.preventDefault(); });
+function forceLetterColor(color){
+  if (!colorPopRange) return;
+  const el = byId(colorPopRange.id);
+  if (!el) return;
+  setRangeStyle(el, colorPopRange.a, colorPopRange.b, { co: color || null });
+  requestRender();
+}
 function forceHighlight(color){
   for (const el of formatTargets()){
     const [a, b] = formatRange(el);
@@ -4059,6 +4088,11 @@ function tplAllCats(){
   for (const t of store.user) found.add(tplCatOf(t));
   return [...TPL_SUGGESTED_CATS, ...[...found].filter(c => !TPL_SUGGESTED_CATS.includes(c)).sort()];
 }
+const TPL_FOLD_KEY = 'koralpaper.tplfold';
+function tplFolded(){
+  try { const v = JSON.parse(localStorage.getItem(TPL_FOLD_KEY)); return Array.isArray(v) ? v : []; }
+  catch (e){ return []; }
+}
 function tplFillCatSelect(current){
   const sel = $('tplCat');
   sel.replaceChildren();
@@ -4178,12 +4212,28 @@ function buildTplList(){
         mini('\u21BB', 'Update with the current design', () => tplUpdate('user', t.id, t.name)),
         mini('\u2715', 'Delete', () => tplDelete('user', t.id, t.name), 'danger tpldel') ] });
   const cats = tplAllCats().filter(c => rows.some(r => r.cat === c));
+  const folded = tplFolded();
   for (const cat of cats){
-    const head = document.createElement('div');
-    head.className = 'menuhead';
-    head.textContent = cat;
+    const catRows = rows.filter(r => r.cat === cat);
+    const isFolded = folded.includes(cat);
+    const head = document.createElement('button');
+    head.className = 'menuhead tplcathead' + (isFolded ? ' folded' : '');
+    head.type = 'button';
+    head.title = isFolded ? 'Show this category' : 'Hide this category';
+    const hn = document.createElement('span'); hn.textContent = cat;
+    const hc = document.createElement('span'); hc.className = 'tplcatmeta';
+    hc.textContent = catRows.length + (isFolded ? ' \u25B8' : ' \u25BE');
+    head.append(hn, hc);
+    head.addEventListener('click', () => {
+      const f = tplFolded();
+      const i = f.indexOf(cat);
+      if (i >= 0) f.splice(i, 1); else f.push(cat);
+      try { localStorage.setItem(TPL_FOLD_KEY, JSON.stringify(f)); } catch (e){}
+      buildTplList();
+    });
     list.appendChild(head);
-    for (const r of rows.filter(r => r.cat === cat)){
+    if (isFolded) continue;
+    for (const r of catRows){
       const row = document.createElement('div');
       row.className = 'tplrow';
       const info = document.createElement('div');
