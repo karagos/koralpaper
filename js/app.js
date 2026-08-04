@@ -748,6 +748,7 @@ function setTool(tool){
 }
 let hintTimer = null;
 function showHint(text){
+  text = kbdLocal(text);
   clearTimeout(hintTimer);
   if (!text){ hintEl.classList.remove('show'); return; }
   hintEl.textContent = text;
@@ -4540,6 +4541,33 @@ function loadDemo(){
   showHint('The KoralPaper tour — every feature on this page is real');
 }
 
+/* ── platform-aware shortcut labels ─────────────────
+   Every shortcut WORKS with Ctrl/Alt on Windows and Linux already;
+   this makes the LABELS say so. One translator, applied at the three
+   choke points: tooltips (lazily, in tipTextOf), hints, and a one-time
+   boot pass over the static help card and menus. */
+const IS_MAC = /Mac|iP(hone|ad|od)/.test(navigator.platform || '') || /Macintosh/.test(navigator.userAgent);
+function kbdLocal(s, force){
+  if ((IS_MAC && !force) || typeof s !== 'string') return s;
+  return s
+    .replace(/⌥⌘/g, 'Ctrl+Alt+')
+    .replace(/⇧⌘/g, 'Ctrl+Shift+')
+    .replace(/⌘/g, 'Ctrl+')
+    .replace(/⇧(?=\S)/g, 'Shift+')
+    .replace(/⇧/g, 'Shift')
+    .replace(/⌥(?=\S)/g, 'Alt+')
+    .replace(/⌥/g, 'Alt');
+}
+if (!IS_MAC){
+  window.addEventListener('DOMContentLoaded', () => {
+    for (const id of ['shortcutsCard', 'fileMenu', 'exportMenu']){
+      const w = document.createTreeWalker($(id), NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = w.nextNode())) n.nodeValue = kbdLocal(n.nodeValue);
+    }
+  });
+}
+
 /* ── tooltips ───────────────────────────────────────
    Every control's `title` becomes a fast, styled tooltip: the title is
    consumed into data-tip on first hover (so the browser's slow native
@@ -4552,12 +4580,12 @@ document.body.appendChild(tipEl);
 let tipTimer = null, tipTarget = null, tipShownAt = 0;
 function tipTextOf(el){
   const t = el.getAttribute('title');
-  if (t){ el.dataset.tip = t; el.removeAttribute('title'); }
+  if (t){ el.dataset.tip = kbdLocal(t); el.removeAttribute('title'); }
   return el.dataset.tip || null;
 }
 function renderTip(text){
   tipEl.textContent = '';
-  const m = text.match(/^(.*?) — ([⌘⇧⌥⌃]*[A-Za-z?!0-9]{1,2}|[⌘⇧⌥⌃]+[A-Za-z?!0-9]{1,2}|\?|[⌘⇧⌥⌃]?drag|⇧1)$/);
+  const m = text.match(/^(.*?) — ((?:[⌘⇧⌥⌃]|Ctrl\+|Shift\+|Alt\+)*(?:[A-Za-z?!0-9]{1,2}|drag))$/);
   if (m){
     tipEl.append(m[1]);
     const key = document.createElement('span');

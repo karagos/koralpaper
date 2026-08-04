@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.31.0 — 2026-08-04
+- **Windows and Linux see their own keys.** Every shortcut already
+  worked with Ctrl and Alt; now the labels say so too. On non-Mac
+  systems, tooltips, the Help card, menu shortcuts and hints all show
+  Ctrl+Z, Ctrl+Shift+Z, Alt+drag and friends instead of ⌘/⇧/⌥. Macs
+  keep the symbols.
+- **iPad layout pass.** At tablet widths the toolbar wraps neatly, the
+  style panel slims down and starts below it, the zoom bar compacts,
+  and the brand shrinks. On touch devices every hit target grows: 42px
+  tool buttons, 28px swatches, taller menu rows, chunkier page tabs and
+  sliders. Combined with the existing pinch/two-finger-pan support,
+  KoralPaper is now genuinely comfortable on an iPad.
+
 ## v3.30.0 — 2026-08-04
 - **Shared image store (save format v6).** Image pixels are now stored
   ONCE per unique image and referenced by id, instead of being embedded

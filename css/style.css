@@ -68,6 +68,7 @@ body{font-family:var(--sans); color:var(--ink); background:var(--paper);
 
 .toolbar{top:14px; left:50%; transform:translateX(-50%); z-index:15;}
 @media (max-width:1180px){ .toolbar{top:72px;} }
+
 .quick{top:14px; right:14px;}
 .zoombar{bottom:14px; left:14px;}
 
@@ -592,3 +593,31 @@ body.dark #tooltip{box-shadow:0 4px 14px -4px rgba(0,0,0,.7);}
 /* while editing, the textarea is a transparent input layer over the live
    canvas text — keep its selection band visible but let the glyphs show */
 #textEditor::selection{background:rgba(91,107,184,.30); color:transparent;}
+
+/* ── tablet / iPad layout ───────────────────────── */
+@media (max-width:1024px){
+  .stylePanel{top:130px; width:196px; max-height:calc(100vh - 220px); padding:11px 11px 9px;}
+  .shortcuts{width:min(92vw, 390px); max-height:calc(100vh - 100px);}
+  .zoombar{bottom:12px; left:10px; padding:4px;}
+  .zoombar .boardlabel{padding:0 8px;}
+  .pagestrip{max-width:44vw;}
+}
+@media (max-width:820px){
+  .brand .motto{display:none;}
+  .brand .name{font-size:16px;}
+  .toolbar{max-width:96vw; flex-wrap:wrap; justify-content:center;}
+  .quick{max-width:60vw; flex-wrap:wrap; justify-content:flex-end;}
+  #zoomLabel{display:none;}
+  .pagestrip{max-width:38vw;}
+  .presentbar{bottom:14px;}
+}
+/* fingers need meat: grow every hit target on touch devices */
+@media (pointer:coarse){
+  .toolbtn,.iconbtn{width:42px; height:42px;}
+  .swatch{width:28px; height:28px;}
+  .segment button{min-height:34px;}
+  .menu button{padding:11px 12px;}
+  .stylePanel{width:218px;}
+  .pagestrip .pagethumb{min-width:56px; min-height:42px;}
+  input[type=range]{height:30px;}
+}
