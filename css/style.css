@@ -531,6 +531,8 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
   background:var(--card); color:var(--ink); min-width:0; cursor:pointer;
 }
 .swatch.brandsw{outline:2px solid var(--coral-soft); outline-offset:-2px;}
+.swatch.libsw{border-radius:50%;}
+.colorpop .libsavebtn{flex:0 0 auto; padding:7px 11px; font-size:12px; white-space:nowrap;}
 
 /* font search + weight picker */
 .fontsearchwrap{padding:4px 6px 6px;}

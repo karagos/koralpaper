@@ -1,5 +1,10 @@
 # KoralPaper — Changelog
 
+## v3.58.0
+
+- Your color library: save any color from the color wheel popover (the ★ Save button) and it appears as a round swatch in the Outline, Fill and Text color rows, working everywhere colors work, including coloring selected letters. Right-click a round swatch to remove it. Up to 24 colors, kept in your browser.
+- Templates feed the library: applying a template automatically adds its distinctive colors (custom hexes and colorful palette tones, never the neutral greys and paper) as round swatches, so a template's look becomes reusable paint the moment you add it.
+
 ## v3.57.1
 
 - Text elements can wrap: dragging a text box's left or right handle now sets its width and the text reflows into lines, with the font size untouched (this replaces the side handles doing nothing since v3.53). Corner handles still scale the type, keeping the wrap width in proportion. Right-click a wrapped text → "Fit width to text" returns it to one auto-sized line. Wrapping carries into SVG and every export.

@@ -2050,6 +2050,53 @@ canvas.addEventListener('contextmenu', ev => {
 });
 
 /* ── style panel ───────────────────────────────────── */
+/* ── custom color library: your own hex swatches in every color row ── */
+const COLORLIB_KEY = 'koralpaper.colorlib';
+const COLORLIB_MAX = 24;
+function colorLib(){
+  try { const v = JSON.parse(localStorage.getItem(COLORLIB_KEY)); return Array.isArray(v) ? v : []; }
+  catch (e){ return []; }
+}
+function colorLibSave(list){
+  try { localStorage.setItem(COLORLIB_KEY, JSON.stringify(list)); } catch (e){}
+}
+function colorLibAdd(hexes, quiet){
+  const list = colorLib();
+  let added = 0;
+  for (let hx of Array.isArray(hexes) ? hexes : [hexes]){
+    hx = String(hx || '').toLowerCase();
+    if (!/^#[0-9a-f]{6}$/.test(hx) || list.includes(hx)) continue;
+    list.push(hx); added++;
+    while (list.length > COLORLIB_MAX) list.shift();
+  }
+  if (added){
+    colorLibSave(list);
+    buildSwatches();
+    if (!quiet) showHint(added === 1
+      ? 'Color saved: find it as a round swatch in every color row (right-click it to remove)'
+      : added + ' colors added to your library');
+  }
+  return added;
+}
+function colorLibRemove(hx){
+  colorLibSave(colorLib().filter(c => c !== hx));
+  buildSwatches();
+}
+function libSwatchesInto(container, prop){
+  for (const hx of colorLib()){
+    const b = document.createElement('button');
+    b.className = 'swatch libsw';
+    b.dataset[prop] = hx;
+    b.style.background = hx;
+    b.title = 'My color ' + hx.toUpperCase() + ' (right-click to remove from the library)';
+    b.addEventListener('contextmenu', ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      colorLibRemove(hx);
+      showHint('Removed from your color library');
+    });
+    container.appendChild(b);
+  }
+}
 function brandSwatchesInto(container, prop){
   if (!brandActive()) return;
   brand.accents.forEach((hx, i) => {
@@ -2072,6 +2119,7 @@ function buildSwatches(){
     sEl.appendChild(b);
   }
   brandSwatchesInto(sEl, 'stroke');
+  libSwatchesInto(sEl, 'stroke');
   addCustomSwatch(sEl, 'stroke');
   const fEl = $('fillSwatches');
   fEl.replaceChildren();
@@ -2083,6 +2131,7 @@ function buildSwatches(){
     fEl.appendChild(b);
   }
   brandSwatchesInto(fEl, 'fill');
+  libSwatchesInto(fEl, 'fill');
   addCustomSwatch(fEl, 'fill');
   const tEl = $('textSwatches');
   tEl.replaceChildren();
@@ -2101,6 +2150,7 @@ function buildSwatches(){
     tEl.appendChild(b);
   }
   brandSwatchesInto(tEl, 'textcolor');
+  libSwatchesInto(tEl, 'textcolor');
   addCustomSwatch(tEl, 'textColor');
   paintSwatches();
 }
@@ -2141,6 +2191,10 @@ function openColorPop(prop, anchor){
   $('popColor').value = cur.toLowerCase();
   $('popHex').value = cur.toUpperCase();
 }
+$('popSaveLib').addEventListener('click', ev => {
+  ev.stopPropagation();
+  colorLibAdd($('popColor').value);
+});
 function closeColorPop(){
   $('colorPop').classList.add('hidden');
   colorPopProp = null;
@@ -4718,6 +4772,30 @@ function clonePageElements(els){
   adoptImages(clones);
   return clones;
 }
+/* pull a template's distinctive colors into the color library: raw hexes
+   always, colorful palette tokens resolved; neutrals and paper stay out */
+const HARVEST_SKIP = new Set(['none', 'ink', 'white', 'cream', 'gdark', 'gmid', 'glight']);
+function harvestTemplateColors(built){
+  const p = pal();
+  const counts = new Map();
+  const noteColor = (val, resolver) => {
+    if (!val || HARVEST_SKIP.has(val)) return;
+    const hex = (typeof val === 'string' && val[0] === '#') ? val.toLowerCase()
+      : (resolver(p, val) || '').toLowerCase();
+    if (!/^#[0-9a-f]{6}$/.test(hex)) return;
+    counts.set(hex, (counts.get(hex) || 0) + 1);
+  };
+  for (const pg of built.pages || []) for (const el of pg.elements || []){
+    noteColor(el.stroke, resolveStroke);
+    noteColor(el.fill, resolveFill);
+    noteColor(el.textColor, resolveStroke);
+    if (el.runs) for (const r of el.runs) if (r.co) noteColor(r.co, resolveStroke);
+  }
+  if (built.bg) noteColor(built.bg, resolveStroke);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(e => e[0]);
+  const added = colorLibAdd(top, true);
+  if (added) showHint(added + ' template color' + (added > 1 ? 's' : '') + ' added to your library (round swatches in the color rows)');
+}
 function applyTemplate(def){
   const built = def.build ? def.build() : def;
   syncPageRef();
@@ -4734,6 +4812,7 @@ function applyTemplate(def){
   state.selection = new Set();
   updateBoundArrows(state.elements);
   preloadDocFonts();
+  harvestTemplateColors(built);
   syncBoardBtn(); buildBoardMenuSel();
   commit(); buildPageStrip(); zoomToFit(); syncPanel();
   $('tplDialog').classList.add('hidden');
