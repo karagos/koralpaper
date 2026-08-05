@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KoralPaper Prompt Library</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M30 10 Q56 6 82 10 Q85 36 82 62 Q56 66 29 62 Q26 36 30 10 Z" stroke="%231F1E1B" stroke-width="7"/><g stroke="%23D97757" stroke-width="8"><path d="M56 20 Q55 36 56 52"/><path d="M41 28 Q56 35 71 44"/><path d="M71 28 Q56 35 41 44"/></g><circle cx="24" cy="74" r="7" fill="%231F1E1B"/><circle cx="13" cy="86" r="5" fill="%231F1E1B"/></svg>'>
+<style>
+:root{
+  --paper:#F2EFE6; --card:#FBF9F2; --card2:#F4F1E8; --ink:#201D18;
+  --soft:rgba(32,29,24,.6); --line:rgba(32,29,24,.85); --linesoft:rgba(32,29,24,.16);
+  --coral:#D97757; --coralsoft:#F0D3C6;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:"Avenir Next",Avenir,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.5;
+  background-image:radial-gradient(rgba(32,29,24,.055) 1px, transparent 1px);background-size:22px 22px;}
+.wrap{max-width:1180px;margin:0 auto;padding:34px 22px 80px}
+header h1{font-family:var(--serif);font-style:italic;font-weight:600;font-size:34px;letter-spacing:.2px}
+header h1 .ast{color:var(--coral);font-style:normal}
+header .sub{color:var(--soft);margin-top:6px;max-width:760px;font-size:14.5px}
+header .sub b{color:var(--ink)}
+.howto{
+  margin-top:14px;background:var(--card);border:1.5px solid var(--line);border-radius:13px;
+  padding:12px 16px;font-size:13px;color:var(--soft);
+  box-shadow:0 2px 0 rgba(32,29,24,.08);
+}
+.howto b{color:var(--ink)}
+.bar{
+  position:sticky;top:0;z-index:5;background:var(--paper);
+  padding:14px 0 10px;border-bottom:1.5px solid var(--linesoft);margin-top:18px;
+}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#q{
+  flex:1;min-width:210px;font-family:var(--sans);font-size:14px;
+  padding:9px 13px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);
+}
+#q:focus{outline:none;border-color:var(--coral)}
+.chip{
+  font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:999px;cursor:pointer;
+  border:1.5px solid var(--linesoft);background:var(--card);color:var(--ink);font-family:var(--sans);
+  transition:background .1s;white-space:nowrap;
+}
+.chip:hover{background:var(--card2)}
+.chip.sel{background:var(--coral);border-color:var(--coral);color:#FBF6EE}
+.chip.mode.sel{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.chiprow{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.meta{display:flex;justify-content:space-between;align-items:center;margin:14px 2px 4px;color:var(--soft);font-size:12.5px}
+#lucky{background:none;border:none;color:var(--coral);font-weight:700;cursor:pointer;font-size:12.5px;font-family:var(--sans)}
+#lucky:hover{text-decoration:underline}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-top:10px}
+.card{
+  background:var(--card);border:1.5px solid var(--line);border-radius:13px;padding:15px 16px 13px;
+  box-shadow:0 2px 0 rgba(32,29,24,.08);display:flex;flex-direction:column;gap:8px;
+  transition:transform .08s;
+}
+.card.flash{outline:3px solid var(--coral);outline-offset:2px}
+.card h3{font-size:15.5px;font-weight:700;line-height:1.3;padding-right:4px}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:3px 8px;border-radius:6px}
+.tag.cat{background:var(--coralsoft);color:#8A4630}
+.tag.mode{background:var(--card2);color:var(--soft);border:1px solid var(--linesoft)}
+.desc{font-size:12.5px;color:var(--soft)}
+.prompt{
+  font-family:var(--mono);font-size:11.5px;line-height:1.55;background:var(--card2);
+  border:1px solid var(--linesoft);border-radius:9px;padding:10px 11px;color:var(--ink);
+  white-space:pre-wrap;max-height:150px;overflow-y:auto;
+}
+.cardfoot{display:flex;justify-content:flex-end;margin-top:2px}
+.copy{
+  font-family:var(--sans);font-size:12.5px;font-weight:600;color:#FBF6EE;background:var(--coral);
+  border:none;border-radius:9px;padding:8px 16px;cursor:pointer;transition:filter .1s,transform .06s;
+}
+.copy:hover{filter:brightness(1.06)}
+.copy:active{transform:scale(.95)}
+.copy.done{background:#6E9E63}
+.empty{margin:50px auto;text-align:center;color:var(--soft);font-size:14px}
+footer{margin-top:44px;color:var(--soft);font-size:12px;text-align:center}
+footer a{color:var(--coral)}
+mark{background:#F7E36B;border-radius:3px;padding:0 1px}
+@media (max-width:720px){ .grid{grid-template-columns:1fr} header h1{font-size:27px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1><span class="ast">✳</span> KoralPaper Prompt Library</h1>
+  <p class="sub">Copy a prompt, paste it into <b>Claude Desktop</b>, and watch it draw on your paper.
+  Replace anything in <b>[BRACKETS]</b> with your own content. Every result lands as normal
+  KoralPaper elements: editable, restylable, exportable.</p>
+  <div class="howto"><b>Setup once:</b> install the KoralPaper extension in Claude Desktop
+  (Help → Claude tab in the app) and keep KoralPaper open in your browser. The ✳ in the top bar
+  glows when the link is alive. <b>Tip:</b> activate your Brand Kit first and most prompts come
+  back in your colors automatically.</div>
+</header>
+
+<div class="bar">
+  <div class="controls">
+    <input id="q" type="search" placeholder="Search 99 prompts: flowchart, carousel, roast, tarot, pricing, funnel…" autocomplete="off">
+  </div>
+  <div class="chiprow" id="cats"></div>
+  <div class="chiprow" id="modes"></div>
+</div>
+
+<div class="meta"><span id="count"></span><button id="lucky">✳ Surprise me</button></div>
+<div class="grid" id="grid"></div>
+<p class="empty" id="empty" hidden>Nothing matches. Loosen the filters or try another word.</p>
+
+<footer>Part of <a href="https://karagos.github.io/koralpaper/">KoralPaper</a> · made by
+<a href="https://wearecaio.com">CAIO Group</a> · AI is an intelligence to communicate with, not a tool to operate.</footer>
+</div>
+
+<script>
+const MODES = {
+  new: 'Creates pages',
+  edit: 'Works on my page',
+  read: 'Reads my document',
+};
+const P = [
+/* ── Diagrams & Flows ── */
+{t:'Customer journey flowchart', c:'Diagrams & Flows', m:'new',
+ d:'A complete journey map with stages, decisions and emotions as a clean flow.',
+ p:'In my KoralPaper, on a new 1920x1080 page, draw a customer journey flowchart for [MY PRODUCT OR SERVICE]: awareness, consideration, decision, onboarding, loyalty. One box per stage, decision diamonds where customers drop off, and a small chip under each stage naming the dominant emotion. Glued arrows, generous spacing. Render the page and fix anything cramped.'},
+{t:'Decision tree from my dilemma', c:'Diagrams & Flows', m:'new',
+ d:'Turns a hard choice into a yes/no tree with outcomes at the leaves.',
+ p:'I need to decide: [DESCRIBE THE DECISION]. In my KoralPaper, build a decision tree on a new page: the dilemma at the top, yes/no diamonds for each key question, and outcome boxes at the leaves colored green for good outcomes and coral for risky ones. Keep every branch honest, include at least one outcome I probably have not considered. Render to check the layout.'},
+{t:'System architecture sketch', c:'Diagrams & Flows', m:'new',
+ d:'A technical architecture anyone can read: services, data stores, arrows.',
+ p:'Draw a system architecture diagram in my KoralPaper for this setup: [DESCRIBE YOUR SYSTEM OR PASTE A TECH STACK]. Rectangles for services, ellipses for data stores, chips for external APIs, elbow arrows for data flow with labels on every arrow. Group related services visually. Neat mode (sketch 0). Render and tidy until it reads at a glance.'},
+{t:'Process with swimlanes', c:'Diagrams & Flows', m:'new',
+ d:'Who does what: a process split into lanes per role.',
+ p:'In my KoralPaper, create a swimlane process diagram for [PROCESS, e.g. publishing a newsletter]. One horizontal lane per role: [ROLES]. Use long thin rectangles as lane backgrounds with the role name at the left, then place the process steps inside the right lanes, connected with arrows crossing lanes where handoffs happen. Highlight handoffs with coral arrows. Render to verify nothing overlaps.'},
+{t:'Before / after transformation', c:'Diagrams & Flows', m:'new',
+ d:'Two side-by-side worlds: the messy今 and the better future.',
+ p:'On a new 1920x1080 KoralPaper page, draw a before/after diagram for [THE CHANGE, e.g. our reporting process]. Left half titled BEFORE: the current messy flow with its pain points as small red chips. Right half titled AFTER: the improved flow, cleaner and shorter. A big arrow between the halves labeled with the key shift. Make the contrast visible in the layout itself: crowded left, calm right.'},
+{t:'Org chart that fits on one page', c:'Diagrams & Flows', m:'new',
+ d:'A compact org chart from a plain list of names and roles.',
+ p:'Here is my team: [PASTE NAMES, ROLES, WHO REPORTS TO WHOM]. Draw an org chart in my KoralPaper: rectangles with name on the first line and role in smaller text below, connected top-down. Color each layer of hierarchy with a different soft fill. Keep it to one page even if you must shrink boxes. Render and equalize spacing.'},
+{t:'Timeline with milestones', c:'Diagrams & Flows', m:'new',
+ d:'A horizontal project timeline with phases and milestone flags.',
+ p:'Create a horizontal timeline in my KoralPaper for [PROJECT] running from [START] to [END]. A long baseline arrow, phases as colored segments above it, milestones as diamonds on the line with short labels underneath, and today marked with a coral vertical line. Add one risk chip under the phase you estimate is riskiest and say why in 6 words.'},
+{t:'Explain a concept as a diagram', c:'Diagrams & Flows', m:'new',
+ d:'Any abstract concept turned into boxes and arrows a beginner gets.',
+ p:'Explain [CONCEPT, e.g. how LLM context windows work] as a KoralPaper diagram a smart beginner understands in 30 seconds. Maximum 7 elements. Use one strong metaphor visually, not just in words. Big readable text, one accent color for the key insight. Render it, look at it as a first-time viewer, and simplify once more.'},
+
+/* ── Mind Maps & Thinking ── */
+{t:'Notes into a mind map', c:'Mind Maps & Thinking', m:'new',
+ d:'Messy notes become a structured mind map around one core idea.',
+ p:'Here are my raw notes: [PASTE NOTES]. In my KoralPaper, reorganize them into a mind map: the core idea in the middle as an ellipse, main themes as first-ring rectangles in different soft fills, details as small chips on the outer ring. Connect everything with curved arrows. Keep my exact wording for the details. Render and balance the rings so no side is overloaded.'},
+{t:'Pre-mortem: why did it fail?', c:'Mind Maps & Thinking', m:'new',
+ d:'Imagine the project already failed; map every reason before it can happen.',
+ p:'Run a pre-mortem in my KoralPaper for [PROJECT]. Center: a tombstone-shaped rectangle reading "[PROJECT] failed. Why?". Around it, map every plausible cause of failure grouped in branches: people, process, market, tech, luck. Color the three most likely causes coral. For each coral one, add a small green chip with the cheapest prevention. Be brutal, not polite.'},
+{t:'Idea storm: 20 ideas, 3 keepers', c:'Mind Maps & Thinking', m:'new',
+ d:'A wide brainstorm where Claude also dares to pick winners.',
+ p:'Brainstorm in my KoralPaper: 20 ideas for [GOAL, e.g. new lead magnets for consultants]. Sticky notes in a loose grid, short punchy phrasing, slightly rotated for energy. Then mark the 3 you would personally bet on with a coral star chip on the corner and add one line under each explaining the bet. Do not pick the safest three.'},
+{t:'Argument map: steelman both sides', c:'Mind Maps & Thinking', m:'new',
+ d:'A fair two-sided map of a disagreement, strongest arguments first.',
+ p:'Map this disagreement in my KoralPaper: [STATE THE QUESTION, e.g. should we hire or automate?]. Two columns of rectangles: the strongest honest case FOR on the left in sage, the strongest honest case AGAINST on the right in blush. No strawmen. In the middle bottom, one diamond with the crux: the single fact that would settle it. Render and check both sides feel equally respected.'},
+{t:'The 5 Whys, drawn', c:'Mind Maps & Thinking', m:'new',
+ d:'Root-cause digging as a vertical chain from symptom to cause.',
+ p:'In my KoralPaper, run a 5 Whys on: [PROBLEM]. A vertical chain: the symptom at top, then five WHY arrows downward, each answer as a rectangle. Make each answer more uncomfortable and more structural than the last. The root cause at the bottom gets a coral fill and a chip suggesting the first corrective step.'},
+{t:'Knowledge map: what I know vs not', c:'Mind Maps & Thinking', m:'new',
+ d:'An honest map of your understanding of a topic with the gaps visible.',
+ p:'I am learning [TOPIC]. Interview me first: ask me 5 quick questions about it, then draw a knowledge map in my KoralPaper: what I clearly understand in sage, what I half-understand in butter, and the important gaps I did not even mention in coral with question marks. Arrange it as a territory map around the topic in the center.'},
+{t:'Eisenhower matrix of my week', c:'Mind Maps & Thinking', m:'new',
+ d:'Your task list sorted into the four classic quadrants.',
+ p:'Here is everything on my plate: [PASTE TASK LIST]. Draw a 2x2 Eisenhower matrix in my KoralPaper: axes Urgent/Not urgent and Important/Not important, four large quadrant rectangles with soft fills, my tasks as small sticky chips placed where they belong. In the Delete quadrant, be ruthless. Add a coral note with the ONE task to do first tomorrow morning.'},
+
+/* ── Charts & Data ── */
+{t:'Chart this data, best-fit type', c:'Charts & Data', m:'new',
+ d:'Paste any table; Claude picks the right chart type and defends the choice.',
+ p:'Here is my data: [PASTE ROWS FROM A SPREADSHEET]. In my KoralPaper, chart it with the most honest chart type for this shape of data, and tell me in one sentence why you chose it. Clean style, value labels on, title that states the INSIGHT not the topic (e.g. "Support costs doubled since March", not "Costs"). Use my brand kit if one is active. Render to check readability.'},
+{t:'One number, made unforgettable', c:'Charts & Data', m:'new',
+ d:'A single-stat poster: one huge number with context that makes it land.',
+ p:'Make a one-number poster in my KoralPaper on a 1080x1350 board: the number [YOUR KPI, e.g. 73%] enormous in the middle (weight 900, size 250+), one line above setting it up, one line below revealing why it matters, and a tiny source line at the bottom. Brand paper if a kit is active. It should stop a scrolling thumb.'},
+{t:'Dashboard sketch from my KPIs', c:'Charts & Data', m:'new',
+ d:'A one-page mock dashboard with the right chart per metric.',
+ p:'Design a dashboard sketch in my KoralPaper (1920x1080) for these KPIs: [LIST 4 TO 6 METRICS WITH ROUGH VALUES]. Mix chart types appropriately: trend metrics get lines, comparisons get bars, shares get a donut, a table for the raw detail. Big number headlines above each chart. Sketchy style: this is a thinking artifact, not a BI tool. Render and align everything to a grid.'},
+{t:'Before/after metrics comparison', c:'Charts & Data', m:'new',
+ d:'Two grouped bar charts proving a change worked (or did not).',
+ p:'In my KoralPaper, build a before/after comparison for [THE CHANGE]: metrics [LIST METRICS WITH BEFORE AND AFTER VALUES]. Grouped bars with the before series in grey and after in my first brand accent (or coral), value labels on, and a verdict line under the chart in plain language: did it work, and by how much. If a metric got worse, do not hide it: mark it.'},
+{t:'Skills spider: me vs the role', c:'Charts & Data', m:'new',
+ d:'A radar chart of your skills against what a target role needs.',
+ p:'Draw a spider chart in my KoralPaper comparing my current skills vs what [TARGET ROLE] requires. Axes: [LIST 5 TO 7 SKILLS]. My scores: [YOUR 1-10 SCORES]. Role requirement: [TARGET SCORES, or estimate them honestly]. Two series, value dots on, slight curviness. Under the chart, one line naming the single gap with the best return if closed this quarter.'},
+{t:'Weekly energy heat map', c:'Charts & Data', m:'new',
+ d:'Your week as a heat grid revealing when you actually have focus.',
+ p:'Build a heat map in my KoralPaper: columns Mon to Fri, rows Morning / Midday / Afternoon / Evening, values = my energy 1-10: [PASTE YOUR ESTIMATES]. Values visible in the cells. Under it, two short recommendations: what to protect (the hottest block) and what to stop scheduling in the coldest one.'},
+{t:'Unit economics on one page', c:'Charts & Data', m:'new',
+ d:'Price, cost, margin and break-even drawn so a non-finance brain gets it.',
+ p:'Visualize the unit economics of [PRODUCT/SERVICE] in my KoralPaper: price [X], costs [LIST THEM], resulting margin. A horizontal stacked-bar style breakdown built from rectangles with labels, margin in green at the end. Below it, a simple line chart showing break-even: units sold vs cumulative profit, with the break-even point marked with a coral dot and label. Clean style.'},
+
+/* ── Carousels & Social ── */
+{t:'Article → LinkedIn carousel', c:'Carousels & Social', m:'new',
+ d:'The full producer: article in, 7-slide performing carousel out.',
+ p:'Turn this article into a 7-page LinkedIn carousel in my KoralPaper (1080x1350 per page, brand kit if active). Page 1: a HOOK, max 8 words, poster type 130+, a claim or number that creates tension, never the article title. Pages 2-6: one idea each, headline max 10 words plus max 2 short support lines, same layout grid on every page, page numbers like 3/7. Page 7: one-line takeaway plus CTA: follow [@HANDLE] and a comment question. Render every page, fix overflow, keep type consistent. Article: [PASTE ARTICLE TEXT]'},
+{t:'Carousel from my template', c:'Carousels & Social', m:'read',
+ d:'Uses YOUR saved template pages as the exact layout system.',
+ p:'My KoralPaper document contains my carousel template pages. Read them carefully: where the headline sits, sizes, colors, footer, page numbers. Now produce a new carousel about [TOPIC OR PASTED TEXT] by cloning that exact layout for each new page: same positions, same type scale, new content. Do not invent a different design. Render each page next to the template style and correct drift.'},
+{t:'10 hooks for one idea', c:'Carousels & Social', m:'new',
+ d:'One message, ten different opening slides to A/B test.',
+ p:'My core message: [ONE SENTENCE]. In my KoralPaper, create one page with 10 alternative HOOK lines for it as big sticky notes: 2 contrarian, 2 with a number, 2 questions, 2 "nobody tells you" style, 2 story openers. Max 8 words each. Then mark your top 2 with a coral star and one line on why they will stop the scroll.'},
+{t:'Quote card from my line', c:'Carousels & Social', m:'new',
+ d:'A bold 1080x1350 quote card in your brand.',
+ p:'Make a quote card in my KoralPaper, 1080x1350: this line huge and centered: "[YOUR QUOTE]". Weight 800+, generous margins, my brand paper and fonts if a kit is active, my name and handle small at the bottom. If the line is longer than 14 words, tighten it first and show me the tightened version on the page.'},
+{t:'Myth vs fact carousel', c:'Carousels & Social', m:'new',
+ d:'5 myths in your field, each destroyed on its own slide pair.',
+ p:'Create a myth-busting carousel in my KoralPaper about [YOUR FIELD]: cover page "5 myths about [FIELD] you probably believe", then for each myth one page: the myth crossed out at the top (strike it through with a coral line element), the fact below it big, one supporting line small. Closing page with CTA. 1080x1350, consistent grid, render-check every page.'},
+{t:'Listicle carousel: N tools/rules', c:'Carousels & Social', m:'new',
+ d:'The classic numbered listicle, done with a consistent visual system.',
+ p:'Build a listicle carousel in my KoralPaper: "[N] [THINGS] every [AUDIENCE] should know", from this raw material: [PASTE LIST OR NOTES]. One item per page with a huge number top-left (weight 900), item name as headline, one utility line below. Consistent accent color per page from my brand kit or rotate two accents. Cover + closing CTA page included.'},
+{t:'Case study mini-story', c:'Carousels & Social', m:'new',
+ d:'A client result as a 6-slide story: before, struggle, shift, result.',
+ p:'Turn this client story into a 6-page KoralPaper carousel: [PASTE THE ROUGH STORY WITH NUMBERS]. Structure: 1 hook with the end result as a number, 2 the before state, 3 what was really blocking them, 4 the shift we made, 5 the results with a small chart drawn from the real numbers, 6 CTA. Never name the client unless I included the name. Keep it humble in words, confident in type.'},
+{t:'30 days of content map', c:'Carousels & Social', m:'new',
+ d:'A month of post ideas laid out as a calendar grid.',
+ p:'Plan 30 days of content for [MY NICHE] in my KoralPaper: a 5x6 grid of sticky notes, each with a day number and a specific post idea (not categories: actual titles). Color-code by format: carousel, text post, image. Ideas must ladder up to my core message: [YOUR MESSAGE]. Mark the 4 with highest expected reach with a star chip.'},
+
+/* ── Presentations & Decks ── */
+{t:'Talk outline → slide deck', c:'Presentations & Decks', m:'new',
+ d:'A full sketchy deck from an outline, one message per slide.',
+ p:'Turn this outline into a KoralPaper deck, 1920x1080 pages: [PASTE OUTLINE]. Rules: one message per slide as a big statement (not a topic label), max 20 words of support, generous whitespace, consistent title position, page numbers. Add one diagram slide and one chart slide where the content earns them. Title and closing slide included. Render each page and fix crowding.'},
+{t:'Executive one-pager', c:'Presentations & Decks', m:'new',
+ d:'Everything a decision-maker needs on a single 1920x1080 page.',
+ p:'Compress this into an executive one-pager in my KoralPaper (1920x1080): [PASTE THE MATERIAL]. Layout: situation top-left, 3 key findings as cards across the middle with one number each, the recommendation in a coral-outlined box bottom-right, and a small risk chip. An exec should get it in 60 seconds without me presenting it. Clean style.'},
+{t:'Workshop agenda wall', c:'Presentations & Decks', m:'new',
+ d:'A visual agenda: blocks, timings, energy curve.',
+ p:'Design a workshop agenda wall in my KoralPaper for "[WORKSHOP TITLE]", duration [X HOURS]: horizontal timeline of session blocks as colored rectangles with times, break chips, and a thin line chart above tracing the expected ENERGY curve of the room. Mark the post-lunch dip and what we do about it. Sketchy style: it should feel like a facilitator drew it.'},
+{t:'Pitch in the 10/20/30 spirit', c:'Presentations & Decks', m:'new',
+ d:'A 10-slide investor-style pitch skeleton filled with your content.',
+ p:'Build a 10-page pitch deck skeleton in my KoralPaper for [COMPANY/IDEA]: problem, solution, why now, market, product, business model, traction, competition (draw a 2x2), team, ask. Fill each page with my actual content from: [PASTE NOTES], big type, one visual per page minimum. Slides must survive being read without a presenter.'},
+{t:'Slide autopsy', c:'Presentations & Decks', m:'read',
+ d:'Claude critiques your current page like a presentation coach.',
+ p:'Look at the current page of my KoralPaper document (read it and render it). Critique it like a tough presentation coach: what is the ONE message, is it visible in 3 seconds, what should be deleted, what is fighting for attention. Then create a revised version on a NEW page applying your own advice. Keep my content, change the hierarchy.'},
+{t:'Section divider set', c:'Presentations & Decks', m:'new',
+ d:'Matching chapter-divider slides for a long deck.',
+ p:'Create [N] section divider pages in my KoralPaper (1920x1080) for these chapters: [LIST CHAPTER NAMES]. Each: a huge chapter number (weight 900, 300px, low-contrast tint), the chapter name in my heading font, and a consistent small footer. Same composition every page, only number and name change. Brand colors if the kit is active.'},
+
+/* ── Rebuild & Redesign ── */
+{t:'Replicate this design', c:'Rebuild & Redesign', m:'new',
+ d:'The replica engine: attach an image, get an editable copy.',
+ p:'Recreate the attached image as a page in my KoralPaper as faithfully as possible: measure proportions against a 1080-wide board, copy every text VERBATIM, sample colors as hex, one text element per line, sketch 0. Use bold and exact weights where the reference is heavy. Render, compare with the reference, and fix differences up to 3 rounds. Tell me what you had to approximate.'},
+{t:'Tidy this page', c:'Rebuild & Redesign', m:'edit',
+ d:'Alignment, spacing and straightened arrows; nothing else changes.',
+ p:'Tidy the current page of my KoralPaper: align the shapes to a sensible grid, even out the spacing, straighten and re-route awkward arrows. Do NOT change any text, color, or size. Render before and after, and fix whatever still looks off in the after.'},
+{t:'Rebuild it clean', c:'Rebuild & Redesign', m:'read',
+ d:'Your sketch, remade as a crisp professional version on a new page.',
+ p:'Read the current page of my KoralPaper and rebuild it as a clean professional version on a NEW page: same content and colors, sketch 0 on everything, aligned to a tidy grid, consistent type sizes. My sketchy original stays untouched. Render both and make sure the clean one would survive a board meeting.'},
+{t:'Translate my page', c:'Rebuild & Redesign', m:'read',
+ d:'A full copy of the page with every text translated.',
+ p:'Duplicate the current page of my KoralPaper document onto a new page and translate every text into [LANGUAGE]. Keep layout, colors and sizes identical: only the words change. Where the translation is much longer, reduce that text size slightly rather than breaking the layout. Render and check nothing overflows.'},
+{t:'Make it accessible', c:'Rebuild & Redesign', m:'edit',
+ d:'Contrast and legibility pass over the current page.',
+ p:'Audit the current KoralPaper page for readability: render it, then fix low-contrast text (dark paper with dark text, tiny labels under 14px, thin greys on cream). Adjust text colors and sizes only as much as needed. List what you changed in one short line per fix.'},
+{t:'Shrink it to one page', c:'Rebuild & Redesign', m:'read',
+ d:'A multi-page document compressed into a single overview page.',
+ p:'Read my whole KoralPaper document. Create ONE new 1920x1080 page that compresses it: each original page becomes a small titled card summarizing its essence in max 12 words, arranged in reading order with arrows showing the narrative. It should work as the map of the document.'},
+
+/* ── Brand & Style ── */
+{t:'Design me a brand kit', c:'Brand & Style', m:'new',
+ d:'Claude proposes a palette + font pairing and shows it on a sample page.',
+ p:'I want a brand kit for [BRAND / VIBE, e.g. a bold consulting studio]. In my KoralPaper, create a sample page presenting your proposal: 6 accent colors as labeled swatch rectangles with hex codes, a heading font and body font suggestion from Google Fonts written in their own faces, and a mini mock (one quote card) using them together. Then tell me the exact values to type into Settings → Brand kit.'},
+{t:'Same page, three moods', c:'Brand & Style', m:'read',
+ d:'Your current page restyled three ways: playful, corporate, editorial.',
+ p:'Read the current page of my KoralPaper. Create three new versions on new pages, same content and layout, restyled: 1 PLAYFUL (hand fonts, bright fills, sketch 2), 2 CORPORATE (clean, navy/grey hexes, sketch 0), 3 EDITORIAL (serif headlines, cream and ink, thin lines). Name each page accordingly. Render all three.'},
+{t:'Logo stamp exploration', c:'Brand & Style', m:'new',
+ d:'Six quick logo-mark sketches for your name, built from shapes.',
+ p:'Sketch 6 logo-mark ideas for "[NAME OR INITIALS]" in my KoralPaper, built only from KoralPaper shapes and letters (no images): geometric monograms, a chip wordmark, an icon+word lockup. Arrange them in a 3x2 grid with a small label under each. Mark your favorite with a coral star and tell me why in one line. I can save the winner to my gallery as a stamp.'},
+{t:'Color story from a feeling', c:'Brand & Style', m:'new',
+ d:'A palette derived from an emotion, with usage notes.',
+ p:'Build a color story in my KoralPaper from this feeling: [e.g. "calm authority with one spark of rebellion"]. 5 swatch rectangles with hex codes and evocative names, plus small usage chips under each: paper, headlines, accent, warning, calm. Then show one tiny mock (a mini slide) using the story. Tell me which two belong in my Brand kit accents.'},
+{t:'Typography specimen page', c:'Brand & Style', m:'new',
+ d:'Your brand fonts tested at every real-world size.',
+ p:'Create a type specimen page in my KoralPaper using my brand fonts (read the kit; if none, use Archivo Black + Inter): the alphabet big, then a poster headline at 160, a slide title at 64, body at 21, a caption at 14, and a number set 0123456789 at 90 weight 900. Label each specimen. This is my reference page for choosing sizes.'},
+
+/* ── Business & Consulting ── */
+{t:'SWOT that takes a position', c:'Business & Consulting', m:'new',
+ d:'A 2x2 SWOT where Claude also concludes something.',
+ p:'Draw a SWOT in my KoralPaper for [COMPANY/PROJECT] based on: [PASTE CONTEXT]. Classic 2x2 with colored quadrants and sticky items, but with a twist: end with a verdict box under the matrix stating the ONE strategic move the SWOT actually implies. A SWOT without a conclusion is decoration.'},
+{t:'Business model on a napkin', c:'Business & Consulting', m:'new',
+ d:'The 9-block business model canvas, hand-drawn style.',
+ p:'Sketch a Business Model Canvas in my KoralPaper (1920x1080) for [BUSINESS]: the classic 9 blocks as outlined rectangles with hand-drawn charm, filled with my reality from: [PASTE NOTES]. Where a block is weak or empty, write the hard question in coral instead of leaving it blank. That coral is the homework.'},
+{t:'Pricing ladder visual', c:'Business & Consulting', m:'new',
+ d:'Your offers as an ascending staircase with anchoring logic.',
+ p:'Visualize my pricing ladder in my KoralPaper: [LIST YOUR OFFERS AND PRICES]. Draw it as ascending steps (rectangles growing in height), price big on each step, what is included as 2-3 small lines, and the recommended "most clients start here" step marked with a coral flag. Above it, one line about the anchoring logic of this ladder.'},
+{t:'Stakeholder power map', c:'Business & Consulting', m:'new',
+ d:'Who matters and how to play it: influence vs support grid.',
+ p:'Map these stakeholders in my KoralPaper: [LIST PEOPLE/ROLES AND YOUR READ ON THEM]. A 2x2: Influence (low/high) vs Support (against/for). Each person as a chip in the right cell. For everyone in the high-influence half, add a tiny action chip: win over, keep close, or neutralize politely. This map stays in the document, not in the meeting.'},
+{t:'Proposal skeleton in 6 pages', c:'Business & Consulting', m:'new',
+ d:'A visual consulting proposal frame ready to fill with your numbers.',
+ p:'Create a 6-page proposal skeleton in my KoralPaper for a [SERVICE] engagement: 1 cover with client name placeholder, 2 the situation in their words, 3 the approach as a 3-phase diagram, 4 deliverables table, 5 investment with a simple ROI chart placeholder, 6 next steps with dates. My brand kit throughout. Placeholders in [BRACKETS] so I can fill them fast.'},
+{t:'Meeting → decisions wall', c:'Business & Consulting', m:'new',
+ d:'Meeting notes distilled into decisions, owners and open questions.',
+ p:'Here are my meeting notes: [PASTE NOTES]. In my KoralPaper, build a decisions wall: three columns of stickies titled DECIDED (sage), TO DO with owner chips (butter), OPEN QUESTIONS (blush). Everything in the notes must land in exactly one column. If an item has no owner, flag it coral: that is where projects die.'},
+{t:'AI opportunity map', c:'Business & Consulting', m:'new',
+ d:'Where AI actually helps in a business: mapped by value vs effort.',
+ p:'Map AI opportunities for [COMPANY/DEPARTMENT] in my KoralPaper based on: [DESCRIBE THEIR PROCESSES]. A 2x2 of Value (low/high) vs Effort (low/high), each opportunity as a sticky in its cell. Quick wins quadrant gets a coral border. For the top 2 quick wins, add a chip naming the first pilot step. Do not include hype use cases that would not survive a CFO.'},
+{t:'The one-slide strategy', c:'Business & Consulting', m:'new',
+ d:'Where to play, how to win, what to stop: one page, no fog.',
+ p:'Compress the strategy of [COMPANY/MY BUSINESS] into one KoralPaper page from: [PASTE CONTEXT]. Three zones: WHERE WE PLAY (market and audience), HOW WE WIN (the honest edge), WHAT WE STOP (at least 2 real things, this is mandatory). Big type, one accent color, no more than 60 words on the entire page. If the strategy cannot fit, it is not a strategy yet: tell me what is missing.'},
+
+/* ── Learning & Workshops ── */
+{t:'Explain like three audiences', c:'Learning & Workshops', m:'new',
+ d:'One concept, three pages: for a child, a manager, an expert.',
+ p:'Explain [CONCEPT] in my KoralPaper three times on three pages: page 1 for a curious 10-year-old (one metaphor, one drawing made of shapes), page 2 for a busy manager (what it changes for them, one diagram), page 3 for a practitioner (the mechanics, correct terminology). Same core truth in all three: no dumbing down into wrongness.'},
+{t:'Cheat sheet builder', c:'Learning & Workshops', m:'new',
+ d:'A dense but organized one-page reference on any topic.',
+ p:'Build a one-page cheat sheet in my KoralPaper (1920x1080) for [TOPIC, e.g. prompt patterns / Excel shortcuts / OKR writing]. Organized zones with coral section headers, compact chips and mini-tables, one "most people get this wrong" box in blush. Dense but scannable: someone should find any answer in under 5 seconds. Clean style.'},
+{t:'Quiz my page', c:'Learning & Workshops', m:'read',
+ d:'Claude reads your study page and quizzes you Socratically.',
+ p:'Read the current page of my KoralPaper document: these are my study notes. Quiz me on them: 5 questions from easy to hard, one at a time, waiting for my answers. After the quiz, add a small coral chip on my page next to each concept I got wrong, so my weak spots are literally visible on the paper.'},
+{t:'Workshop icebreaker canvas', c:'Learning & Workshops', m:'new',
+ d:'A ready-to-project icebreaker board for a live session.',
+ p:'Create an icebreaker canvas in my KoralPaper for a workshop of [N] people about [TOPIC]: a big playful prompt in the middle (invent one that connects personally to the topic), and empty sticky-note spots in a circle around it where I will type answers live. Add a tiny rules chip: one answer, five words max, no job titles.'},
+{t:'Concept ladder: novice to master', c:'Learning & Workshops', m:'new',
+ d:'The learning path of a skill as an ascending staircase.',
+ p:'Draw a learning ladder for [SKILL] in my KoralPaper: 6 ascending steps from first contact to mastery. Each step: a name, what you can DO at that level (not what you know), and the trap that keeps people stuck there in small coral text. Mark where you estimate I am based on this context: [ONE LINE ABOUT YOUR LEVEL].'},
+{t:'Feedback capture grid', c:'Learning & Workshops', m:'new',
+ d:'The classic 4-quadrant retro board, ready for a session.',
+ p:'Prepare a feedback grid in my KoralPaper for the end of my [SESSION/WORKSHOP]: four quadrants titled Loved / Learned / Lacked / Longed for, each with its own soft fill and 4 empty sticky spots. Big title with the session name and date. I will fill it live while the room talks.'},
+
+/* ── Fun & Wild ── */
+{t:'Roast my diagram', c:'Fun & Wild', m:'read',
+ d:'A merciless (but useful) roast of whatever is on your page.',
+ p:'Render the current page of my KoralPaper and ROAST it: be funny and merciless about the layout, the colors, the arrows, everything. Stand-up comedian energy, 6 punchlines max. Then, because you are a professional, add a small sticky note on the page with the three fixes hidden inside the jokes.'},
+{t:'Fortune teller mode', c:'Fun & Wild', m:'read',
+ d:'Claude reads your sketch like tea leaves and predicts your quarter.',
+ p:'Look at my current KoralPaper page like a fortune teller reads tea leaves. Based on the shapes, colors and chaos level, predict my next quarter in mystical language, then draw a small "prophecy card" on the page: an ornate rectangle with my fortune in 3 cryptic lines and one lucky color (use it as the fill). End by admitting one real pattern you noticed in my sketch.'},
+{t:'Turn my flowchart into a story', c:'Fun & Wild', m:'read',
+ d:'Your boring process narrated as an epic adventure, on a new page.',
+ p:'Read the flowchart on my current KoralPaper page. Retell it as a tiny epic adventure on a new page: the data (or customer, or ticket) is the hero, each step a chapter with a dramatic one-line caption, the decision diamond a plot twist, the end state the happy ending. Keep the same layout skeleton so the mapping is obvious. Illustrate with chips and icons.'},
+{t:'Monster from my shapes', c:'Fun & Wild', m:'new',
+ d:'A friendly monster built entirely from KoralPaper primitives.',
+ p:'Build a friendly monster in my KoralPaper using only shapes: ellipses, rectangles, diamonds, draw paths. Give it a name (written under it in the hand font), asymmetric eyes, and exactly one accessory that says "I work in [MY INDUSTRY]". Sketch level 2 for maximum wobble. It becomes my project mascot: make it worthy.'},
+{t:'My week as a weather map', c:'Fun & Wild', m:'new',
+ d:'Calendar stress rendered as a forecast with fronts and storms.',
+ p:'Here is my week: [PASTE ROUGH CALENDAR]. Draw it as a WEATHER MAP in my KoralPaper: sunny ellipses over light days, storm clouds (grey draw-paths) over brutal ones, a cold front line where the hard deadline hits, temperature numbers as workload scores. Weatherman tone in the labels. Bottom corner: tomorrow’s forecast in one line.'},
+{t:'Two truths and a lie, drawn', c:'Fun & Wild', m:'new',
+ d:'A game card about your field that trains critical thinking.',
+ p:'Create a game page in my KoralPaper: "Two truths and a lie about [MY FIELD]". Three big statement cards, visually identical so nothing gives the lie away. On a second page, the reveal: the lie crossed out in coral with a one-line explanation of why people believe it anyway. I will use page 1 in a workshop.'},
+{t:'The conspiracy board', c:'Fun & Wild', m:'new',
+ d:'Red-string detective wall connecting your project chaos.',
+ p:'Make a detective conspiracy board in my KoralPaper about [MY PROJECT/TOPIC]: polaroid-style rectangles with the key players and facts, chaotic coral string lines (thin draw paths) connecting them, tilted sticky notes with wild-but-true observations, and one big question mark ellipse in the middle: the thing nobody can explain. Half joke, half genuinely useful map of the mess.'},
+{t:'Kanban of my life admin', c:'Fun & Wild', m:'new',
+ d:'The chores board, with drama.',
+ p:'Build a life-admin kanban in my KoralPaper: columns "Pretending it does not exist", "Panicking about it", "Actually doing it", "Victory lap". Fill it with my items: [PASTE CHORES/TASKS], phrased with maximum drama. Each column its own fill color, victory column gets tiny stars. Motivating and mildly shameful in equal measure.'},
+{t:'Sketchnote a quote', c:'Fun & Wild', m:'new',
+ d:'A famous idea illustrated sketchnote-style around the words.',
+ p:'Sketchnote this idea in my KoralPaper: "[PASTE A QUOTE OR PRINCIPLE]". The quote in the middle in a strong hand font, then illustrate AROUND it with shapes, arrows, chips and tiny drawings that unpack the meaning: causes on the left, consequences on the right, one counterexample bottom corner. Sketch level 2, warm colors, alive.'},
+{t:'Boss battle: my biggest blocker', c:'Fun & Wild', m:'new',
+ d:'Your obstacle as a video game boss, with a strategy guide.',
+ p:'My biggest blocker right now: [DESCRIBE IT]. Draw it in my KoralPaper as a VIDEO GAME BOSS: a menacing shape-built creature with a health bar (rectangle segments), its "attacks" as labeled chips around it, and below, the strategy guide: 3 numbered moves that actually beat it in real life, each with a damage estimate. Final line: the loot I get when it falls.'},
+{t:'Year compass, one page', c:'Fun & Wild', m:'new',
+ d:'A poetic but practical map of your year ahead.',
+ p:'Build my year compass in my KoralPaper on a 1080x1350 page: a big compass rose in the middle made of shapes, N labeled with my north star: [YOUR BIG GOAL], E with what energizes me, W with what I am walking away from, S with what keeps me steady. Around the edge, 4 season chips with one intention each. Beautiful enough to print, honest enough to sting.'},
+
+/* ── extension to 99 ── */
+{t:'Quarter roadmap, Gantt-lite', c:'Diagrams & Flows', m:'new',
+ d:'Workstreams as horizontal bars across the quarter, dependencies marked.',
+ p:'Draw a lightweight roadmap in my KoralPaper (1920x1080) for [QUARTER] with these workstreams: [LIST THEM WITH ROUGH TIMING]. Month columns as background lanes, each workstream a horizontal bar in its own soft fill with the name inside, dependency arrows where one cannot start before another, and a coral diamond on each hard deadline. No fake precision: weeks, not days.'},
+{t:'Ecosystem map around my business', c:'Diagrams & Flows', m:'new',
+ d:'Everyone orbiting your business: partners, channels, competitors, regulators.',
+ p:'Map the ecosystem around [MY BUSINESS] in my KoralPaper: me in the center, then orbiting groups as clustered chips: customers segments, partners, channels, competitors, suppliers, regulators. Arrows showing value flowing in and out, labeled with what actually flows (money, leads, data, trust). Mark the single most fragile dependency with a coral outline and one line on how to de-risk it.'},
+{t:'Automation map: if this, then that', c:'Diagrams & Flows', m:'new',
+ d:'Your manual routine redrawn as triggers, conditions and actions.',
+ p:'I do this manually every week: [DESCRIBE THE ROUTINE]. Redraw it in my KoralPaper as an automation map: trigger ellipses, condition diamonds, action rectangles, connected left to right. Under each action, a small chip naming a tool that could do it (or "human" where judgment is truly needed). Color the automatable path green and the human-only steps butter. Tell me the % of this routine a machine could own.'},
+{t:'Second-order consequences map', c:'Mind Maps & Thinking', m:'new',
+ d:'A decision and its ripples: first, second and third order effects.',
+ p:'Map the consequences of [DECISION] in my KoralPaper: the decision in the center, first-order effects in a ring around it (sage), second-order effects further out (butter), and at least three third-order effects nobody usually thinks about (blush). Arrows showing the causal chains. Mark the scariest chain in coral and the most underrated positive chain in green.'},
+{t:'Assumption audit of my plan', c:'Mind Maps & Thinking', m:'new',
+ d:'Every belief your plan silently rests on, sorted by risk.',
+ p:'Here is my plan: [PASTE PLAN]. In my KoralPaper, list every assumption it silently makes as sticky notes, then sort them into three columns: TESTED (evidence exists), TESTABLE THIS WEEK (with a chip naming the cheap test), and PURE HOPE (coral fill). Be uncomfortable: include assumptions about me, not just the market. The PURE HOPE column is the real to-do list.'},
+{t:'Funnel from my stage numbers', c:'Charts & Data', m:'new',
+ d:'A conversion funnel with honest drop-off percentages.',
+ p:'Draw my funnel in my KoralPaper from these numbers: [STAGE NAMES AND COUNTS, e.g. Visitors 5000, Leads 400, Calls 60, Clients 12]. Stacked centered rectangles narrowing by actual proportion, count and conversion % on each step, and the biggest drop-off marked with a coral bracket plus one line hypothesizing why it leaks there. Clean style, value labels on.'},
+{t:'Where my hours actually go', c:'Charts & Data', m:'new',
+ d:'A time-budget donut that compares reality with intention.',
+ p:'Chart my week in my KoralPaper: a donut of where my hours actually go: [PASTE ROUGH HOURS PER ACTIVITY]. Next to it, a second smaller donut of where I WANT them to go. Same color per category in both so the gaps jump out. Under the pair, the single trade in plain words: "move X hours from A to B". Values on, brand colors if the kit is active.'},
+{t:'Goal thermometer', c:'Charts & Data', m:'new',
+ d:'Progress toward a target as a big satisfying fill bar.',
+ p:'Draw a goal thermometer in my KoralPaper: target [GOAL AND NUMBER], current [CURRENT NUMBER]. A tall rounded rectangle filled proportionally with my first brand accent (or coral), the percentage huge next to it, milestone ticks at 25/50/75 with tiny labels of what each unlocked. Honest space left empty: that gap is the motivation. 1080x1350 so I can post it.'},
+{t:'Contrarian take carousel', c:'Carousels & Social', m:'new',
+ d:'"Everyone says X, here is why Y": the highest-engagement format, done responsibly.',
+ p:'Build a contrarian carousel in my KoralPaper (1080x1350, 7 pages) around this take: [YOUR CONTRARIAN OPINION]. Page 1: "Everyone says [COMMON BELIEF]." Page 2: "Here is why that is wrong." big. Pages 3-5: the argument, one honest reason per page with a concrete example each. Page 6: the caveat page: where the common belief IS right (mandatory: this is what makes it credible). Page 7: CTA asking which side the reader is on. Consistent grid, render-check all.'},
+{t:'FAQ carousel from real questions', c:'Carousels & Social', m:'new',
+ d:'Customer questions become a service-flavored carousel.',
+ p:'Turn these real questions I keep getting into a KoralPaper carousel: [PASTE 4 TO 6 QUESTIONS]. Cover: "You keep asking me these. Fair." Then one page per question: the question big at top in quotes, my answer in max 3 tight lines below: [PASTE YOUR ROUGH ANSWERS]. Closing page: "Ask me the next one" CTA. Number the pages, keep one accent color.'},
+{t:'Cold-open keynote trio', c:'Presentations & Decks', m:'new',
+ d:'Three opening slides that earn attention before the title appears.',
+ p:'Design a cold open for my talk about [TOPIC] in my KoralPaper: three 1920x1080 pages BEFORE any title slide. Page 1: a provocative image-free statement, huge. Page 2: the twist or the number that reframes it. Page 3: "this talk is about what to do about it" plus the title small at the bottom, almost casual. The audience should be leaning in before they know my name.'},
+{t:'Chart, insight, action: data story', c:'Presentations & Decks', m:'new',
+ d:'The 3-slide pattern that makes any metric meeting shorter.',
+ p:'Build a 3-page data story in my KoralPaper from this data: [PASTE DATA AND CONTEXT]. Page 1: the chart, clean, one highlight colored, everything else grey. Page 2: THE INSIGHT as one sentence, huge, no chart. Page 3: the action: who does what by when, three lines max. If the data does not actually support a confident insight, say so on page 2 in exactly those words.'},
+{t:'Find the duplicates in my document', c:'Rebuild & Redesign', m:'read',
+ d:'Claude hunts repeated ideas across all pages and proposes merges.',
+ p:'Read my whole KoralPaper document. Find ideas, boxes or notes that repeat across pages in different words. Create a new page titled "Duplicates found": each cluster as a group of small chips quoting the duplicates with their page numbers, plus a suggested single merged phrasing in green. Do not change my pages: this is the audit, I decide the merges.'},
+{t:'Reorder my story', c:'Rebuild & Redesign', m:'read',
+ d:'A better narrative order for your pages, proposed as a visual TOC.',
+ p:'Read every page of my KoralPaper document and judge the narrative order. Create a new page: a visual table of contents with one small card per existing page (title + 5-word summary), arranged in the ORDER YOU WOULD PUT THEM, numbered, with arrows. Where you moved something, add a tiny chip saying why. I will drag the real pages myself if I agree.'},
+{t:'Instagram grid preview', c:'Brand & Style', m:'new',
+ d:'Nine tiles as one composed grid: how your profile will look.',
+ p:'Mock my Instagram grid in my KoralPaper: a 3x3 arrangement of 1080x1080-proportioned rectangles on one page, filled with my next nine post concepts: [LIST 9 IDEAS OR LET CLAUDE PROPOSE FROM MY NICHE: X]. Alternate formats visually: quote tiles, chart tiles, photo placeholders (grey with a label). Check the grid reads as ONE composition: adjust colors so no two loud tiles touch.'},
+{t:'Footer system for the whole doc', c:'Brand & Style', m:'edit',
+ d:'A consistent footer stamped on every page of the document.',
+ p:'Add a consistent footer to EVERY page of my KoralPaper document: my name [NAME], handle [@HANDLE], and page number as "3/12", small (14-16px), bottom of each page, same position everywhere, in a grey that whispers. If a page already has something in that spot, nudge the footer, not my content. Render two random pages to verify alignment matches.'},
+{t:'OKR tree', c:'Business & Consulting', m:'new',
+ d:'Objective, key results and initiatives as a clean cascade.',
+ p:'Draw my OKR tree in my KoralPaper: Objective at top: [OBJECTIVE], Key Results as measurable children: [LIST KRS WITH NUMBERS], initiatives under each KR as small chips: [LIST OR PROPOSE]. Strict rule you enforce: if a KR has no number, paint it coral and write "not measurable yet" under it. If an initiative maps to no KR, park it in a side box titled "Why are we doing this?".'},
+{t:'Risk register that fits one wall', c:'Business & Consulting', m:'new',
+ d:'Risks placed on a likelihood-impact grid with owners and mitigations.',
+ p:'Build a risk register in my KoralPaper for [PROJECT]: a 3x3 grid of Likelihood vs Impact, risks as stickies in their cells from: [LIST RISKS OR PASTE CONTEXT]. Anything in the top-right corner gets: an owner chip, a mitigation chip, and a coral border. Bottom-left risks get one shared sticky: "accepted, stop worrying". That sticky is as important as the coral ones.'},
+{t:'Competitor teardown page', c:'Business & Consulting', m:'new',
+ d:'One competitor dissected honestly on a single page.',
+ p:'Tear down [COMPETITOR] on one KoralPaper page from what I know: [PASTE OBSERVATIONS]. Quadrants: their offer and pricing, their angle (what they want the market to believe), their real strength (be generous, no cope), their exploitable weakness. Bottom strip: the one sentence I should say when a prospect mentions them. Never trash-talk: the page should make ME sharper, not them smaller.'},
+{t:'Flashcards: question and answer pages', c:'Learning & Workshops', m:'new',
+ d:'Alternating Q/A pages you can flip through in presentation mode.',
+ p:'Create flashcards in my KoralPaper for [TOPIC] from this material: [PASTE NOTES]. Alternating pages: a QUESTION page (question huge, centered, nothing else) then its ANSWER page (answer + one memory hook line). 6 to 8 pairs, strongest concepts first. I will flip through them in presentation mode: make each question genuinely answerable before the flip.'},
+{t:'Mistake museum', c:'Learning & Workshops', m:'new',
+ d:'The classic errors of a field, exhibited like museum pieces.',
+ p:'Curate a Mistake Museum in my KoralPaper about [FIELD, e.g. first-year consulting]: 6 exhibits, each a framed rectangle (use the frame look: outlined boxes with a small plaque chip underneath) containing the mistake stated in first person, the plaque naming the cost, and a tiny green chip with the correction. Museum tone in the labels: reverent, slightly amused. Title the page "Hall of Expensive Lessons".'},
+{t:'Tarot card of the project', c:'Fun & Wild', m:'new',
+ d:'Your project as a single ornate tarot card with a reading.',
+ p:'Design a tarot card for [MY PROJECT] in my KoralPaper on a 1080x1350 board: ornate double border (two rounded rectangles), a central symbolic figure built from shapes representing the project spirit, the card name at the bottom in serif caps (invent something like THE SHIPBUILDER or THE JUGGLER), roman numeral at top. Below the card, a 3-line reading: what it says about the project upright, and reversed.'},
+{t:'Buzzword bingo card', c:'Fun & Wild', m:'new',
+ d:'A 5x5 bingo card for your next painful meeting.',
+ p:'Make a buzzword bingo card in my KoralPaper for [MEETING TYPE, e.g. quarterly strategy review]: a 5x5 table, center square FREE with a star, the other 24 filled with the phrases most likely to be said unironically: mix universal classics with ones specific to [MY INDUSTRY]. Title it "[MEETING] Survival Bingo". Clean grid so I can actually print it.'},
+{t:'Draw my brain today', c:'Fun & Wild', m:'new',
+ d:'A mood map of your head, right now, as a territory chart.',
+ p:'Interview me with 4 quick questions about how today feels, then draw my brain in my KoralPaper as a territory map: a big ellipse head outline, regions sized by how much space each concern occupies (labeled, soft fills), tiny storm clouds over the stressed regions, one sunny spot for whatever is going well, and a small flag planted on the region that deserves my next hour.'},
+{t:'Recipe card for success', c:'Fun & Wild', m:'new',
+ d:'A goal written as a grandmother-style recipe card.',
+ p:'Write [MY GOAL, e.g. ship the course] as a RECIPE CARD in my KoralPaper: vintage card layout (rounded rectangle, title in the hand font), "Ingredients" as a chip list (the real resources and habits needed, with amounts: "2 mornings/week, undisturbed"), "Method" as 5 numbered steps, "Serves": who benefits, "Burns easily if": the top failure mode in coral. Charming AND true.'},
+{t:'Movie poster for my quarter', c:'Fun & Wild', m:'new',
+ d:'Your next three months as a blockbuster one-sheet.',
+ p:'Design a movie poster in my KoralPaper (1080x1350) for my next quarter: dramatic title (invent it from my goal: [GOAL]), a tagline that is secretly my strategy in 7 words, me as the hero credit, my blockers as the villains in the small cast list, a review quote from "The Future Me" giving it 5 stars, and a release date: the real deadline. Poster-grade type: weight 900, strong hierarchy.'},
+{t:'Portrait of my pet, in shapes', c:'Fun & Wild', m:'new',
+ d:'A geometric portrait built from ellipses and rectangles, with love.',
+ p:'Draw a portrait of my pet in my KoralPaper using only shapes: [DESCRIBE THE PET: SPECIES, COLORS, ONE PERSONALITY TRAIT]. Ellipses and rectangles for the body, tiny diamonds for the eyes if mischievous, the personality trait expressed in the pose or an accessory. Name plate underneath in the hand font. Sketch level 2. Make it fridge-worthy.'},
+];
+
+/* ── UI ── */
+const cats = ['All', ...new Set(P.map(x => x.c))];
+const state = { q: '', cat: 'All', mode: 'all' };
+const $ = id => document.getElementById(id);
+
+function chipRow(el, items, key, labelFn){
+  el.replaceChildren();
+  for (const it of items){
+    const b = document.createElement('button');
+    b.className = 'chip' + (key === 'mode' ? ' mode' : '');
+    b.textContent = labelFn(it);
+    b.dataset.v = it;
+    b.addEventListener('click', () => { state[key] = it; sync(); });
+    el.appendChild(b);
+  }
+}
+chipRow($('cats'), cats, 'cat', c => c);
+chipRow($('modes'), ['all', 'new', 'edit', 'read'], 'mode',
+  m => m === 'all' ? 'Any mode' : MODES[m]);
+
+$('q').addEventListener('input', () => { state.q = $('q').value.trim().toLowerCase(); sync(); });
+
+function matches(x){
+  if (state.cat !== 'All' && x.c !== state.cat) return false;
+  if (state.mode !== 'all' && x.m !== state.mode) return false;
+  if (state.q){
+    const hay = (x.t + ' ' + x.c + ' ' + x.d + ' ' + x.p).toLowerCase();
+    if (!hay.includes(state.q)) return false;
+  }
+  return true;
+}
+
+function sync(){
+  document.querySelectorAll('#cats .chip').forEach(b => b.classList.toggle('sel', b.dataset.v === state.cat));
+  document.querySelectorAll('#modes .chip').forEach(b => b.classList.toggle('sel', b.dataset.v === state.mode));
+  const grid = $('grid');
+  grid.replaceChildren();
+  let n = 0;
+  P.forEach((x, i) => {
+    if (!matches(x)) return;
+    n++;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.i = i;
+    const h = document.createElement('h3'); h.textContent = x.t;
+    const tags = document.createElement('div'); tags.className = 'tags';
+    const t1 = document.createElement('span'); t1.className = 'tag cat'; t1.textContent = x.c;
+    const t2 = document.createElement('span'); t2.className = 'tag mode'; t2.textContent = MODES[x.m];
+    tags.append(t1, t2);
+    const d = document.createElement('p'); d.className = 'desc'; d.textContent = x.d;
+    const pr = document.createElement('div'); pr.className = 'prompt'; pr.textContent = x.p;
+    const foot = document.createElement('div'); foot.className = 'cardfoot';
+    const btn = document.createElement('button'); btn.className = 'copy'; btn.textContent = 'Copy prompt';
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(x.p); }
+      catch (e){ prompt('Copy this prompt:', x.p); }
+      btn.textContent = 'Copied ✓'; btn.classList.add('done');
+      setTimeout(() => { btn.textContent = 'Copy prompt'; btn.classList.remove('done'); }, 1400);
+    });
+    foot.appendChild(btn);
+    card.append(h, tags, d, pr, foot);
+    grid.appendChild(card);
+  });
+  $('count').textContent = n + ' of ' + P.length + ' prompts';
+  $('empty').hidden = n > 0;
+}
+
+$('lucky').addEventListener('click', () => {
+  state.q = ''; $('q').value = ''; state.cat = 'All'; state.mode = 'all';
+  sync();
+  const cards = [...document.querySelectorAll('.card')];
+  const pick = cards[Math.floor(Math.random() * cards.length)];
+  pick.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  pick.classList.add('flash');
+  setTimeout(() => pick.classList.remove('flash'), 1600);
+});
+
+sync();
+</script>
+</body>
+</html>

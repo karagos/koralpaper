@@ -2,6 +2,11 @@
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
+**New:** the **[Prompt Library](https://karagos.github.io/koralpaper/docs/prompts.html)**, 99
+copy-paste prompts for Claude Desktop + KoralPaper, searchable and filtered by category:
+diagrams, carousels, charts, business canvases, workshops, and a Fun & Wild section that
+includes roasting your own diagram.
+
 ## What it looks like
 
 <table>
