@@ -792,12 +792,12 @@ function findBindTarget(sx, sy, excludeId){
 /* ── tools + hints ─────────────────────────────────── */
 const HINTS = {
   select: '', hand: 'Drag to pan around the paper',
-  rect: 'Drag to draw a sticky note — double-click it later to type',
+  rect: 'Drag to draw a sticky note, double-click it later to type',
   diamond: 'Drag to draw a diamond', ellipse: 'Drag to draw an ellipse',
-  chip: 'Drag to place a label chip — double-click to name it',
-  icon: 'Drag to stamp the icon — click the ✳ button again to pick another',
-  arrow: 'Drag between shapes — aim for the side dots to pin the arrow to a side',
-  line: 'Drag to draw a line', draw: 'Draw freely — it keeps your hand',
+  chip: 'Drag to place a label chip, double-click to name it',
+  icon: 'Drag to stamp the icon, click the ✳ button again to pick another',
+  arrow: 'Drag between shapes, aim for the side dots to pin the arrow to a side',
+  line: 'Drag to draw a line', draw: 'Draw freely: it keeps your hand',
   text: 'Click anywhere and start typing',
 };
 function setTool(tool){
@@ -2151,7 +2151,7 @@ function buildSwatches(){
     const b = document.createElement('button');
     b.className = 'swatch' + (key === 'none' ? ' none' : '');
     b.dataset.stroke = key;
-    b.title = key === 'none' ? 'no stroke — fill only' : (COLOR_TITLES[key] || key);
+    b.title = key === 'none' ? 'no stroke: fill only' : (COLOR_TITLES[key] || key);
     sEl.appendChild(b);
   }
   brandSwatchesInto(sEl, 'stroke');
@@ -3090,7 +3090,7 @@ function assetList(){
 }
 function assetSave(list){
   try { localStorage.setItem(ASSET_KEY, JSON.stringify(list)); return true; }
-  catch (e){ alert('Gallery storage is full — remove an asset (right-click) and try again.'); return false; }
+  catch (e){ alert('Gallery storage is full. Remove an asset (right-click) and try again.'); return false; }
 }
 function assetAddFiles(files){
   for (const f of files){
@@ -3188,10 +3188,10 @@ function buildAssetGrid(){
   const list = assetList();
   $('assetHint').textContent = list.length
     ? 'Click to place · right-click to remove. SVG stays pure vector, PNG keeps transparency.'
-    : 'Your reusable logos & marks live here — add an SVG or transparent PNG to get started.';
+    : 'Your reusable logos & marks live here. Add an SVG or transparent PNG to get started.';
   for (const a of list){
     const b = document.createElement('button');
-    b.title = a.name + ' — right-click to remove';
+    b.title = a.name + ' · right-click to remove';
     const im = document.createElement('img');
     im.src = a.src;
     b.appendChild(im);
@@ -3331,7 +3331,7 @@ function miRenderGrid(names){
   const pinned = miPinned();
   for (const name of names){
     const b = document.createElement('button');
-    b.title = name.replace(/_/g, ' ') + ' — right-click to pin';
+    b.title = name.replace(/_/g, ' ') + ' · right-click to pin';
     b.dataset.mi = name;
     b.classList.toggle('pin', pinned.includes(name));
     b.addEventListener('click', ev => { ev.stopPropagation(); pickMaterial(name); });
@@ -3494,7 +3494,7 @@ $('themeBtn').addEventListener('click', () => {
 });
 function syncToggles(){
   $('gridBtn').classList.toggle('on', state.grid !== 'off');
-  $('gridBtn').title = `Grid (now ${state.grid === 'off' ? 'off' : state.grid}), click for options — G`;
+  $('gridBtn').title = `Grid (now ${state.grid === 'off' ? 'off' : state.grid}), click for options · G`;
   $('snapBtn').classList.toggle('on', state.snap);
 }
 
@@ -4062,7 +4062,7 @@ $('tabSettings').addEventListener('click', () => {
   const mb = docSizeMB();
   $('setDocSize').textContent =
     `This document: ${mb < 0.1 ? (mb * 1024).toFixed(0) + ' KB' : mb.toFixed(1) + ' MB'} · ` +
-    `browser autosave holds roughly 5 MB${autosaveFailing ? ' — AUTOSAVE IS CURRENTLY FAILING, save as .json' : ''}`;
+    `browser autosave holds roughly 5 MB${autosaveFailing ? '. AUTOSAVE IS CURRENTLY FAILING, save as .json' : ''}`;
 });
 $('claudeLinkBtn').addEventListener('click', () => {
   $('shortcutsCard').classList.remove('hidden');
@@ -4322,7 +4322,7 @@ $('fileMenu').addEventListener('click', ev => {
 });
 function newDocument(){
   const hasContent = state.pages.length > 1 || state.pages.some(p => p.elements.length);
-  if (hasContent && !confirm('Start a new, empty document?\n\nThe current document will be replaced — use “Save sketch (.json)” first if you want to keep a copy. (⌘Z still brings the pages back.)')) return;
+  if (hasContent && !confirm('Start a new, empty document?\n\nThe current document will be replaced. Use “Save sketch (.json)” first if you want to keep a copy. (⌘Z still brings the pages back.)')) return;
   state.pages = [{ id: uid(), name: 'Page 1', elements: [] }];
   state.pageIndex = 0;
   state.elements = state.pages[0].elements;
@@ -4468,9 +4468,13 @@ function tlAutoCapture(){
   tlSnap(true);
   tl.lastAutoIdx = tl.sel;
 }
+const TL_MAX_FRAMES = 400;
 function tlRestore(frames){
-  tl.frames = (frames || []).filter(f => f && Array.isArray(f.els)).map(f => ({
-    id: f.id || uid(), els: f.els, bg: f.bg || null, board: f.board || null,
+  /* defensive: cap the frame count, and run frame elements through the same
+     migration/normalization as page elements so old or crafted files render */
+  tl.frames = (frames || []).slice(0, TL_MAX_FRAMES)
+    .filter(f => f && Array.isArray(f.els)).map(f => ({
+    id: f.id || uid(), els: migrateElements(f.els, 6), bg: f.bg || null, board: f.board || null,
     delay: clamp(Number(f.delay) || 0.5, 0.1, 30),
     move: clamp(Number(f.move) || 0, 0, 10),
     ease: TL_EASES[f.ease] ? f.ease : 'step',
@@ -5206,25 +5210,24 @@ async function exportGIF(items, targetW, loop){
   if (!rect){ alert('Nothing to export: the selected pages are empty.'); return; }
   const scale = Math.min(1.5, targetW / rect.w);
   const w = Math.round(rect.w * scale), h = Math.round(rect.h * scale);
-  const frames = [];
   showHint('Rendering ' + items.length + ' frames…');
+  const off = document.createElement('canvas');
+  off.width = w; off.height = h;
+  const octx = off.getContext('2d', { willReadFrequently: true });
+  const gw = gifWriter(w, h, loop);   // streaming + diffed: two frames in memory, never more
   for (const it of items){
-    const off = document.createElement('canvas');
-    off.width = w; off.height = h;
     const p2 = state.pages[it.idx];
-    renderScene(off.getContext('2d'), visibleEls(p2.elements), {
+    renderScene(octx, visibleEls(p2.elements), {
       width: w, height: h,
       camera: { x: -rect.x * scale, y: -rect.y * scale, z: scale },
       pal: pal(), bg: pageBgOf(p2),
       grid: state.board ? state.grid : false, gridSize: gsize(),
       gridColor: gridColorForBg(p2.bg || state.bgColor),
     });
-    frames.push({ rgba: off.getContext('2d').getImageData(0, 0, w, h).data, delayCs: it.delay * 100 });
-    await new Promise(r => setTimeout(r, 0)); // keep the UI alive
+    gw.add(octx.getImageData(0, 0, w, h).data, it.delay * 100, true);
+    await tlYield();                  // not throttled in background tabs
   }
-  showHint('Encoding GIF…');
-  await new Promise(r => setTimeout(r, 30));
-  const blob = encodeGIF(frames, w, h, loop, true);
+  const blob = gw.finish();
   const stamp = new Date().toISOString().slice(0, 10);
   download(`koralpaper-${stamp}.gif`, URL.createObjectURL(blob));
   showHint('GIF saved: ' + w + 'x' + h + ', ' + items.length + ' frames, ' + (blob.size / 1048576).toFixed(1) + ' MB');
@@ -5409,6 +5412,8 @@ function docTooBig(data){
   let n = 0;
   if (Array.isArray(data.pages)) for (const p of data.pages) n += Array.isArray(p.elements) ? p.elements.length : 0;
   else if (Array.isArray(data.elements)) n = data.elements.length;
+  if (data.timelapse && Array.isArray(data.timelapse.frames))
+    for (const f of data.timelapse.frames) n += (f && Array.isArray(f.els)) ? f.els.length : 0;
   return n > FILE_OPEN_MAX_ELS;
 }
 fileInput.addEventListener('change', () => {
@@ -5470,7 +5475,7 @@ fileInput.addEventListener('change', () => {
     } catch (e){
       alert('KoralPaper could not open that file.\n\n' +
         'It opens: .json sketches saved by KoralPaper, and .excalidraw files.\n' +
-        'If this file came from KoralPaper, it may be damaged — the technical reason: ' +
+        'If this file came from KoralPaper, it may be damaged. The technical reason: ' +
         (e && e.message ? e.message : 'unknown') + '.');
     }
   };
@@ -7146,7 +7151,7 @@ function openPdfDialog(){
     cb.checked = true;
     cb.dataset.i = i;
     label.appendChild(cb);
-    label.appendChild(document.createTextNode(` ${i + 1} — ${p.name}`));
+    label.appendChild(document.createTextNode(` ${i + 1} · ${p.name}`));
     list.appendChild(label);
   });
   dlg.classList.remove('hidden');

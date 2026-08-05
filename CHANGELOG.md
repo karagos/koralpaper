@@ -1,5 +1,14 @@
 # KoralPaper — Changelog
 
+## v3.65.0
+
+Stability milestone: full application audit after the time-lapse era (v3.61 to v3.64.1).
+
+- Page-based GIF export (⬇ → Animated GIF) now uses the same streaming engine as the time-lapse: only two frames in memory no matter how many pages, changed-rectangle diffing for smaller files, and it keeps running when the tab is in the background (the old version could stall there).
+- Hardened document loading: time-lapse recordings inside .json files are capped at 400 frames, their elements pass through the same migration and normalization as page elements, and the file-size guard now counts recording elements too, so an oversized or crafted file is refused instead of freezing the app.
+- Typography pass over every tooltip, dialog and message for consistent punctuation.
+- Security review: CSP unchanged and strict (no external scripts, object-src none, form-action none), no HTML injection sinks (all UI text goes through textContent), gallery SVG sanitization and the font-family allowlist intact, bridge still bound to 127.0.0.1.
+
 ## v3.64.1
 
 - The fps selector now means one thing everywhere: steps per second of every move. New 3 fps and 5 fps options give big, chunky stop-motion steps; 20 and 25 approach smooth. (Before, stop-motion ignored the fps selector entirely.) Default is 10.

@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.64.1';
+const APP_VERSION = '3.65.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -69,9 +69,9 @@ const COLOR_TITLES = { ink:'black', gdark:'dark grey', gmid:'grey', glight:'ligh
    Google fonts load via a <link> when online and fall back gracefully offline. */
 const FONT_GROUPS = ['Built-in', 'Sans & display', 'Serif', 'Mono', 'Hand & script', 'Pixel & dot'];
 const FONTS = {
-  serif: { label:'Serif — classic', stack:'"Iowan Old Style","Palatino Linotype",Palatino,"Times New Roman",Georgia,serif', weight:'500', group:'Built-in' },
-  sans:  { label:'Sans — notes', stack:'"Avenir Next",Avenir,"Helvetica Neue",Helvetica,Arial,sans-serif', weight:'600', group:'Built-in' },
-  hand:  { label:'Hand — marker', stack:'"Chalkboard SE","Comic Sans MS","Segoe Print","Bradley Hand",cursive', weight:'400', group:'Built-in' },
+  serif: { label:'Serif · classic', stack:'"Iowan Old Style","Palatino Linotype",Palatino,"Times New Roman",Georgia,serif', weight:'500', group:'Built-in' },
+  sans:  { label:'Sans · notes', stack:'"Avenir Next",Avenir,"Helvetica Neue",Helvetica,Arial,sans-serif', weight:'600', group:'Built-in' },
+  hand:  { label:'Hand · marker', stack:'"Chalkboard SE","Comic Sans MS","Segoe Print","Bradley Hand",cursive', weight:'400', group:'Built-in' },
 
   inter:      { label:'Inter', stack:'"Inter","Helvetica Neue",sans-serif', weight:'500', google:'Inter:wght@400;500;700', group:'Sans & display' },
   montserrat: { label:'Montserrat', stack:'"Montserrat","Helvetica Neue",sans-serif', weight:'500', google:'Montserrat:wght@400;500;700', group:'Sans & display' },
