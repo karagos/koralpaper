@@ -1,5 +1,14 @@
 # KoralPaper — Changelog
 
+## v3.63.0
+
+- Time-lapse v2, from slideshow to motion design. Every keyframe now has a hold time (how long it stays still) and a move time (how long it animates into the next frame). During the move, elements with the same identity glide between positions, resize, rotate, fade and recolor smoothly; elements that appear or disappear fade in and out, or hard-cut if you switch Fade off. Four easing personalities: Smooth, Snappy, Overshoot (a bounce past the target, then settle) and Linear, plus 10 / 20 / 25 fps for export smoothness. Frames captured before v2 keep working exactly as before: move defaults to 0, which is the old hard cut.
+- Camera keyframes: switch on 🎥 and each new frame remembers your current zoom and position. The export then travels between them, so you can start tight on a detail and pull out to reveal the whole board.
+- Live preview with scrubber: ▶ plays the full animation, motion and all, in a small player above the bar. Drag the scrubber to any moment. No more export-to-check loops.
+- Onion skin: 👻 shows the selected frame as a ghost under the live page, so you can place the next keyframe precisely.
+- Recordings now survive reload: frames are saved with the document (autosave and .json files), including any images they reference.
+- Smarter GIF engine: every frame after the first encodes only the rectangle that actually changed, with untouched pixels transparent. Lossless, and it applies to the page-based GIF export too. Exports also keep running when the tab is in the background, with a progress bar on the bar.
+
 ## v3.62.0
 
 - Time-lapse recorder: ☰ → "Time-lapse recorder" opens a frames bar above the page strip. Two ways to capture: press F (or the camera button) to snapshot the page as a frame, or switch on ● auto-record and every change you make becomes a frame automatically while you simply work. Frames are element states, not pixels: click one to select it, double-click to put that moment back on the page (undoable), right-click to delete, arrows to reorder, and give any frame its own duration.

@@ -508,8 +508,36 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 /* time-lapse bar */
 .tlbar{
   bottom:88px; left:50%; transform:translateX(-50%);
-  max-width:min(96vw, 1100px); padding:7px 9px; gap:7px; z-index:20;
+  max-width:min(96vw, 1100px); padding:7px 9px; gap:6px; z-index:20;
+  flex-direction:column; align-items:stretch;
 }
+.tlrow{display:flex; align-items:center; gap:7px; min-width:0;}
+.tllab{font-size:11px; font-weight:700; color:var(--ink-soft); flex:0 0 auto;}
+.tlfade{
+  display:flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+  color:var(--ink); flex:0 0 auto; cursor:pointer; white-space:nowrap;
+}
+.tlfade input{accent-color:var(--coral); width:14px; height:14px;}
+.tlbtn.on{background:var(--coral); border-color:var(--coral); color:#fff;}
+.tlprog{
+  flex:1; min-width:40px; height:7px; border-radius:4px; overflow:hidden;
+  background:var(--card-2); border:1px solid var(--line-soft);
+}
+.tlprogfill{height:100%; width:0; background:var(--coral); transition:width .15s;}
+.tlcam{
+  position:absolute; right:2px; top:1px; font-size:9px;
+  background:rgba(251,249,242,.85); border-radius:4px; padding:0 2px;
+}
+.tlprev{
+  bottom:206px; left:50%; transform:translateX(-50%); z-index:21;
+  flex-direction:column; align-items:stretch; padding:9px; gap:7px;
+}
+.tlprev canvas{
+  display:block; margin:0 auto; border-radius:8px;
+  border:1.5px solid var(--line-soft); max-width:min(88vw, 380px);
+}
+.tlprevrow{display:flex; align-items:center; gap:8px;}
+#tlScrub{flex:1; accent-color:var(--coral); min-width:120px;}
 .tlrec{
   width:34px; height:34px; border-radius:50%; font-size:15px; color:var(--ink-soft);
   border:1.5px solid var(--line-soft); background:var(--card); flex:0 0 auto;
@@ -533,6 +561,9 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
   background:rgba(251,249,242,.85); border-radius:4px; padding:0 4px; color:var(--ink);
 }
 .tlsize{flex:0 0 64px; padding:6px 4px;}
+#tlFps{flex:0 0 78px;}
+#tlSize{flex:0 0 70px;}
+#tlEase{flex:0 0 118px;}
 .tlexport{flex:0 0 auto; font-size:12px; padding:8px 13px; margin:0;}
 .gifdialog{width:400px;}
 #gifPageList{display:flex; flex-direction:column; gap:6px; max-height:38vh; overflow-y:auto; margin-top:8px;}

@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.62.0)
+# KoralPaper — *Draw your thinking* (v3.63.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -165,9 +165,13 @@ and Settings.
   elements in one group: recolor any bar or slice with the usual controls,
   and right-click the chart to **edit its data** and rebuild it in place.
 - **Time-lapse recorder (☰):** press F to snapshot the page as a frame, or
-  turn on auto-record and every change you make becomes a frame. Reorder,
-  retime, then export the sequence as a looping GIF or a .webm video:
-  stop-motion for your ideas, including watching Claude build a page live.
+  turn on auto-record and every change you make becomes a frame. Each frame
+  has a hold time and a move time: during the move, elements glide, fade,
+  resize and recolor into the next frame with the easing you pick (Smooth,
+  Snappy, Overshoot, Linear). Camera keyframes zoom and pan between frames,
+  onion skin ghosts the previous frame while you build the next, and a live
+  preview with a scrubber plays the whole animation before you export it as
+  a looping GIF or a .webm video. Recordings are saved with the document.
 - **Animated GIF export (⬇):** pages become frames, each with its own
   on-screen duration, size and loop controls. A carousel becomes a looping
   animation with zero extra tools.

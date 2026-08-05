@@ -576,24 +576,61 @@
 
   <!-- ── Time-lapse frames bar ────────────────────── -->
   <div class="island tlbar hidden" id="tlBar">
-    <button class="tlrec" id="tlRecBtn" title="Auto-record: capture a frame on every change">●</button>
-    <button class="minipill tlbtn" id="tlSnapBtn" title="Capture the current page as a frame (F)">📷 Snap</button>
-    <span class="tlcount" id="tlCount">no frames yet</span>
-    <div class="tlframes" id="tlFrames"></div>
-    <button class="minipill tlbtn" id="tlMoveL" title="Move the selected frame left">◀</button>
-    <button class="minipill tlbtn" id="tlMoveR" title="Move the selected frame right">▶</button>
-    <input type="number" id="tlDelay" class="gifdelay" min="0.1" max="30" step="0.1" value="0.5"
-      title="Seconds for the selected frame (and for new frames)">
-    <button class="minipill tlbtn" id="tlDelayAll" title="Apply this delay to every frame">all</button>
-    <select id="tlSize" class="brandselect tlsize" title="Export width">
-      <option value="480">480</option>
-      <option value="720" selected>720</option>
-      <option value="1080">1080</option>
-    </select>
-    <button class="pill tlexport" id="tlExportGif" title="Export the frames as a looping GIF">GIF</button>
-    <button class="pill tlexport" id="tlExportVid" title="Export the frames as a .webm video">Video</button>
-    <button class="minipill tlbtn danger" id="tlClearBtn" title="Delete all frames">Clear</button>
-    <button class="minipill tlbtn" id="tlCloseBtn" title="Close the recorder">✕</button>
+    <div class="tlrow">
+      <button class="tlrec" id="tlRecBtn" title="Auto-record: capture a frame on every change">●</button>
+      <button class="minipill tlbtn" id="tlSnapBtn" title="Capture the current page as a frame (F)">📷 Snap</button>
+      <button class="minipill tlbtn" id="tlCamBtn" title="Camera keyframes: new frames remember the current zoom and position, and the export travels between them">🎥 Cam</button>
+      <button class="minipill tlbtn" id="tlOnionBtn" title="Onion skin: show the selected frame as a ghost under the live page">👻 Onion</button>
+      <button class="minipill tlbtn" id="tlPlayBtn" title="Preview the animation with all motion, right here">▶ Preview</button>
+      <span class="tlcount" id="tlCount">no frames yet</span>
+      <div class="tlprog hidden" id="tlProg"><div class="tlprogfill" id="tlProgFill"></div></div>
+      <label class="tlfade" title="Fade: elements that appear or disappear between frames fade in and out. Off = hard cuts">
+        <input type="checkbox" id="tlFade" checked> Fade
+      </label>
+      <select id="tlFps" class="brandselect tlsize" title="Smoothness of the motion (frames per second)">
+        <option value="10">10 fps</option>
+        <option value="20" selected>20 fps</option>
+        <option value="25">25 fps</option>
+      </select>
+      <select id="tlSize" class="brandselect tlsize" title="Export width">
+        <option value="480">480</option>
+        <option value="720" selected>720</option>
+        <option value="1080">1080</option>
+      </select>
+      <button class="pill tlexport" id="tlExportGif" title="Export as a looping GIF with smooth motion">GIF</button>
+      <button class="pill tlexport" id="tlExportVid" title="Export as a .webm video with smooth motion">Video</button>
+      <button class="minipill tlbtn danger" id="tlClearBtn" title="Delete all frames">Clear</button>
+      <button class="minipill tlbtn" id="tlCloseBtn" title="Close the recorder">✕</button>
+    </div>
+    <div class="tlrow">
+      <div class="tlframes" id="tlFrames"></div>
+      <button class="minipill tlbtn" id="tlMoveL" title="Move the selected frame left">◀</button>
+      <button class="minipill tlbtn" id="tlMoveR" title="Move the selected frame right">▶</button>
+      <span class="tllab" title="Seconds the selected frame stays still">hold</span>
+      <input type="number" id="tlDelay" class="gifdelay" min="0.1" max="30" step="0.1" value="0.5"
+        title="Seconds the selected frame stays still (and for new frames)">
+      <span class="tllab" title="Seconds of animated motion into the next frame. 0 = hard cut">move</span>
+      <input type="number" id="tlMoveDur" class="gifdelay" min="0" max="10" step="0.1" value="0.6"
+        title="Seconds of animated motion into the next frame. 0 = hard cut">
+      <select id="tlEase" class="brandselect tlsize" title="Personality of the motion">
+        <option value="smooth" selected>Smooth</option>
+        <option value="snappy">Snappy</option>
+        <option value="over">Overshoot</option>
+        <option value="linear">Linear</option>
+      </select>
+      <button class="minipill tlbtn" id="tlDelayAll" title="Apply this hold, move and easing to every frame">all</button>
+    </div>
+  </div>
+
+  <!-- ── Time-lapse live preview ──────────────────── -->
+  <div class="island tlprev hidden" id="tlPreview">
+    <canvas id="tlPrevCv"></canvas>
+    <div class="tlprevrow">
+      <button class="minipill tlbtn" id="tlPrevPlay" title="Play / pause">⏸</button>
+      <input type="range" id="tlScrub" min="0" max="1000" value="0" title="Scrub through the animation">
+      <span class="tlcount" id="tlPrevTime">0.0s</span>
+      <button class="minipill tlbtn" id="tlPrevClose" title="Close the preview">✕</button>
+    </div>
   </div>
 
   <!-- ── Animated GIF dialog ──────────────────────── -->
@@ -706,8 +743,11 @@
         it fills the shape, clipped by the outline. Photos also get a <b>Corners</b>
         slider in the panel, from sharp to a full pill</td></tr>
       <tr><td><b>Time-lapse:</b> ☰ → Time-lapse recorder. <b>F</b> snaps the page as a
-        frame; ● auto-records every change while you work. Reorder, retime, then export
-        the sequence as a GIF or video: stop-motion for your ideas</td></tr>
+        frame; ● auto-records every change while you work. Each frame has a <b>hold</b>
+        time and a <b>move</b> time: during the move, elements glide, fade, resize and
+        recolor into the next frame with the easing you pick. 🎥 records camera zooms,
+        👻 shows the last frame as a ghost while you build the next one, and ▶ previews
+        the whole animation before you export it as a GIF or video</td></tr>
       <tr><td><b>Animated GIF:</b> ⬇ → Animated GIF turns your pages into a looping
         GIF, one frame per page, with its own on-screen time for every frame.
         Carousels become animations</td></tr>

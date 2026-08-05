@@ -269,6 +269,7 @@ function render(){
 }
 
 function drawOverlay(){
+  if (typeof tl !== 'undefined' && tl.open && tl.onion && tl.frames.length) tlDrawOnion();
   const p = pal();
   const z = state.camera.z;
 
@@ -656,9 +657,11 @@ function scheduleAutosave(){
       const doc = JSON.parse(serialize());
       localStorage.setItem(STORE_KEY, JSON.stringify({
         v: 6, appVersion: APP_VERSION,
-        pages: doc.pages, pageIndex: doc.pageIndex, images: usedImages(),
+        pages: doc.pages, pageIndex: doc.pageIndex,
+        images: { ...usedImages(), ...tlImages() },
         camera: state.camera, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
         theme: state.theme, bgColor: state.bgColor, board: state.board,
+        timelapse: tl.frames.length ? { frames: tl.frames } : undefined,
       }));
       setStorageWarn(false);
     } catch (e) {
@@ -697,6 +700,7 @@ function loadSaved(){
     state.theme = data.theme === 'dark' ? 'dark' : 'light';
     state.bgColor = (typeof data.bgColor === 'string' && data.bgColor[0] === '#') ? data.bgColor : null;
     state.board = (data.board && data.board.w > 0 && data.board.h > 0) ? data.board : null;
+    if (data.timelapse && Array.isArray(data.timelapse.frames)) tlRestore(data.timelapse.frames);
     return true;
   } catch (e){ return false; }
 }
@@ -4391,12 +4395,27 @@ function download(name, url){
 }
 
 
-/* ── time-lapse recorder ─────────────────────────────
-   Keyframes store ELEMENT STATES, not pixels: light, restorable, and
-   rendered only at export time through the GIF / video pipelines. */
-const tl = { open: false, auto: false, frames: [], sel: -1, lastJson: null, lastAutoT: 0 };
+/* ── time-lapse recorder v2 ─────────────────────────
+   Keyframes store ELEMENT STATES, not pixels. v2 adds motion: each
+   keyframe holds for `delay` seconds, then MOVES to the next one over
+   `move` seconds with an easing curve. In-between frames are generated
+   by interpolating matched elements (same id): position, size, angle,
+   colors, opacity, font size, corners, even draw points. Optional
+   camera keyframes pan/zoom the viewport between frames. */
+const tl = { open: false, auto: false, frames: [], sel: -1, lastJson: null, lastAutoT: 0,
+  camOn: false, onion: false };
+const TL_EASES = {
+  linear: t => t,
+  smooth: t => t * t * (3 - 2 * t),
+  snappy: t => 1 - Math.pow(1 - t, 3),
+  over: t => { const c = 1.70158, u = t - 1; return 1 + (c + 1) * u * u * u + c * u * u; },
+};
 function tlStrip(els){
   return JSON.parse(JSON.stringify(els, (k, v) => (k && k[0] === '_') ? undefined : v));
+}
+function tlViewRect(){
+  const c = state.camera;
+  return { x: -c.x / c.z, y: -c.y / c.z, w: canvas.clientWidth / c.z, h: canvas.clientHeight / c.z };
 }
 function tlSnap(fromAuto){
   const json = JSON.stringify(state.elements, (k, v) => (k && k[0] === '_') ? undefined : v);
@@ -4407,7 +4426,10 @@ function tlSnap(fromAuto){
     els: JSON.parse(json),
     bg: pageBg() || state.bgColor || null,
     board: state.board ? { ...state.board } : null,
-    delay: Number($('tlDelay').value) || 0.5,
+    delay: clamp(Number($('tlDelay').value) || 0.5, 0.1, 30),
+    move: clamp(Number($('tlMoveDur').value) || 0, 0, 10),
+    ease: TL_EASES[$('tlEase').value] ? $('tlEase').value : 'smooth',
+    cam: tl.camOn ? tlViewRect() : null,
   });
   tl.sel = tl.frames.length - 1;
   tlRender();
@@ -4419,6 +4441,26 @@ function tlAutoCapture(){
   if (now - tl.lastAutoT < 250) return;                 // burst throttle
   tl.lastAutoT = now;
   tlSnap(true);
+}
+function tlRestore(frames){
+  tl.frames = (frames || []).filter(f => f && Array.isArray(f.els)).map(f => ({
+    id: f.id || uid(), els: f.els, bg: f.bg || null, board: f.board || null,
+    delay: clamp(Number(f.delay) || 0.5, 0.1, 30),
+    move: clamp(Number(f.move) || 0, 0, 10),
+    ease: TL_EASES[f.ease] ? f.ease : 'smooth',
+    cam: (f.cam && f.cam.w > 0 && f.cam.h > 0) ? f.cam : null,
+  }));
+  tl.sel = -1; tl.lastJson = null;
+  if (tl.open) tlRender();
+}
+function tlImages(){
+  /* images referenced only by keyframes, so autosave/save keeps their pixels */
+  const used = {};
+  for (const f of tl.frames) for (const el of f.els){
+    if (el.imgId && state.images[el.imgId] !== undefined) used[el.imgId] = state.images[el.imgId];
+    if (el.imgFillId && state.images[el.imgFillId] !== undefined) used[el.imgFillId] = state.images[el.imgFillId];
+  }
+  return used;
 }
 function tlFrameRect(){
   const f0 = tl.frames.find(f => f.board);
@@ -4436,16 +4478,149 @@ function tlFrameRect(){
   const pad = 40;
   return { x: r.x - pad, y: r.y - pad, w: (r.x2 - r.x) + pad * 2, h: (r.y2 - r.y) + pad * 2 };
 }
-function tlRenderFrameTo(ctx2, f, rect, w, h){
-  adoptImages(f.els);
-  renderScene(ctx2, visibleEls(f.els), {
+
+/* ── interpolation ── */
+function tlParseHex(c){
+  if (typeof c !== 'string' || c[0] !== '#') return null;
+  let x = c.slice(1);
+  if (x.length === 3) x = x[0] + x[0] + x[1] + x[1] + x[2] + x[2];
+  if (x.length !== 6 || /[^0-9a-fA-F]/.test(x)) return null;
+  const n = parseInt(x, 16);
+  return [n >> 16, (n >> 8) & 255, n & 255];
+}
+function tlMixColor(a, b, t){
+  if (a === b) return a;
+  const ca = tlParseHex(a), cb = tlParseHex(b);
+  if (!ca || !cb) return t < 0.5 ? a : b;           // palette tokens snap mid-move
+  const m = i => clamp(Math.round(ca[i] + (cb[i] - ca[i]) * t), 0, 255);
+  return '#' + ((1 << 24) | (m(0) << 16) | (m(1) << 8) | m(2)).toString(16).slice(1);
+}
+const TL_NUMS = ['x', 'y', 'w', 'h', 'size', 'sw', 'angle', 'imgRadius', 'cornerRad', 'curve'];
+const TL_COLS = ['stroke', 'fill', 'textColor'];
+function tlTweenEl(a, b, t){
+  const e = { ...(t < 0.5 ? a : b) };               // discrete props snap mid-move
+  for (const k of TL_NUMS)
+    if (typeof a[k] === 'number' && typeof b[k] === 'number') e[k] = a[k] + (b[k] - a[k]) * t;
+  const oa = a.opacity == null ? 100 : a.opacity, ob = b.opacity == null ? 100 : b.opacity;
+  if (oa !== ob) e.opacity = clamp(oa + (ob - oa) * t, 0, 100);
+  for (const k of TL_COLS)
+    if (a[k] !== undefined && b[k] !== undefined && a[k] !== b[k]) e[k] = tlMixColor(a[k], b[k], t);
+  if (Array.isArray(a.points) && Array.isArray(b.points) && a.points.length === b.points.length)
+    e.points = a.points.map((p, i) =>
+      [p[0] + (b.points[i][0] - p[0]) * t, p[1] + (b.points[i][1] - p[1]) * t]);
+  return e;
+}
+function tlTweenEls(fa, fb, t, fade){
+  const mapA = new Map(fa.els.map(e => [e.id, e]));
+  const mapB = new Map(fb.els.map(e => [e.id, e]));
+  const out = [];
+  for (const a of fa.els){
+    const b = mapB.get(a.id);
+    if (b){ out.push(tlTweenEl(a, b, t)); continue; }
+    if (!fade){ out.push(a); continue; }           // hard cut: stays until arrival
+    const o = (a.opacity == null ? 100 : a.opacity) * (1 - clamp(t, 0, 1));
+    if (o > 1) out.push({ ...a, opacity: o });     // exit: fade away
+  }
+  for (const b of fb.els){
+    if (mapA.has(b.id) || !fade) continue;         // hard cut: appears at arrival
+    const o = (b.opacity == null ? 100 : b.opacity) * clamp(t, 0, 1);
+    if (o > 1) out.push({ ...b, opacity: o });     // enter: fade in
+  }
+  return out;
+}
+function tlLerpRect(a, b, t){
+  const k = clamp(t, 0, 1);                        // cameras never overshoot
+  const cx = (a.x + a.w / 2) + ((b.x + b.w / 2) - (a.x + a.w / 2)) * k;
+  const cy = (a.y + a.h / 2) + ((b.y + b.h / 2) - (a.y + a.h / 2)) * k;
+  const w = Math.exp(Math.log(a.w) + (Math.log(b.w) - Math.log(a.w)) * k);
+  const h = Math.exp(Math.log(a.h) + (Math.log(b.h) - Math.log(a.h)) * k);
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+function tlFitRect(r, aspect){
+  /* cover-fit any camera rect to the export aspect so zooms never distort */
+  let { x, y, w, h } = r;
+  if (w / h < aspect){ const nw = h * aspect; x -= (nw - w) / 2; w = nw; }
+  else { const nh = w / aspect; y -= (nh - h) / 2; h = nh; }
+  return { x, y, w, h };
+}
+
+/* ── timeline: hold segments + move segments ── */
+function tlSegments(loop){
+  const segs = [], n = tl.frames.length;
+  for (let i = 0; i < n; i++){
+    const f = tl.frames[i];
+    segs.push({ kind: 'hold', i, dur: clamp(Number(f.delay) || 0.5, 0.05, 30) });
+    const j = i + 1 < n ? i + 1 : (loop ? 0 : -1);
+    const mv = Number(f.move) || 0;
+    if (j >= 0 && mv > 0)
+      segs.push({ kind: 'move', i, j, dur: mv, ease: TL_EASES[f.ease] ? f.ease : 'smooth' });
+  }
+  return { segs, total: segs.reduce((s, x) => s + x.dur, 0) };
+}
+function tlStateAt(time, segs, fade, baseRect){
+  let t = time;
+  for (const s of segs){
+    if (t > s.dur){ t -= s.dur; continue; }
+    if (s.kind === 'hold'){
+      const f = tl.frames[s.i];
+      return { els: f.els, bg: f.bg, cam: f.cam || null };
+    }
+    const fa = tl.frames[s.i], fb = tl.frames[s.j];
+    const k = TL_EASES[s.ease](clamp(t / s.dur, 0, 1));
+    const ra = fa.cam || baseRect, rb = fb.cam || baseRect;
+    return {
+      els: tlTweenEls(fa, fb, k, fade),
+      bg: tlMixColor(fa.bg || pal().bg, fb.bg || pal().bg, clamp(k, 0, 1)),
+      cam: (fa.cam || fb.cam) ? tlLerpRect(ra, rb, k) : null,
+    };
+  }
+  const f = tl.frames[tl.frames.length - 1];
+  return f ? { els: f.els, bg: f.bg, cam: f.cam || null } : null;
+}
+function tlDrawState(ctx2, st, baseRect, w, h){
+  const rect = st.cam ? tlFitRect(st.cam, w / h) : baseRect;
+  adoptImages(st.els);
+  renderScene(ctx2, visibleEls(st.els), {
     width: w, height: h,
     camera: { x: -rect.x * (w / rect.w), y: -rect.y * (w / rect.w), z: w / rect.w },
-    pal: pal(), bg: f.bg || pal().bg,
+    pal: pal(), bg: st.bg || pal().bg,
     grid: false,
   });
 }
+function tlRenderFrameTo(ctx2, f, rect, w, h){
+  tlDrawState(ctx2, { els: f.els, bg: f.bg, cam: null }, rect, w, h);
+}
+
+/* ── onion skin: ghost of the reference keyframe over the live canvas ── */
+let tlOnionCache = null;
+function tlDrawOnion(){
+  const f = tl.frames[tl.sel >= 0 ? tl.sel : tl.frames.length - 1];
+  if (!f) return;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const dpr = window.devicePixelRatio || 1;
+  const key = f.id + '|' + state.camera.x + ',' + state.camera.y + ',' + state.camera.z +
+    '|' + w + 'x' + h;
+  if (!tlOnionCache || tlOnionCache.key !== key){
+    const off = document.createElement('canvas');
+    off.width = Math.max(1, w * dpr); off.height = Math.max(1, h * dpr);
+    const c2 = off.getContext('2d');
+    c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+    adoptImages(f.els);
+    renderScene(c2, visibleEls(f.els), {
+      width: w, height: h, camera: state.camera, pal: pal(),
+      transparent: true, grid: false,
+    });
+    tlOnionCache = { key, canvas: off };
+  }
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.drawImage(tlOnionCache.canvas, 0, 0, w, h);
+  ctx.restore();
+}
+
+/* ── bar UI ── */
 function tlRender(){
+  tlOnionCache = null;
   const strip = $('tlFrames');
   strip.replaceChildren();
   tl.frames.forEach((f, i) => {
@@ -4462,8 +4637,15 @@ function tlRender(){
     num.className = 'tlnum';
     num.textContent = (i + 1);
     cell.append(cv, num);
-    cell.title = 'Frame ' + (i + 1) + ' · ' + f.delay + 's. Click to select, double-click to put it back on the page, right-click to delete';
-    cell.addEventListener('click', () => { tl.sel = i; $('tlDelay').value = f.delay; tlRender(); });
+    if (f.cam){
+      const camTag = document.createElement('span');
+      camTag.className = 'tlcam';
+      camTag.textContent = '🎥';
+      cell.appendChild(camTag);
+    }
+    cell.title = 'Frame ' + (i + 1) + ' · hold ' + f.delay + 's · move ' + (f.move || 0) +
+      's. Click to select, double-click to put it back on the page, right-click to delete';
+    cell.addEventListener('click', () => { tl.sel = i; tlSyncInputs(); tlRender(); });
     cell.addEventListener('dblclick', () => {
       state.elements = tlStrip(f.els);
       state.pages[state.pageIndex].elements = state.elements;
@@ -4483,8 +4665,18 @@ function tlRender(){
   });
   $('tlCount').textContent = tl.frames.length ? tl.frames.length + ' frames' : 'no frames yet';
   $('tlRecBtn').classList.toggle('on', tl.auto);
-  $('tlExportGif').disabled = $('tlExportVid').disabled = tl.frames.length < 2;
+  $('tlCamBtn').classList.toggle('on', tl.camOn);
+  $('tlOnionBtn').classList.toggle('on', tl.onion);
+  $('tlExportGif').disabled = $('tlExportVid').disabled = $('tlPlayBtn').disabled =
+    tl.frames.length < 2;
   $('tlMoveL').disabled = $('tlMoveR').disabled = tl.sel < 0;
+}
+function tlSyncInputs(){
+  const f = tl.frames[tl.sel];
+  if (!f) return;
+  $('tlDelay').value = f.delay;
+  $('tlMoveDur').value = f.move || 0;
+  $('tlEase').value = TL_EASES[f.ease] ? f.ease : 'smooth';
 }
 function tlMove(dir){
   const i = tl.sel;
@@ -4495,37 +4687,75 @@ function tlMove(dir){
   tl.sel = j;
   tlRender();
 }
-async function tlExportGif(){
-  const rect = tlFrameRect();
-  if (!rect) return;
-  const targetW = Number($('tlSize').value) || 720;
-  const scale = Math.min(1.5, targetW / rect.w);
-  const w = Math.round(rect.w * scale), h = Math.round(rect.h * scale);
-  showHint('Rendering ' + tl.frames.length + ' frames…');
-  const frames = [];
-  for (const f of tl.frames){
-    const off = document.createElement('canvas');
-    off.width = w; off.height = h;
-    tlRenderFrameTo(off.getContext('2d'), f, rect, w, h);
-    frames.push({ rgba: off.getContext('2d').getImageData(0, 0, w, h).data, delayCs: f.delay * 100 });
-    await new Promise(r => setTimeout(r, 0));
+function tlProgress(p){
+  $('tlProg').classList.toggle('hidden', p == null);
+  if (p != null) $('tlProgFill').style.width = Math.round(clamp(p, 0, 1) * 100) + '%';
+}
+/* MessageChannel yield: unlike setTimeout it is NOT throttled in hidden tabs,
+   so exports keep moving even when the tab is in the background */
+function tlYield(){
+  return new Promise(r => {
+    const ch = new MessageChannel();
+    ch.port1.onmessage = () => r();
+    ch.port2.postMessage(0);
+  });
+}
+
+/* ── exports ── */
+function tlBuildPlan(fps, loop){
+  const { segs, total } = tlSegments(loop);
+  const plan = [];
+  let cursor = 0;
+  for (const s of segs){
+    if (s.kind === 'hold'){
+      plan.push({ time: cursor + 0.001, delayCs: Math.round(s.dur * 100) });
+    } else {
+      const steps = Math.max(1, Math.round(s.dur * fps));
+      for (let k = 1; k < steps; k++)
+        plan.push({ time: cursor + (k / steps) * s.dur, delayCs: Math.max(2, Math.round(100 / fps)) });
+    }
+    cursor += s.dur;
   }
-  showHint('Encoding GIF…');
-  await new Promise(r => setTimeout(r, 30));
-  const blob = encodeGIF(frames, w, h, true);
+  return { plan, segs, total };
+}
+async function tlExportGif(){
+  const baseRect = tlFrameRect();
+  if (!baseRect) return;
+  const targetW = Number($('tlSize').value) || 720;
+  const fps = Number($('tlFps').value) || 20;
+  const fade = $('tlFade').checked;
+  const scale = Math.min(1.5, targetW / baseRect.w);
+  const w = Math.round(baseRect.w * scale), h = Math.round(baseRect.h * scale);
+  const { plan, segs } = tlBuildPlan(fps, true);
+  showHint('Rendering ' + plan.length + ' frames…');
+  const off = document.createElement('canvas');
+  off.width = w; off.height = h;
+  const c2 = off.getContext('2d', { willReadFrequently: true });
+  const gw = gifWriter(w, h, true);              // streaming: two frames in memory, never more
+  tlProgress(0);
+  for (let i = 0; i < plan.length; i++){
+    const st = tlStateAt(plan[i].time, segs, fade, baseRect);
+    tlDrawState(c2, st, baseRect, w, h);
+    gw.add(c2.getImageData(0, 0, w, h).data, plan[i].delayCs, true);
+    if ((i & 3) === 3){ tlProgress(i / plan.length); await tlYield(); }
+  }
+  const blob = gw.finish();
+  tlProgress(null);
   const stamp = new Date().toISOString().slice(0, 10);
   download(`koralpaper-timelapse-${stamp}.gif`, URL.createObjectURL(blob));
-  showHint('Time-lapse GIF saved: ' + tl.frames.length + ' frames, ' + (blob.size / 1048576).toFixed(1) + ' MB');
+  showHint('Time-lapse GIF saved: ' + plan.length + ' frames, ' + (blob.size / 1048576).toFixed(1) + ' MB');
 }
 async function tlExportVideo(){
-  const rect = tlFrameRect();
-  if (!rect) return;
+  const baseRect = tlFrameRect();
+  if (!baseRect) return;
   const targetW = Number($('tlSize').value) || 720;
-  const scale = Math.min(2, targetW / rect.w);
-  const w = Math.round(rect.w * scale) & ~1, h = Math.round(rect.h * scale) & ~1;
+  const fade = $('tlFade').checked;
+  const scale = Math.min(2, targetW / baseRect.w);
+  const w = Math.round(baseRect.w * scale) & ~1, h = Math.round(baseRect.h * scale) & ~1;
   const cv = document.createElement('canvas');
   cv.width = w; cv.height = h;
   const ctx2 = cv.getContext('2d');
+  const { segs, total } = tlSegments(false);     // a video plays once: no loop-back move
   const stream = cv.captureStream(30);
   const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
     ? 'video/webm;codecs=vp9' : 'video/webm';
@@ -4533,12 +4763,21 @@ async function tlExportVideo(){
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   const done = new Promise(r => { rec.onstop = r; });
-  showHint('Recording video…');
+  showHint('Recording ' + total.toFixed(1) + 's of video…');
+  tlDrawState(ctx2, tlStateAt(0.001, segs, fade, baseRect), baseRect, w, h);
   rec.start();
-  for (const f of tl.frames){
-    tlRenderFrameTo(ctx2, f, rect, w, h);
-    await new Promise(r => setTimeout(r, Math.max(100, f.delay * 1000)));
-  }
+  const t0 = performance.now();
+  await new Promise(res => {
+    const step = () => {
+      const t = (performance.now() - t0) / 1000;
+      if (t >= total){ res(); return; }
+      tlDrawState(ctx2, tlStateAt(t, segs, fade, baseRect), baseRect, w, h);
+      setTimeout(step, 33);                      // ~30fps draw clock
+    };
+    step();
+  });
+  tlDrawState(ctx2, tlStateAt(Math.max(0, total - 0.001), segs, fade, baseRect), baseRect, w, h);
+  await new Promise(r => setTimeout(r, 150));
   rec.stop();
   await done;
   const blob = new Blob(chunks, { type: 'video/webm' });
@@ -4546,14 +4785,68 @@ async function tlExportVideo(){
   download(`koralpaper-timelapse-${stamp}.webm`, URL.createObjectURL(blob));
   showHint('Time-lapse video saved: ' + (blob.size / 1048576).toFixed(1) + ' MB');
 }
+
+/* ── live preview ── */
+const tlPrev = { on: false, playing: false, t: 0, raf: 0, last: 0, rect: null, segs: null, total: 0 };
+function tlPreviewOpen(){
+  if (tl.frames.length < 2) return;
+  tlPrev.rect = tlFrameRect();
+  if (!tlPrev.rect) return;
+  const tli = tlSegments(true);
+  tlPrev.segs = tli.segs; tlPrev.total = tli.total;
+  const cv = $('tlPrevCv');
+  const s = Math.min(380 / tlPrev.rect.w, 300 / tlPrev.rect.h);
+  const cw = Math.max(60, Math.round(tlPrev.rect.w * s)), chh = Math.max(60, Math.round(tlPrev.rect.h * s));
+  cv.width = cw * 2; cv.height = chh * 2;
+  cv.style.width = cw + 'px'; cv.style.height = chh + 'px';
+  tlPrev.on = true; tlPrev.t = 0;
+  $('tlPreview').classList.remove('hidden');
+  $('tlPlayBtn').classList.add('on');
+  tlPrevDrawAt(0);
+  tlPrevSetPlaying(true);
+}
+function tlPreviewClose(){
+  tlPrev.on = false;
+  tlPrevSetPlaying(false);
+  $('tlPreview').classList.add('hidden');
+  $('tlPlayBtn').classList.remove('on');
+}
+function tlPrevDrawAt(t){
+  const cv = $('tlPrevCv');
+  const st = tlStateAt(clamp(t, 0.001, Math.max(0.001, tlPrev.total - 0.001)),
+    tlPrev.segs, $('tlFade').checked, tlPrev.rect);
+  if (!st) return;
+  tlDrawState(cv.getContext('2d'), st, tlPrev.rect, cv.width, cv.height);
+  $('tlScrub').value = Math.round(t / Math.max(0.001, tlPrev.total) * 1000);
+  $('tlPrevTime').textContent = t.toFixed(1) + 's / ' + tlPrev.total.toFixed(1) + 's';
+}
+function tlPrevSetPlaying(on){
+  /* interval clock, not rAF: rAF stops in non-painting tabs and the
+     preview must keep its place even when the window is backgrounded */
+  tlPrev.playing = on;
+  $('tlPrevPlay').textContent = on ? '⏸' : '▶';
+  clearInterval(tlPrev.raf);
+  if (!on) return;
+  tlPrev.last = performance.now();
+  tlPrev.raf = setInterval(() => {
+    if (!tlPrev.on || !tlPrev.playing) return;
+    const now = performance.now();
+    tlPrev.t += (now - tlPrev.last) / 1000;
+    tlPrev.last = now;
+    if (tlPrev.t >= tlPrev.total) tlPrev.t %= tlPrev.total;   // seamless loop
+    tlPrevDrawAt(tlPrev.t);
+  }, 33);
+}
 function tlToggleBar(){
   tl.open = !tl.open;
   $('tlBar').classList.toggle('hidden', !tl.open);
   if (tl.open){
     tlRender();
-    showHint('Time-lapse: F or 📷 snaps a frame. ● records every change automatically');
+    showHint('Time-lapse: F or 📷 snaps a frame. ● auto-records. ▶ previews the motion');
   } else {
     tl.auto = false;
+    if (tlPrev.on) tlPreviewClose();
+    requestRender();                              // clears the onion ghost
   }
 }
 $('tlSnapBtn').addEventListener('click', () => tlSnap(false));
@@ -4563,24 +4856,54 @@ $('tlRecBtn').addEventListener('click', () => {
   tlRender();
   showHint(tl.auto ? 'Auto-record ON: every change becomes a frame' : 'Auto-record off');
 });
+$('tlCamBtn').addEventListener('click', () => {
+  tl.camOn = !tl.camOn;
+  tlRender();
+  showHint(tl.camOn
+    ? 'Camera ON: each new frame remembers this zoom and position, and the export travels between them'
+    : 'Camera off: the export shows the whole board');
+});
+$('tlOnionBtn').addEventListener('click', () => {
+  tl.onion = !tl.onion;
+  tlRender(); requestRender();
+  showHint(tl.onion ? 'Onion skin ON: the selected frame shows as a ghost' : 'Onion skin off');
+});
+$('tlPlayBtn').addEventListener('click', () => { tlPrev.on ? tlPreviewClose() : tlPreviewOpen(); });
+$('tlPrevPlay').addEventListener('click', () => tlPrevSetPlaying(!tlPrev.playing));
+$('tlPrevClose').addEventListener('click', tlPreviewClose);
+$('tlScrub').addEventListener('input', () => {
+  tlPrevSetPlaying(false);
+  tlPrev.t = Number($('tlScrub').value) / 1000 * tlPrev.total;
+  tlPrevDrawAt(tlPrev.t);
+});
 $('tlDelay').addEventListener('change', () => {
   const v = clamp(Number($('tlDelay').value) || 0.5, 0.1, 30);
   $('tlDelay').value = v;
-  if (tl.sel >= 0 && tl.frames[tl.sel]) tl.frames[tl.sel].delay = v;
-  tlRender();
+  if (tl.sel >= 0 && tl.frames[tl.sel]){ tl.frames[tl.sel].delay = v; tlRender(); }
+});
+$('tlMoveDur').addEventListener('change', () => {
+  const v = clamp(Number($('tlMoveDur').value) || 0, 0, 10);
+  $('tlMoveDur').value = v;
+  if (tl.sel >= 0 && tl.frames[tl.sel]){ tl.frames[tl.sel].move = v; tlRender(); }
+});
+$('tlEase').addEventListener('change', () => {
+  if (tl.sel >= 0 && tl.frames[tl.sel]){ tl.frames[tl.sel].ease = $('tlEase').value; tlRender(); }
 });
 $('tlDelayAll').addEventListener('click', () => {
-  const v = clamp(Number($('tlDelay').value) || 0.5, 0.1, 30);
-  for (const f of tl.frames) f.delay = v;
+  const d = clamp(Number($('tlDelay').value) || 0.5, 0.1, 30);
+  const m = clamp(Number($('tlMoveDur').value) || 0, 0, 10);
+  const e = TL_EASES[$('tlEase').value] ? $('tlEase').value : 'smooth';
+  for (const f of tl.frames){ f.delay = d; f.move = m; f.ease = e; }
   tlRender();
-  showHint('Every frame set to ' + v + 's');
+  showHint('Every frame: hold ' + d + 's, move ' + m + 's');
 });
 $('tlMoveL').addEventListener('click', () => tlMove(-1));
 $('tlMoveR').addEventListener('click', () => tlMove(1));
 $('tlClearBtn').addEventListener('click', () => {
   if (tl.frames.length && !confirm('Delete all ' + tl.frames.length + ' captured frames?')) return;
   tl.frames = []; tl.sel = -1; tl.lastJson = null;
-  tlRender();
+  if (tlPrev.on) tlPreviewClose();
+  tlRender(); requestRender();
 });
 $('tlCloseBtn').addEventListener('click', tlToggleBar);
 $('tlExportGif').addEventListener('click', tlExportGif);
@@ -4589,18 +4912,21 @@ $('tlExportVid').addEventListener('click', tlExportVideo);
 /* ── animated GIF export ─────────────────────────────
    Zero-dependency GIF89a encoder: median-cut quantization to 256 colors,
    GIF-flavored LZW, Netscape looping, per-frame delays in centiseconds. */
-function gifQuantize(rgba){
-  // collect unique colors (5-bit bucketed for photos); exact if few
+function gifQuantize(rgba, skip){
+  // collect unique colors (5-bit bucketed for photos); exact if few.
+  // skip: per-pixel mask of pixels that become the TRANSPARENT slot
   const seen = new Map();
   for (let i = 0; i < rgba.length; i += 4){
+    if (skip && skip[i >> 2]) continue;
     const key = (rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2];
     seen.set(key, (seen.get(key) || 0) + 1);
   }
   let colors = [...seen.keys()];
-  if (colors.length > 256){
+  const maxC = skip ? 255 : 256;   // reserve one slot for transparency
+  if (colors.length > maxC){
     // median cut on the unique colors weighted by count
     let boxes = [colors];
-    while (boxes.length < 256){
+    while (boxes.length < maxC){
       boxes.sort((a, b) => b.length - a.length);
       const box = boxes.shift();
       if (box.length <= 1){ boxes.push(box); break; }
@@ -4646,6 +4972,7 @@ function gifQuantize(rgba){
   };
   const idx = new Uint8Array(rgba.length / 4);
   for (let i = 0, j = 0; i < rgba.length; i += 4, j++){
+    if (skip && skip[j]){ idx[j] = colors.length; continue; }   // transparent slot
     const key = (rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2];
     const e = exact.get(key);
     idx[j] = e !== undefined ? e : nearest(rgba[i], rgba[i + 1], rgba[i + 2]);
@@ -4685,8 +5012,12 @@ function gifLZW(minCodeSize, pixels){
   if (bits > 0) bytes.push(cur & 255);
   return bytes;
 }
-function encodeGIF(frames, w, h, loop){
-  // frames: [{rgba: Uint8ClampedArray, delayCs: number}]
+function gifWriter(w, h, loop){
+  /* streaming GIF89a writer: add() one frame at a time so only the current
+     and previous frame live in memory. With diff=true each frame encodes
+     ONLY the rectangle that changed, unchanged pixels inside it transparent
+     (disposal 1 keeps the previous frame underneath). Lossless, and tween
+     sequences shrink by an order of magnitude. */
   const out = [];
   const push = (...b) => out.push(...b);
   const pushStr = str => { for (const ch of str) out.push(ch.charCodeAt(0)); };
@@ -4695,25 +5026,71 @@ function encodeGIF(frames, w, h, loop){
   if (loop){
     push(0x21, 0xFF, 11); pushStr('NETSCAPE2.0'); push(3, 1, 0, 0, 0);
   }
-  for (const fr of frames){
-    const { palette, indices, count } = gifQuantize(fr.rgba);
-    const palBits = Math.max(1, Math.ceil(Math.log2(Math.max(2, count))));
-    const palSize = 1 << palBits;
-    const d = Math.max(2, Math.round(fr.delayCs));
-    push(0x21, 0xF9, 4, 0x04, d & 255, d >> 8, 0, 0); // GCE: disposal 1
-    push(0x2C, 0, 0, 0, 0, w & 255, w >> 8, h & 255, h >> 8, 0x80 | (palBits - 1));
-    for (let i = 0; i < palSize * 3; i++) push(palette[i] || 0);
-    const minCode = Math.max(2, palBits);
-    push(minCode);
-    const data = gifLZW(minCode, indices);
-    for (let i = 0; i < data.length; i += 255){
-      const chunk = data.slice(i, i + 255);
-      push(chunk.length, ...chunk);
-    }
-    push(0);
-  }
-  push(0x3B);
-  return new Blob([new Uint8Array(out)], { type: 'image/gif' });
+  let prev = null;
+  return {
+    add(rgba, delayCs, diff){
+      const d = Math.max(2, Math.round(delayCs));
+      let rx = 0, ry = 0, rw = w, rh = h, sub = rgba, skip = null;
+      if (diff && prev){
+        const a32 = new Uint32Array(rgba.buffer, rgba.byteOffset, w * h);
+        const p32 = new Uint32Array(prev.buffer, prev.byteOffset, w * h);
+        let x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (let y = 0; y < h; y++){
+          const row = y * w;
+          for (let x = 0; x < w; x++){
+            if (a32[row + x] !== p32[row + x]){
+              if (x < x0) x0 = x;
+              if (x > x1) x1 = x;
+              if (y < y0) y0 = y;
+              if (y > y1) y1 = y;
+            }
+          }
+        }
+        if (x1 < 0){ x0 = y0 = 0; x1 = y1 = 0; }  // identical frame: 1x1 transparent
+        rx = x0; ry = y0; rw = x1 - x0 + 1; rh = y1 - y0 + 1;
+        sub = new Uint8ClampedArray(rw * rh * 4);
+        skip = new Uint8Array(rw * rh);
+        for (let y = 0; y < rh; y++){
+          for (let x = 0; x < rw; x++){
+            const si = (ry + y) * w + (rx + x);
+            const di = y * rw + x;
+            if (a32[si] === p32[si]){ skip[di] = 1; continue; }
+            sub[di * 4] = rgba[si * 4];
+            sub[di * 4 + 1] = rgba[si * 4 + 1];
+            sub[di * 4 + 2] = rgba[si * 4 + 2];
+            sub[di * 4 + 3] = 255;
+          }
+        }
+      }
+      const { palette, indices, count } = gifQuantize(sub, skip);
+      const slots = count + (skip ? 1 : 0);
+      const palBits = Math.max(1, Math.ceil(Math.log2(Math.max(2, slots))));
+      const palSize = 1 << palBits;
+      push(0x21, 0xF9, 4, 0x04 | (skip ? 1 : 0), d & 255, d >> 8, skip ? count : 0, 0);
+      push(0x2C, rx & 255, rx >> 8, ry & 255, ry >> 8,
+        rw & 255, rw >> 8, rh & 255, rh >> 8, 0x80 | (palBits - 1));
+      for (let i = 0; i < palSize * 3; i++) push(palette[i] || 0);
+      const minCode = Math.max(2, palBits);
+      push(minCode);
+      const data = gifLZW(minCode, indices);
+      for (let i = 0; i < data.length; i += 255){
+        const chunk = data.slice(i, i + 255);
+        push(chunk.length, ...chunk);
+      }
+      push(0);
+      prev = rgba;
+    },
+    finish(){
+      push(0x3B);
+      return new Blob([new Uint8Array(out)], { type: 'image/gif' });
+    },
+  };
+}
+function encodeGIF(frames, w, h, loop, diff){
+  // frames: [{rgba: Uint8ClampedArray, delayCs: number}]
+  const gw = gifWriter(w, h, loop);
+  for (const fr of frames) gw.add(fr.rgba, fr.delayCs, !!diff);
+  return gw.finish();
 }
 /* frame geometry shared by all pages: board if set, else union of content */
 function gifFrameRect(pageIdxs){
@@ -4753,7 +5130,7 @@ async function exportGIF(items, targetW, loop){
   }
   showHint('Encoding GIF…');
   await new Promise(r => setTimeout(r, 30));
-  const blob = encodeGIF(frames, w, h, loop);
+  const blob = encodeGIF(frames, w, h, loop, true);
   const stamp = new Date().toISOString().slice(0, 10);
   download(`koralpaper-${stamp}.gif`, URL.createObjectURL(blob));
   showHint('GIF saved: ' + w + 'x' + h + ', ' + items.length + ' frames, ' + (blob.size / 1048576).toFixed(1) + ' MB');
@@ -4912,9 +5289,11 @@ function saveJSON(){
   const doc = JSON.parse(serialize());
   const data = {
     app: 'koralpaper', version: 6, appVersion: APP_VERSION,
-    pages: doc.pages, pageIndex: doc.pageIndex, images: usedImages(),
+    pages: doc.pages, pageIndex: doc.pageIndex,
+    images: { ...usedImages(), ...tlImages() },
     appState: { theme: state.theme, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
       bgColor: state.bgColor, board: state.board },
+    timelapse: tl.frames.length ? { frames: tl.frames } : undefined,
   };
   const stamp = new Date().toISOString().slice(0, 10);
   let name = prompt('File name for the sketch:',
@@ -4990,6 +5369,7 @@ fileInput.addEventListener('change', () => {
         state.board = (data.appState.board && data.appState.board.w > 0) ? data.appState.board : null;
         paintSwatches(); syncToggles(); syncPaperUI(); syncBoardBtn(); buildBoardMenuSel();
       }
+      tlRestore(data.timelapse && Array.isArray(data.timelapse.frames) ? data.timelapse.frames : []);
       state.selection = new Set();
       updateBoundArrows(state.elements);
       commit(); zoomToFit(); syncPanel();
