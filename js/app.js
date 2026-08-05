@@ -602,6 +602,7 @@ function commit(){
   scheduleAutosave();
   scheduleThumbRefresh();
   preloadDocFonts(); // any newly-referenced Google font starts downloading
+  if (typeof tl !== 'undefined') tlAutoCapture(); // time-lapse auto keyframes
 }
 
 /* ── coalesced commits ──────────────────────────────
@@ -4351,6 +4352,7 @@ function runFileAction(act){
   if (act === 'save') saveJSON();
   if (act === 'snapshots') openSnapDialog();
   if (act === 'gif') openGifDialog();
+  if (act === 'timelapse') tlToggleBar();
   if (act === 'image') $('imgInput').click();
   if (act === 'excal') exportExcalidraw();
   if (act === 'templates'){ buildTplList(); $('tplDialog').classList.remove('hidden'); }
@@ -4387,6 +4389,202 @@ function download(name, url){
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
 }
+
+
+/* ── time-lapse recorder ─────────────────────────────
+   Keyframes store ELEMENT STATES, not pixels: light, restorable, and
+   rendered only at export time through the GIF / video pipelines. */
+const tl = { open: false, auto: false, frames: [], sel: -1, lastJson: null, lastAutoT: 0 };
+function tlStrip(els){
+  return JSON.parse(JSON.stringify(els, (k, v) => (k && k[0] === '_') ? undefined : v));
+}
+function tlSnap(fromAuto){
+  const json = JSON.stringify(state.elements, (k, v) => (k && k[0] === '_') ? undefined : v);
+  if (fromAuto && json === tl.lastJson) return;         // nothing visibly changed
+  tl.lastJson = json;
+  tl.frames.push({
+    id: uid(),
+    els: JSON.parse(json),
+    bg: pageBg() || state.bgColor || null,
+    board: state.board ? { ...state.board } : null,
+    delay: Number($('tlDelay').value) || 0.5,
+  });
+  tl.sel = tl.frames.length - 1;
+  tlRender();
+  if (!fromAuto) showHint('Frame ' + tl.frames.length + ' captured');
+}
+function tlAutoCapture(){
+  if (!tl.open || !tl.auto) return;
+  const now = performance.now();
+  if (now - tl.lastAutoT < 250) return;                 // burst throttle
+  tl.lastAutoT = now;
+  tlSnap(true);
+}
+function tlFrameRect(){
+  const f0 = tl.frames.find(f => f.board);
+  if (f0) return { x: f0.board.x, y: f0.board.y, w: f0.board.w, h: f0.board.h };
+  let r = null;
+  for (const f of tl.frames){
+    adoptImages(f.els);
+    const b = sceneBounds(f.els);
+    if (!b) continue;
+    r = r ? { x: Math.min(r.x, b.x), y: Math.min(r.y, b.y),
+      x2: Math.max(r.x2, b.x + b.w), y2: Math.max(r.y2, b.y + b.h) }
+      : { x: b.x, y: b.y, x2: b.x + b.w, y2: b.y + b.h };
+  }
+  if (!r) return null;
+  const pad = 40;
+  return { x: r.x - pad, y: r.y - pad, w: (r.x2 - r.x) + pad * 2, h: (r.y2 - r.y) + pad * 2 };
+}
+function tlRenderFrameTo(ctx2, f, rect, w, h){
+  adoptImages(f.els);
+  renderScene(ctx2, visibleEls(f.els), {
+    width: w, height: h,
+    camera: { x: -rect.x * (w / rect.w), y: -rect.y * (w / rect.w), z: w / rect.w },
+    pal: pal(), bg: f.bg || pal().bg,
+    grid: false,
+  });
+}
+function tlRender(){
+  const strip = $('tlFrames');
+  strip.replaceChildren();
+  tl.frames.forEach((f, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'tlframe' + (i === tl.sel ? ' sel' : '');
+    const cv = document.createElement('canvas');
+    const rect = f.board ? { x: f.board.x, y: f.board.y, w: f.board.w, h: f.board.h }
+      : (adoptImages(f.els), sceneBounds(f.els)) || { x: 0, y: 0, w: 100, h: 100 };
+    const th = 46, tw = clamp(Math.round(th * rect.w / rect.h), 30, 84);
+    cv.width = tw * 2; cv.height = th * 2;
+    cv.style.width = tw + 'px'; cv.style.height = th + 'px';
+    tlRenderFrameTo(cv.getContext('2d'), f, rect, tw * 2, th * 2);
+    const num = document.createElement('span');
+    num.className = 'tlnum';
+    num.textContent = (i + 1);
+    cell.append(cv, num);
+    cell.title = 'Frame ' + (i + 1) + ' · ' + f.delay + 's. Click to select, double-click to put it back on the page, right-click to delete';
+    cell.addEventListener('click', () => { tl.sel = i; $('tlDelay').value = f.delay; tlRender(); });
+    cell.addEventListener('dblclick', () => {
+      state.elements = tlStrip(f.els);
+      state.pages[state.pageIndex].elements = state.elements;
+      adoptImages(state.elements);
+      state.selection = new Set();
+      updateBoundArrows(state.elements);
+      commit(); requestRender();
+      showHint('Frame ' + (i + 1) + ' restored to the page (⌘Z to go back)');
+    });
+    cell.addEventListener('contextmenu', ev => {
+      ev.preventDefault();
+      tl.frames.splice(i, 1);
+      if (tl.sel >= tl.frames.length) tl.sel = tl.frames.length - 1;
+      tlRender();
+    });
+    strip.appendChild(cell);
+  });
+  $('tlCount').textContent = tl.frames.length ? tl.frames.length + ' frames' : 'no frames yet';
+  $('tlRecBtn').classList.toggle('on', tl.auto);
+  $('tlExportGif').disabled = $('tlExportVid').disabled = tl.frames.length < 2;
+  $('tlMoveL').disabled = $('tlMoveR').disabled = tl.sel < 0;
+}
+function tlMove(dir){
+  const i = tl.sel;
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= tl.frames.length) return;
+  const [f] = tl.frames.splice(i, 1);
+  tl.frames.splice(j, 0, f);
+  tl.sel = j;
+  tlRender();
+}
+async function tlExportGif(){
+  const rect = tlFrameRect();
+  if (!rect) return;
+  const targetW = Number($('tlSize').value) || 720;
+  const scale = Math.min(1.5, targetW / rect.w);
+  const w = Math.round(rect.w * scale), h = Math.round(rect.h * scale);
+  showHint('Rendering ' + tl.frames.length + ' frames…');
+  const frames = [];
+  for (const f of tl.frames){
+    const off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    tlRenderFrameTo(off.getContext('2d'), f, rect, w, h);
+    frames.push({ rgba: off.getContext('2d').getImageData(0, 0, w, h).data, delayCs: f.delay * 100 });
+    await new Promise(r => setTimeout(r, 0));
+  }
+  showHint('Encoding GIF…');
+  await new Promise(r => setTimeout(r, 30));
+  const blob = encodeGIF(frames, w, h, true);
+  const stamp = new Date().toISOString().slice(0, 10);
+  download(`koralpaper-timelapse-${stamp}.gif`, URL.createObjectURL(blob));
+  showHint('Time-lapse GIF saved: ' + tl.frames.length + ' frames, ' + (blob.size / 1048576).toFixed(1) + ' MB');
+}
+async function tlExportVideo(){
+  const rect = tlFrameRect();
+  if (!rect) return;
+  const targetW = Number($('tlSize').value) || 720;
+  const scale = Math.min(2, targetW / rect.w);
+  const w = Math.round(rect.w * scale) & ~1, h = Math.round(rect.h * scale) & ~1;
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const ctx2 = cv.getContext('2d');
+  const stream = cv.captureStream(30);
+  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+    ? 'video/webm;codecs=vp9' : 'video/webm';
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  const done = new Promise(r => { rec.onstop = r; });
+  showHint('Recording video…');
+  rec.start();
+  for (const f of tl.frames){
+    tlRenderFrameTo(ctx2, f, rect, w, h);
+    await new Promise(r => setTimeout(r, Math.max(100, f.delay * 1000)));
+  }
+  rec.stop();
+  await done;
+  const blob = new Blob(chunks, { type: 'video/webm' });
+  const stamp = new Date().toISOString().slice(0, 10);
+  download(`koralpaper-timelapse-${stamp}.webm`, URL.createObjectURL(blob));
+  showHint('Time-lapse video saved: ' + (blob.size / 1048576).toFixed(1) + ' MB');
+}
+function tlToggleBar(){
+  tl.open = !tl.open;
+  $('tlBar').classList.toggle('hidden', !tl.open);
+  if (tl.open){
+    tlRender();
+    showHint('Time-lapse: F or 📷 snaps a frame. ● records every change automatically');
+  } else {
+    tl.auto = false;
+  }
+}
+$('tlSnapBtn').addEventListener('click', () => tlSnap(false));
+$('tlRecBtn').addEventListener('click', () => {
+  tl.auto = !tl.auto;
+  if (tl.auto){ tl.lastJson = null; tlSnap(true); }
+  tlRender();
+  showHint(tl.auto ? 'Auto-record ON: every change becomes a frame' : 'Auto-record off');
+});
+$('tlDelay').addEventListener('change', () => {
+  const v = clamp(Number($('tlDelay').value) || 0.5, 0.1, 30);
+  $('tlDelay').value = v;
+  if (tl.sel >= 0 && tl.frames[tl.sel]) tl.frames[tl.sel].delay = v;
+  tlRender();
+});
+$('tlDelayAll').addEventListener('click', () => {
+  const v = clamp(Number($('tlDelay').value) || 0.5, 0.1, 30);
+  for (const f of tl.frames) f.delay = v;
+  tlRender();
+  showHint('Every frame set to ' + v + 's');
+});
+$('tlMoveL').addEventListener('click', () => tlMove(-1));
+$('tlMoveR').addEventListener('click', () => tlMove(1));
+$('tlClearBtn').addEventListener('click', () => {
+  if (tl.frames.length && !confirm('Delete all ' + tl.frames.length + ' captured frames?')) return;
+  tl.frames = []; tl.sel = -1; tl.lastJson = null;
+  tlRender();
+});
+$('tlCloseBtn').addEventListener('click', tlToggleBar);
+$('tlExportGif').addEventListener('click', tlExportGif);
+$('tlExportVid').addEventListener('click', tlExportVideo);
 
 /* ── animated GIF export ─────────────────────────────
    Zero-dependency GIF89a encoder: median-cut quantization to 256 colors,
@@ -6726,6 +6924,7 @@ window.addEventListener('keydown', ev => {
   }
   if (k === 'i' && !ev.shiftKey){ $('imgInput').click(); return; }
   if (k === 'b' && !ev.shiftKey){ chartOpen(null); return; }
+  if (k === 'f' && !ev.shiftKey && tl.open){ tlSnap(false); return; }
   if (TOOL_KEYS[k] && !ev.shiftKey){ setTool(TOOL_KEYS[k]); return; }
 });
 window.addEventListener('keyup', ev => {

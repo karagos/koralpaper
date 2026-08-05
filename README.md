@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.61.0)
+# KoralPaper — *Draw your thinking* (v3.62.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -164,6 +164,10 @@ and Settings.
   hand-drawn Sketchy or crisp professional Clean. Everything lands as normal sketchy
   elements in one group: recolor any bar or slice with the usual controls,
   and right-click the chart to **edit its data** and rebuild it in place.
+- **Time-lapse recorder (☰):** press F to snapshot the page as a frame, or
+  turn on auto-record and every change you make becomes a frame. Reorder,
+  retime, then export the sequence as a looping GIF or a .webm video:
+  stop-motion for your ideas, including watching Claude build a page live.
 - **Animated GIF export (⬇):** pages become frames, each with its own
   on-screen duration, size and loop controls. A carousel becomes a looping
   animation with zero extra tools.

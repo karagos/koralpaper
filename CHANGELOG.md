@@ -1,5 +1,10 @@
 # KoralPaper — Changelog
 
+## v3.62.0
+
+- Time-lapse recorder: ☰ → "Time-lapse recorder" opens a frames bar above the page strip. Two ways to capture: press F (or the camera button) to snapshot the page as a frame, or switch on ● auto-record and every change you make becomes a frame automatically while you simply work. Frames are element states, not pixels: click one to select it, double-click to put that moment back on the page (undoable), right-click to delete, arrows to reorder, and give any frame its own duration.
+- Export the sequence as a looping GIF or a .webm video at 480 / 720 / 1080 width, straight from the bar. Stop-motion carousels, elements flying into place, or a recording of Claude building your page through the bridge: a content format no other canvas produces.
+
 ## v3.61.0
 
 - Animated GIF export: ⬇ → "Animated GIF" turns your pages into a looping GIF, one frame per page. Full control: tick which pages to include, give every frame its own on-screen duration (0.1 to 30 seconds, plus an apply-to-all shortcut), choose 480 / 720 / 1080 px width, and toggle looping. The encoder is built into the app (zero dependencies, like everything else): your carousel becomes a scroll-stopping animation without any external tool.

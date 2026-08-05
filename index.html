@@ -46,6 +46,7 @@
       <button data-act="image">Import image… &nbsp;<span class="menukey">I</span></button>
       <button data-act="templates">Templates…</button>
       <button data-act="snapshots">Snapshots…</button>
+      <button data-act="timelapse">Time-lapse recorder</button>
       <hr>
       <button data-act="present">Present &nbsp;<span class="menukey">⇧⌘P</span></button>
       <button data-act="replay">Replay the drawing</button>
@@ -573,6 +574,28 @@
     </div>
   </div>
 
+  <!-- ── Time-lapse frames bar ────────────────────── -->
+  <div class="island tlbar hidden" id="tlBar">
+    <button class="tlrec" id="tlRecBtn" title="Auto-record: capture a frame on every change">●</button>
+    <button class="minipill tlbtn" id="tlSnapBtn" title="Capture the current page as a frame (F)">📷 Snap</button>
+    <span class="tlcount" id="tlCount">no frames yet</span>
+    <div class="tlframes" id="tlFrames"></div>
+    <button class="minipill tlbtn" id="tlMoveL" title="Move the selected frame left">◀</button>
+    <button class="minipill tlbtn" id="tlMoveR" title="Move the selected frame right">▶</button>
+    <input type="number" id="tlDelay" class="gifdelay" min="0.1" max="30" step="0.1" value="0.5"
+      title="Seconds for the selected frame (and for new frames)">
+    <button class="minipill tlbtn" id="tlDelayAll" title="Apply this delay to every frame">all</button>
+    <select id="tlSize" class="brandselect tlsize" title="Export width">
+      <option value="480">480</option>
+      <option value="720" selected>720</option>
+      <option value="1080">1080</option>
+    </select>
+    <button class="pill tlexport" id="tlExportGif" title="Export the frames as a looping GIF">GIF</button>
+    <button class="pill tlexport" id="tlExportVid" title="Export the frames as a .webm video">Video</button>
+    <button class="minipill tlbtn danger" id="tlClearBtn" title="Delete all frames">Clear</button>
+    <button class="minipill tlbtn" id="tlCloseBtn" title="Close the recorder">✕</button>
+  </div>
+
   <!-- ── Animated GIF dialog ──────────────────────── -->
   <div class="island pdfdialog gifdialog hidden" id="gifDialog">
     <h3>Animated GIF</h3>
@@ -682,6 +705,9 @@
       <tr><td><b>Pictures in shapes:</b> select a shape and paste an image (⌘V):
         it fills the shape, clipped by the outline. Photos also get a <b>Corners</b>
         slider in the panel, from sharp to a full pill</td></tr>
+      <tr><td><b>Time-lapse:</b> ☰ → Time-lapse recorder. <b>F</b> snaps the page as a
+        frame; ● auto-records every change while you work. Reorder, retime, then export
+        the sequence as a GIF or video: stop-motion for your ideas</td></tr>
       <tr><td><b>Animated GIF:</b> ⬇ → Animated GIF turns your pages into a looping
         GIF, one frame per page, with its own on-screen time for every frame.
         Carousels become animations</td></tr>
