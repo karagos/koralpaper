@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.57.1
+
+- Text elements can wrap: dragging a text box's left or right handle now sets its width and the text reflows into lines, with the font size untouched (this replaces the side handles doing nothing since v3.53). Corner handles still scale the type, keeping the wrap width in proportion. Right-click a wrapped text → "Fit width to text" returns it to one auto-sized line. Wrapping carries into SVG and every export.
+
 ## v3.57.0
 
 - Make your own stamps: select anything on the canvas, right-click → "Save to gallery…", give it a name, and it becomes a reusable vector asset. Stamps stay pure SVG: place them anywhere, tint them any color, and they export as real editable vectors. Your sketches become your icon library.

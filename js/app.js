@@ -1286,7 +1286,8 @@ function resizeTo(it, sx, sy, shiftKey){
   }
   let nw = x1 - x0, nh = y1 - y0;
   const onlyText = it.orig.every(o => { const e = byId(o.id); return e && e.type === 'text'; });
-  if (shiftKey || onlyText){
+  // text keeps its aspect on corner drags; side drags are free (they wrap)
+  if (shiftKey || (onlyText && h.length === 2)){
     // preserve aspect
     const arx = Math.abs(nw) / (b.w || 1), ary = Math.abs(nh) / (b.h || 1);
     const s = (h === 'n' || h === 's') ? ary : (h === 'e' || h === 'w') ? arx : Math.max(arx, ary);
@@ -1310,6 +1311,11 @@ function resizeTo(it, sx, sy, shiftKey){
       if (cornerDrag){
         const s = Math.max(kx, ky);
         el.size = clamp(Math.round(o.size * s), 8, 600);
+        if (el.wrap) el.w = Math.max(40, o.w * kx);
+      } else if (h === 'e' || h === 'w'){
+        // side drag on a text box sets its wrap width; the text reflows
+        el.wrap = true;
+        el.w = Math.max(40, o.w * kx);
       }
       el.x = fx + (o.x - b.x) * kx;
       el.y = fy + (o.y - b.y) * ky;
@@ -1971,6 +1977,12 @@ function openCtxMenu(ev){
       add('Edit text', () => openTextEditor(sel[0], false));
     if (sel[0].chart)
       add('Edit chart data…', () => chartOpen(sel[0]));
+    if (sel.length === 1 && sel[0].type === 'text' && sel[0].wrap)
+      add('Fit width to text (unwrap)', () => {
+        sel[0].wrap = false;
+        autosizeText(sel[0]);
+        commit(); requestRender();
+      });
     if (sel.length >= 2 && sel.every(e => e.type === 'text'))
       add(`Merge ${sel.length} texts into one`, mergeTexts);
     if (sel.length >= 2

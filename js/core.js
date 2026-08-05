@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.57.0';
+const APP_VERSION = '3.57.1';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -1304,7 +1304,7 @@ function drawBoxText(ctx, el, pal, box){
 }
 
 function drawTextElement(ctx, el, pal){
-  const lay = layoutText(el, null);
+  const lay = layoutText(el, el.wrap ? Math.max(40, el.w) : null);
   applyTracking(ctx, el);
   ctx.textBaseline = 'middle';
   const color = textColorOf(pal, el);
@@ -2740,7 +2740,7 @@ function renderSceneSVG(elements, opts){
     }
     else if (el.type === 'text'){
       if (el.text && el.text.trim())
-        parts.push(textLinesSVG(el, layoutText(el, null), eb));
+        parts.push(textLinesSVG(el, layoutText(el, el.wrap ? Math.max(40, el.w) : null), eb));
     }
     else if (isLinear(el)){
       const drawFillSVG = el.type === 'draw' ? resolveFill(pal, el.fill) : null;
@@ -2883,7 +2883,8 @@ function buildPDF(pages){
 
 /* refresh a text element's box from its content */
 function autosizeText(el){
-  const lay = layoutText(el, null);
-  el.w = Math.max(10, lay.w);
+  /* wrapped texts keep their dragged width and only grow downward */
+  const lay = layoutText(el, el.wrap ? Math.max(40, el.w) : null);
+  if (!el.wrap) el.w = Math.max(10, lay.w);
   el.h = Math.max(elLH(el), lay.totalH);
 }
