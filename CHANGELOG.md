@@ -1,5 +1,12 @@
 # KoralPaper — Changelog
 
+## v3.64.1
+
+- The fps selector now means one thing everywhere: steps per second of every move. New 3 fps and 5 fps options give big, chunky stop-motion steps; 20 and 25 approach smooth. (Before, stop-motion ignored the fps selector entirely.) Default is 10.
+- Multi-select frames: Shift-click selects a range of thumbnails, Cmd or Ctrl-click adds and removes individual ones. Hold, move and easing edits apply to every selected frame at once, and the counter shows "12 frames · 5 selected".
+- Auto-record grouping: a new window selector next to ●. With "2s", "5s" or "10s" chosen, edits made within that window collapse into ONE keyframe (the newest state replaces the frame), so a scene built from moving three or four elements one after another stays a single frame. Off keeps today's one-change-one-frame behavior.
+- Fixed along the way: rapid bursts of changes used to lose their final state to a throttle (now the last state always wins), an open preview went stale when frames were retimed, reordered or deleted under it (now it refreshes live), and Escape now closes the preview.
+
 ## v3.64.0
 
 - Stop-motion is now the soul of the time-lapse, and the default. A real time-lapse is not smooth motion design: things move in discrete, slightly shaky steps, like photos taken one by one. The new Stop-motion easing moves elements in about 8 distinct positions per second, adds a tiny deterministic hand-shake to every element on every step, and re-seeds the sketchy strokes so the whole drawing "boils" as if redrawn by hand for each photo. On hold frames everything settles perfectly still. The camera still glides smoothly between camera keyframes, like a rig, while the objects step.

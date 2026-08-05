@@ -562,6 +562,7 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 }
 .tlsize{flex:0 0 64px; padding:6px 4px;}
 #tlFps{flex:0 0 78px;}
+#tlBatch{flex:0 0 58px;}
 #tlSize{flex:0 0 70px;}
 #tlEase{flex:0 0 132px;}
 .tlexport{flex:0 0 auto; font-size:12px; padding:8px 13px; margin:0;}

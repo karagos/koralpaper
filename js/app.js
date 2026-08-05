@@ -4402,9 +4402,13 @@ function download(name, url){
    by interpolating matched elements (same id): position, size, angle,
    colors, opacity, font size, corners, even draw points. Optional
    camera keyframes pan/zoom the viewport between frames. */
-const tl = { open: false, auto: false, frames: [], sel: -1, lastJson: null, lastAutoT: 0,
-  camOn: false, onion: false };
-const TL_STEP_RATE = 8;   // stop-motion: discrete positions per second of move
+const tl = { open: false, auto: false, frames: [], sel: -1, selMulti: new Set(),
+  lastJson: null, lastAutoT: 0, lastAutoIdx: -1, camOn: false, onion: false };
+function tlSelectedIdxs(){
+  if (tl.selMulti.size) return [...tl.selMulti].filter(i => i < tl.frames.length);
+  return tl.sel >= 0 && tl.sel < tl.frames.length ? [tl.sel] : [];
+}
+function tlFpsVal(){ return Number($('tlFps').value) || 10; }
 const TL_EASES = {
   step: t => t,           // quantized in tlStateAt, listed here for validation
   linear: t => t,
@@ -4434,15 +4438,35 @@ function tlSnap(fromAuto){
     cam: tl.camOn ? tlViewRect() : null,
   });
   tl.sel = tl.frames.length - 1;
+  tl.selMulti = new Set([tl.sel]);
+  if (!fromAuto){ tl.lastAutoIdx = -1; tl.lastAutoT = 0; }
   tlRender();
   if (!fromAuto) showHint('Frame ' + tl.frames.length + ' captured');
 }
 function tlAutoCapture(){
   if (!tl.open || !tl.auto) return;
   const now = performance.now();
-  if (now - tl.lastAutoT < 250) return;                 // burst throttle
+  const json = JSON.stringify(state.elements, (k, v) => (k && k[0] === '_') ? undefined : v);
+  if (json === tl.lastJson) return;                     // nothing visibly changed
+  const win = Math.max(250, (Number($('tlBatch').value) || 0) * 1000);
+  if (tl.lastAutoIdx >= 0 && tl.lastAutoIdx < tl.frames.length &&
+      tl.lastAutoT && (now - tl.lastAutoT) < win){
+    /* grouping window: the newest state REPLACES the last auto frame, so a
+       scene built from several quick edits stays ONE keyframe, and the final
+       state of a rapid burst is never lost */
+    tl.lastJson = json;
+    const f = tl.frames[tl.lastAutoIdx];
+    f.els = JSON.parse(json);
+    f.bg = pageBg() || state.bgColor || null;
+    f.board = state.board ? { ...state.board } : null;
+    if (tl.camOn) f.cam = tlViewRect();
+    tl.lastAutoT = now;
+    tlRender();
+    return;
+  }
   tl.lastAutoT = now;
   tlSnap(true);
+  tl.lastAutoIdx = tl.sel;
 }
 function tlRestore(frames){
   tl.frames = (frames || []).filter(f => f && Array.isArray(f.els)).map(f => ({
@@ -4452,7 +4476,7 @@ function tlRestore(frames){
     ease: TL_EASES[f.ease] ? f.ease : 'step',
     cam: (f.cam && f.cam.w > 0 && f.cam.h > 0) ? f.cam : null,
   }));
-  tl.sel = -1; tl.lastJson = null;
+  tl.sel = -1; tl.selMulti = new Set(); tl.lastJson = null; tl.lastAutoIdx = -1;
   if (tl.open) tlRender();
 }
 function tlImages(){
@@ -4587,7 +4611,7 @@ function tlStateAt(time, segs, fade, baseRect){
     const raw = clamp(t / s.dur, 0, 1);
     let k, shake = null;
     if (s.ease === 'step'){
-      const n = Math.max(2, Math.round(s.dur * TL_STEP_RATE));
+      const n = Math.max(2, Math.round(s.dur * tlFpsVal()));
       const st = Math.min(n - 1, Math.floor(raw * n));
       k = st / n;
       if (st > 0) shake = st;
@@ -4653,7 +4677,8 @@ function tlRender(){
   strip.replaceChildren();
   tl.frames.forEach((f, i) => {
     const cell = document.createElement('div');
-    cell.className = 'tlframe' + (i === tl.sel ? ' sel' : '');
+    const isSel = tl.selMulti.size ? tl.selMulti.has(i) : i === tl.sel;
+    cell.className = 'tlframe' + (isSel ? ' sel' : '');
     const cv = document.createElement('canvas');
     const rect = f.board ? { x: f.board.x, y: f.board.y, w: f.board.w, h: f.board.h }
       : (adoptImages(f.els), sceneBounds(f.els)) || { x: 0, y: 0, w: 100, h: 100 };
@@ -4672,8 +4697,23 @@ function tlRender(){
       cell.appendChild(camTag);
     }
     cell.title = 'Frame ' + (i + 1) + ' · hold ' + f.delay + 's · move ' + (f.move || 0) +
-      's. Click to select, double-click to put it back on the page, right-click to delete';
-    cell.addEventListener('click', () => { tl.sel = i; tlSyncInputs(); tlRender(); });
+      's. Click selects, Shift-click a range, ' + (IS_MAC ? '⌘' : 'Ctrl') + '-click adds. ' +
+      'Hold and move edits apply to every selected frame. Double-click restores, right-click deletes';
+    cell.addEventListener('click', ev => {
+      if (ev.shiftKey && tl.sel >= 0){
+        const a = Math.min(tl.sel, i), b = Math.max(tl.sel, i);
+        tl.selMulti = new Set(Array.from({ length: b - a + 1 }, (_, k) => a + k));
+      } else if (ev.metaKey || ev.ctrlKey){
+        if (!tl.selMulti.size && tl.sel >= 0) tl.selMulti.add(tl.sel);
+        if (tl.selMulti.has(i) && tl.selMulti.size > 1) tl.selMulti.delete(i);
+        else tl.selMulti.add(i);
+        tl.sel = i;
+      } else {
+        tl.sel = i;
+        tl.selMulti = new Set([i]);
+      }
+      tlSyncInputs(); tlRender();
+    });
     cell.addEventListener('dblclick', () => {
       state.elements = tlStrip(f.els);
       state.pages[state.pageIndex].elements = state.elements;
@@ -4687,17 +4727,31 @@ function tlRender(){
       ev.preventDefault();
       tl.frames.splice(i, 1);
       if (tl.sel >= tl.frames.length) tl.sel = tl.frames.length - 1;
+      tl.selMulti = new Set();
+      tl.lastAutoIdx = -1;
       tlRender();
     });
     strip.appendChild(cell);
   });
-  $('tlCount').textContent = tl.frames.length ? tl.frames.length + ' frames' : 'no frames yet';
+  const nSel = tl.selMulti.size;
+  $('tlCount').textContent = !tl.frames.length ? 'no frames yet'
+    : tl.frames.length + ' frames' + (nSel > 1 ? ' · ' + nSel + ' selected' : '');
   $('tlRecBtn').classList.toggle('on', tl.auto);
   $('tlCamBtn').classList.toggle('on', tl.camOn);
   $('tlOnionBtn').classList.toggle('on', tl.onion);
   $('tlExportGif').disabled = $('tlExportVid').disabled = $('tlPlayBtn').disabled =
     tl.frames.length < 2;
-  $('tlMoveL').disabled = $('tlMoveR').disabled = tl.sel < 0;
+  $('tlMoveL').disabled = $('tlMoveR').disabled = tl.sel < 0 || tl.selMulti.size > 1;
+  if (tlPrev.on){
+    /* keep the open preview honest while frames are edited, retimed or deleted */
+    if (tl.frames.length < 2){ tlPreviewClose(); }
+    else {
+      tlPrev.rect = tlFrameRect();
+      const ti = tlSegments(true);
+      tlPrev.segs = ti.segs; tlPrev.total = ti.total;
+      if (tlPrev.t > tlPrev.total) tlPrev.t = 0;
+    }
+  }
 }
 function tlSyncInputs(){
   const f = tl.frames[tl.sel];
@@ -4713,6 +4767,8 @@ function tlMove(dir){
   const [f] = tl.frames.splice(i, 1);
   tl.frames.splice(j, 0, f);
   tl.sel = j;
+  tl.selMulti = new Set([j]);
+  tl.lastAutoIdx = -1;
   tlRender();
 }
 function tlProgress(p){
@@ -4738,7 +4794,7 @@ function tlBuildPlan(fps, loop){
     if (s.kind === 'hold'){
       plan.push({ time: cursor + 0.001, delayCs: Math.round(s.dur * 100) });
     } else if (s.ease === 'step'){
-      const n = Math.max(2, Math.round(s.dur * TL_STEP_RATE));
+      const n = Math.max(2, Math.round(s.dur * fps));
       for (let k = 1; k < n; k++)
         plan.push({ time: cursor + ((k + 0.5) / n) * s.dur, delayCs: Math.max(2, Math.round(100 * s.dur / n)) });
     } else {
@@ -4911,15 +4967,21 @@ $('tlScrub').addEventListener('input', () => {
 $('tlDelay').addEventListener('change', () => {
   const v = clamp(Number($('tlDelay').value) || 0.5, 0.1, 30);
   $('tlDelay').value = v;
-  if (tl.sel >= 0 && tl.frames[tl.sel]){ tl.frames[tl.sel].delay = v; tlRender(); }
+  const idxs = tlSelectedIdxs();
+  for (const i of idxs) tl.frames[i].delay = v;
+  if (idxs.length) tlRender();
 });
 $('tlMoveDur').addEventListener('change', () => {
   const v = clamp(Number($('tlMoveDur').value) || 0, 0, 10);
   $('tlMoveDur').value = v;
-  if (tl.sel >= 0 && tl.frames[tl.sel]){ tl.frames[tl.sel].move = v; tlRender(); }
+  const idxs = tlSelectedIdxs();
+  for (const i of idxs) tl.frames[i].move = v;
+  if (idxs.length) tlRender();
 });
 $('tlEase').addEventListener('change', () => {
-  if (tl.sel >= 0 && tl.frames[tl.sel]){ tl.frames[tl.sel].ease = $('tlEase').value; tlRender(); }
+  const idxs = tlSelectedIdxs();
+  for (const i of idxs) tl.frames[i].ease = $('tlEase').value;
+  if (idxs.length) tlRender();
 });
 $('tlDelayAll').addEventListener('click', () => {
   const d = clamp(Number($('tlDelay').value) || 0.5, 0.1, 30);
@@ -4933,7 +4995,7 @@ $('tlMoveL').addEventListener('click', () => tlMove(-1));
 $('tlMoveR').addEventListener('click', () => tlMove(1));
 $('tlClearBtn').addEventListener('click', () => {
   if (tl.frames.length && !confirm('Delete all ' + tl.frames.length + ' captured frames?')) return;
-  tl.frames = []; tl.sel = -1; tl.lastJson = null;
+  tl.frames = []; tl.sel = -1; tl.selMulti = new Set(); tl.lastJson = null; tl.lastAutoIdx = -1;
   if (tlPrev.on) tlPreviewClose();
   tlRender(); requestRender();
 });
@@ -7336,6 +7398,7 @@ window.addEventListener('keydown', ev => {
   }
   if (k === 'i' && !ev.shiftKey){ $('imgInput').click(); return; }
   if (k === 'b' && !ev.shiftKey){ chartOpen(null); return; }
+  if (ev.key === 'Escape' && tlPrev.on){ tlPreviewClose(); return; }
   if (k === 'f' && !ev.shiftKey && tl.open){ tlSnap(false); return; }
   if (TOOL_KEYS[k] && !ev.shiftKey){ setTool(TOOL_KEYS[k]); return; }
 });

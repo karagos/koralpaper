@@ -578,6 +578,12 @@
   <div class="island tlbar hidden" id="tlBar">
     <div class="tlrow">
       <button class="tlrec" id="tlRecBtn" title="Auto-record: capture a frame on every change">●</button>
+      <select id="tlBatch" class="brandselect tlsize" title="Auto-record grouping: edits made within this window collapse into ONE frame, so a scene built from several quick changes stays a single keyframe. Off = every change is its own frame">
+        <option value="0" selected>off</option>
+        <option value="2">2s</option>
+        <option value="5">5s</option>
+        <option value="10">10s</option>
+      </select>
       <button class="minipill tlbtn" id="tlSnapBtn" title="Capture the current page as a frame (F)">📷 Snap</button>
       <button class="minipill tlbtn" id="tlCamBtn" title="Camera keyframes: new frames remember the current zoom and position, and the export travels between them">🎥 Cam</button>
       <button class="minipill tlbtn" id="tlOnionBtn" title="Onion skin: show the selected frame as a ghost under the live page">👻 Onion</button>
@@ -587,9 +593,11 @@
       <label class="tlfade" title="Fade: elements that appear or disappear between frames fade in and out. Off (the default) = hard cuts, the classic time-lapse feel">
         <input type="checkbox" id="tlFade"> Fade
       </label>
-      <select id="tlFps" class="brandselect tlsize" title="Smoothness of the motion (frames per second)">
-        <option value="10">10 fps</option>
-        <option value="20" selected>20 fps</option>
+      <select id="tlFps" class="brandselect tlsize" title="Steps per second of every move: 3 and 5 are chunky stop-motion, 20 and 25 are nearly smooth">
+        <option value="3">3 fps</option>
+        <option value="5">5 fps</option>
+        <option value="10" selected>10 fps</option>
+        <option value="20">20 fps</option>
         <option value="25">25 fps</option>
       </select>
       <select id="tlSize" class="brandselect tlsize" title="Export width">
