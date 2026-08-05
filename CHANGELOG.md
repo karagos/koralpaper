@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.59.1
+
+- Panel polish: the font and weight buttons share one line, and the exact-size field sits inline with S / M / L / XL at the same 30 px height, like a fifth button, instead of stretching taller and wrapping.
+
 ## v3.59.0
 
 - Exact font size, visible and editable: the Size row now shows the selection's true pixel size in a small field next to the S / M / L / XL presets. Handle-resized text no longer hides its size: read it, or type an exact value (8 to 600, Enter applies). Mixed selections show an empty field.

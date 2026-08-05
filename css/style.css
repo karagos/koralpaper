@@ -532,17 +532,17 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 }
 .swatch.brandsw{outline:2px solid var(--coral-soft); outline-offset:-2px;}
 .swatch.libsw{border-radius:50%;}
-.sizerow{display:flex; gap:5px; align-items:stretch;}
-.sizerow .segment{flex:1;}
+.sizerow{display:flex; gap:5px; align-items:center;}
+.sizerow .segment{flex:1; flex-wrap:nowrap;}
 #sizeInput{
-  width:52px; flex:0 0 auto; text-align:center;
+  width:46px; height:30px; flex:0 0 auto; text-align:center;
   font-family:var(--sans); font-size:12.5px; font-weight:600;
-  font-variant-numeric:tabular-nums;
+  font-variant-numeric:tabular-nums; -moz-appearance:textfield; appearance:textfield;
   border:1.5px solid var(--line-soft); border-radius:8px;
   background:var(--card); color:var(--ink); padding:0 2px;
 }
 #sizeInput:focus{outline:none; border-color:var(--coral);}
-#sizeInput::-webkit-inner-spin-button{opacity:1;}
+#sizeInput::-webkit-inner-spin-button, #sizeInput::-webkit-outer-spin-button{-webkit-appearance:none; margin:0;}
 .colorpop .libsavebtn{flex:0 0 auto; padding:7px 11px; font-size:12px; white-space:nowrap;}
 
 /* font search + weight picker */
@@ -553,7 +553,9 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
   background:var(--card); color:var(--ink);
 }
 #fontSearch:focus{outline:none; border-color:var(--coral);}
-.weightbtn{flex:0 0 auto; min-width:58px;}
+.fontrow{display:flex; gap:5px;}
+.fontrow .fontbtn{width:auto; flex:1; min-width:0;}
+.weightbtn{flex:0 0 60px; min-width:0; justify-content:center;}
 .weightmenu{position:fixed; min-width:170px; max-height:60vh; overflow-y:auto; z-index:60;}
 .weightmenu button.sel{color:var(--coral); font-weight:700;}
 .chartslider input[type=range]{width:86px; height:16px; accent-color:var(--coral);}
