@@ -2006,6 +2006,7 @@ function openCtxMenu(ev){
     }
     add('Duplicate', duplicateSelection);
     add('Copy', copySelection);
+    add('Save to gallery…', saveSelectionToGallery);
     add('Copy style', copyStyle);
     if (styleClipboard) add('Paste style', pasteStyle);
     add('Delete', deleteSelection);
@@ -2998,6 +2999,32 @@ function assetAddFiles(files){
     };
     if (isSvg) reader.readAsText(f);
     else reader.readAsDataURL(f);
+  }
+}
+/* turn the current selection into a reusable gallery asset: rendered as a
+   tight transparent SVG, so it stays vector, tintable, and inline-exported */
+function saveSelectionToGallery(){
+  const els = selected();
+  if (!els.length) return;
+  const b = sceneBounds(els);
+  if (!b) return;
+  const name = prompt('Name for the gallery asset:', 'My stamp');
+  if (!name || !name.trim()) return;
+  const svg = renderSceneSVG(els, {
+    pal: pal(), transparent: true, bg: effectiveBg(), board: null, grid: false, pad: 8,
+  });
+  if (!svg){ showHint('Nothing to save: the selection is empty'); return; }
+  const src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+  if (src.length > 700000){
+    alert('This selection is too large for the gallery (max ~700 KB as SVG). Try it without embedded photos.');
+    return;
+  }
+  const list = assetList();
+  list.push({ id: uid(), name: name.trim(), svg: true,
+    src, w: Math.round(b.w + 16), h: Math.round(b.h + 16) });
+  if (assetSave(list)){
+    buildAssetGrid();
+    showHint('\u201C' + name.trim() + '\u201D saved: find it in the gallery (star button), tint it like any SVG');
   }
 }
 function insertAsset(a){

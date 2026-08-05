@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.57.0
+
+- Make your own stamps: select anything on the canvas, right-click → "Save to gallery…", give it a name, and it becomes a reusable vector asset. Stamps stay pure SVG: place them anywhere, tint them any color, and they export as real editable vectors. Your sketches become your icon library.
+
 ## v3.56.1
 
 - Copy as SVG and SVG export now inline your gallery SVGs as real vector markup (paths, text, shapes), not as an embedded image object. Other tools that open the file see editable vectors. Tint and crop carry over (crop becomes precise viewBox math), scripts and event handlers are stripped from the inlined markup for safety, and raster images keep using the image tag as before.
