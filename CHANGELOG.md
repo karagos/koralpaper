@@ -1,5 +1,10 @@
 # KoralPaper — Changelog
 
+## v3.59.0
+
+- Exact font size, visible and editable: the Size row now shows the selection's true pixel size in a small field next to the S / M / L / XL presets. Handle-resized text no longer hides its size: read it, or type an exact value (8 to 600, Enter applies). Mixed selections show an empty field.
+- Copy and paste just the text size: right-click any element with text → "Copy text size (47px)", then right-click others → "Paste text size". Like copy/paste style, but only the size, perfect for making drifted headlines match again.
+
 ## v3.58.0
 
 - Your color library: save any color from the color wheel popover (the ★ Save button) and it appears as a round swatch in the Outline, Fill and Text color rows, working everywhere colors work, including coloring selected letters. Right-click a round swatch to remove it. Up to 24 colors, kept in your browser.

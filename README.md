@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.58.0)
+# KoralPaper — *Draw your thinking* (v3.59.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 

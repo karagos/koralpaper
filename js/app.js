@@ -1747,6 +1747,7 @@ function reorder(mode){
 /* ── copy / paste style ────────────────────────────── */
 const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor','frame','fweight'];
 let styleClipboard = null;
+let sizeClipboard = null;
 function copyStyle(){
   const sel = selected();
   if (!sel.length) return;
@@ -2021,6 +2022,20 @@ function openCtxMenu(ev){
     add('Save to gallery…', saveSelectionToGallery);
     add('Copy style', copyStyle);
     if (styleClipboard) add('Paste style', pasteStyle);
+    const sizeSource = sel.find(e => canHaveText(e) || e.type === 'text');
+    if (sizeSource)
+      add(`Copy text size (${sizeSource.size}px)`, () => {
+        sizeClipboard = sizeSource.size;
+        showHint('Text size ' + sizeClipboard + 'px copied: right-click other elements to paste it');
+      });
+    if (sizeClipboard != null && sel.some(e => canHaveText(e) || e.type === 'text'))
+      add(`Paste text size (${sizeClipboard}px)`, () => {
+        for (const e of sel) if (canHaveText(e) || e.type === 'text'){
+          e.size = sizeClipboard;
+          if (e.type === 'text') autosizeText(e);
+        }
+        commit(); syncPanel(); requestRender();
+      });
     add('Delete', deleteSelection);
     hr();
     if (sel.length >= 2) add('Group', () => { groupSelection(); syncPanel(); });
@@ -2416,6 +2431,10 @@ function syncPanel(){
     : (fSel && FONTS[fSel]) ? String(FONTS[fSel].weight) : '400';
   $('weightBtnLabel').style.fontWeight = fwCur || ((fSel && FONTS[fSel]) ? FONTS[fSel].weight : 400);
   markSel('#sizeSeg button', b => Number(b.dataset.v) === val('size'));
+  if (document.activeElement !== $('sizeInput')){
+    const szv = val('size');
+    $('sizeInput').value = szv == null ? '' : szv;
+  }
   markSel('#alignSeg button', b => b.dataset.v === val('align'));
   markSel('#valignSeg button', b => b.dataset.v === (val('valign') || 'middle'));
   const fmtEls = sel.filter(e => canHaveText(e) && e.text && e.text.trim());
@@ -2435,6 +2454,17 @@ function syncPanel(){
 function show(id, on){ $(id).classList.toggle('hidden', !on); }
 function markSel(q, fn){ document.querySelectorAll(q).forEach(b => b.classList.toggle('sel', !!fn(b))); }
 
+function applySizeInput(){
+  const v = Math.round(Number($('sizeInput').value));
+  if (!Number.isFinite(v) || !$('sizeInput').value.trim()) return;
+  applyStyle({ size: clamp(v, 8, 600) });
+}
+$('sizeInput').addEventListener('change', applySizeInput);
+$('sizeInput').addEventListener('keydown', ev => {
+  ev.stopPropagation();
+  if (ev.key === 'Enter'){ ev.preventDefault(); applySizeInput(); $('sizeInput').blur(); }
+  if (ev.key === 'Escape'){ ev.preventDefault(); $('sizeInput').blur(); syncPanel(); }
+});
 /* panel events */
 document.addEventListener('click', ev => {
   const t = ev.target.closest('button');
@@ -2458,6 +2488,7 @@ document.addEventListener('click', ev => {
   else if (t.closest('#artSeg') && t.dataset.art) applyStyle({ artStyle: t.dataset.art });
   else if (t.closest('#artDetailSeg') && t.dataset.detail) applyStyle({ detail: Number(t.dataset.detail) });
   else if (t.closest('#sizeSeg') && t.dataset.v) applyStyle({ size: Number(t.dataset.v) });
+  // (exact size input handled by its own listeners below)
   else if (t.closest('#alignSeg') && t.dataset.v) applyStyle({ align: t.dataset.v });
   else if (t.closest('#valignSeg') && t.dataset.v) applyStyle({ valign: t.dataset.v });
 });

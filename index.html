@@ -285,8 +285,12 @@
       <div class="menu weightmenu hidden" id="weightMenu"></div>
     </div>
     <div class="row" id="rowSize"><label>Size</label>
-      <div class="segment" id="sizeSeg">
-        <button data-v="16">S</button><button data-v="21">M</button><button data-v="29">L</button><button data-v="42">XL</button>
+      <div class="sizerow">
+        <div class="segment" id="sizeSeg">
+          <button data-v="16">S</button><button data-v="21">M</button><button data-v="29">L</button><button data-v="42">XL</button>
+        </div>
+        <input type="number" id="sizeInput" min="8" max="600" step="1"
+          title="Exact font size in px: type a value and press Enter" autocomplete="off">
       </div>
     </div>
     <div class="row" id="rowAlign"><label>Align</label>
