@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.56.0';
+const APP_VERSION = '3.56.1';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -2459,6 +2459,51 @@ function dForPoly(poly){
   return poly.closed ? dSmoothClosed(poly.pts) : dSmoothOpen(poly.pts);
 }
 
+/* decode an svg data URL back to its source text */
+function svgSourceText(dataUrl){
+  const i = dataUrl.indexOf(',');
+  const head = dataUrl.slice(0, i), body = dataUrl.slice(i + 1);
+  if (/;base64/i.test(head)) return decodeURIComponent(escape(atob(body)));
+  return decodeURIComponent(body);
+}
+/* inline a gallery SVG as a REAL nested vector (sanitized), so copied and
+   exported SVGs stay editable shapes instead of an embedded image object.
+   Returns null when the source can't be inlined safely — callers fall back
+   to an <image> tag. */
+function inlineSvgMarkup(el, eb){
+  if (!el._src || !el._src.startsWith('data:image/svg')) return null;
+  try {
+    const doc = new DOMParser().parseFromString(svgSourceText(el._src), 'image/svg+xml');
+    const root = doc.documentElement;
+    if (!root || root.nodeName.toLowerCase() !== 'svg' || doc.querySelector('parsererror')) return null;
+    doc.querySelectorAll('script, foreignObject').forEach(n => n.remove());
+    for (const n of doc.querySelectorAll('*')){
+      for (const a of [...n.attributes]){
+        if (/^on/i.test(a.name)) n.removeAttribute(a.name);
+        if (/href$/i.test(a.name) && /^\s*javascript:/i.test(a.value)) n.removeAttribute(a.name);
+      }
+    }
+    let vb = root.getAttribute('viewBox');
+    let vx, vy, vw, vh;
+    if (vb){
+      [vx, vy, vw, vh] = vb.trim().split(/[\s,]+/).map(Number);
+    } else {
+      vx = 0; vy = 0;
+      vw = parseFloat(root.getAttribute('width')) || el.w;
+      vh = parseFloat(root.getAttribute('height')) || el.h;
+    }
+    if (![vx, vy, vw, vh].every(Number.isFinite) || vw <= 0 || vh <= 0) return null;
+    if (el.crop){
+      const c = el.crop;
+      vx += c[0] * vw; vy += c[1] * vh;
+      vw = Math.max(1e-6, (c[2] - c[0]) * vw);
+      vh = Math.max(1e-6, (c[3] - c[1]) * vh);
+    }
+    const ser = new XMLSerializer();
+    const inner = [...root.childNodes].map(n => ser.serializeToString(n)).join('');
+    return `<svg x="${svgNum(eb.x)}" y="${svgNum(eb.y)}" width="${svgNum(eb.w)}" height="${svgNum(eb.h)}" viewBox="${svgNum(vx)} ${svgNum(vy)} ${svgNum(vw)} ${svgNum(vh)}" preserveAspectRatio="none">${inner}</svg>`;
+  } catch (e){ return null; }
+}
 function renderSceneSVG(elements, opts){
   const pal = opts.pal;
   setRouteContext(elements);
@@ -2598,7 +2643,11 @@ function renderSceneSVG(elements, opts){
             tintAttr = ` filter="url(#${fid})"`;
           }
         }
-        if (el.crop){
+        const unadjusted = !A || A.canvas === baseEntry.img;
+        const inlined = unadjusted ? inlineSvgMarkup(el, eb) : null;
+        if (inlined){
+          parts.push(tintAttr ? `<g${tintAttr}>${inlined}</g>` : inlined);
+        } else if (el.crop){
           // scale the full image so the crop window fills the element, clipped
           const c = el.crop;
           const fw = eb.w / Math.max(0.001, c[2] - c[0]);

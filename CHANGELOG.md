@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.56.1
+
+- Copy as SVG and SVG export now inline your gallery SVGs as real vector markup (paths, text, shapes), not as an embedded image object. Other tools that open the file see editable vectors. Tint and crop carry over (crop becomes precise viewBox math), scripts and event handlers are stripped from the inlined markup for safety, and raster images keep using the image tag as before.
+
 ## v3.56.0
 
 - SVG assets are now recolorable: place a gallery SVG and the Outline row becomes "Tint". Pick any color and the whole mark recolors (transparency preserved), vector-crisp on canvas and in SVG export, where the original SVG source is kept and tinted with a real SVG filter. "None" restores the original artwork colors. To be clear about the reported concern: gallery SVGs were always stored and exported as SVG; what was missing was color control, and now it exists.
