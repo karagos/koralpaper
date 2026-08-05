@@ -6,7 +6,7 @@
 
 <table>
 <tr>
-<td align="center" width="33%"><b>Claude draws on your paper</b><br><sub>Describe it in Claude Desktop, edit it here</sub><br><img src="docs/shots/01-claude-draws.png" alt="Claude drawing an editable diagram through the MCP bridge"></td>
+<td align="center" width="33%"><b>Claude draws on your paper(MCP)</b><br><sub>Describe it in Claude Desktop, edit it here</sub><br><img src="docs/shots/01-claude-draws.png" alt="Claude drawing an editable diagram through the MCP bridge"></td>
 <td align="center" width="33%"><b>Replica: image → editable page</b><br><sub>Attach a poster, get it back as elements</sub><br><img src="docs/shots/02-replica.png" alt="A poster recreated as an editable KoralPaper page"></td>
 <td align="center" width="33%"><b>Charts from a spreadsheet paste</b><br><sub>8 types, Sketchy or Clean</sub><br><img src="docs/shots/03-charts.png" alt="Hand-drawn bar chart and donut made from pasted data"></td>
 </tr>
