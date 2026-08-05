@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.61.0
+
+- Animated GIF export: ⬇ → "Animated GIF" turns your pages into a looping GIF, one frame per page. Full control: tick which pages to include, give every frame its own on-screen duration (0.1 to 30 seconds, plus an apply-to-all shortcut), choose 480 / 720 / 1080 px width, and toggle looping. The encoder is built into the app (zero dependencies, like everything else): your carousel becomes a scroll-stopping animation without any external tool.
+
 ## v3.60.1
 
 - The Corners slider now also fine-tunes rectangles: sharp to full pill, same dial as photos. The classic sharp/rounded buttons still work and reset the fine value.

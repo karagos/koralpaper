@@ -1,4 +1,4 @@
-# KoralPaper — *Draw your thinking* (v3.60.1)
+# KoralPaper — *Draw your thinking* (v3.61.0)
 
 ![KoralPaper — the tour: wobbly shapes, glued arrows, Google fonts & icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
@@ -164,6 +164,9 @@ and Settings.
   hand-drawn Sketchy or crisp professional Clean. Everything lands as normal sketchy
   elements in one group: recolor any bar or slice with the usual controls,
   and right-click the chart to **edit its data** and rebuild it in place.
+- **Animated GIF export (⬇):** pages become frames, each with its own
+  on-screen duration, size and loop controls. A carousel becomes a looping
+  animation with zero extra tools.
 - **Snapshots (☰):** named checkpoints of the whole document, kept locally;
   restore any of them at any time, one undo brings the current version back.
 - **Prompt recipes (Claude tab):** one-click copies of the Claude moves that

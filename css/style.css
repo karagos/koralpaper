@@ -505,6 +505,24 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 .snapdialog .row.actions .minipill{flex:0 0 auto; padding:8px 14px;}
 .snapdialog .row.actions .pill{flex:0 0 auto; font-size:12.5px; padding:8px 16px; margin:0;}
 .snapempty{font-size:12.5px; color:var(--ink-soft); line-height:1.5;}
+.gifdialog{width:400px;}
+#gifPageList{display:flex; flex-direction:column; gap:6px; max-height:38vh; overflow-y:auto; margin-top:8px;}
+.gifrow{
+  display:flex; align-items:center; gap:8px; font-size:13px;
+  padding:7px 9px; border:1.5px solid var(--line-soft); border-radius:8px;
+}
+.gifrow input[type=checkbox]{accent-color:var(--coral); width:15px; height:15px; flex:0 0 auto;}
+.gifname{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.gifdelay{
+  width:56px; height:28px; text-align:center; font-family:var(--sans); font-size:12.5px; font-weight:600;
+  border:1.5px solid var(--line-soft); border-radius:7px; background:var(--card); color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.gifdelay:focus{outline:none; border-color:var(--coral);}
+.gifsec{font-size:11.5px; color:var(--ink-soft); font-weight:600;}
+.gifdialog .row.actions{display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; margin-top:10px;}
+.gifdialog .row.actions .minipill{flex:0 0 auto; padding:8px 14px;}
+.gifdialog .row.actions .pill{flex:0 0 auto; font-size:12.5px; padding:8px 16px; margin:0;}
 
 /* brand kit settings */
 .brandaccents{display:flex; gap:7px; flex-wrap:wrap;}

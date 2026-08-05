@@ -4350,6 +4350,7 @@ function runFileAction(act){
   if (act === 'open') fileInput.click();
   if (act === 'save') saveJSON();
   if (act === 'snapshots') openSnapDialog();
+  if (act === 'gif') openGifDialog();
   if (act === 'image') $('imgInput').click();
   if (act === 'excal') exportExcalidraw();
   if (act === 'templates'){ buildTplList(); $('tplDialog').classList.remove('hidden'); }
@@ -4386,6 +4387,221 @@ function download(name, url){
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
 }
+
+/* ── animated GIF export ─────────────────────────────
+   Zero-dependency GIF89a encoder: median-cut quantization to 256 colors,
+   GIF-flavored LZW, Netscape looping, per-frame delays in centiseconds. */
+function gifQuantize(rgba){
+  // collect unique colors (5-bit bucketed for photos); exact if few
+  const seen = new Map();
+  for (let i = 0; i < rgba.length; i += 4){
+    const key = (rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2];
+    seen.set(key, (seen.get(key) || 0) + 1);
+  }
+  let colors = [...seen.keys()];
+  if (colors.length > 256){
+    // median cut on the unique colors weighted by count
+    let boxes = [colors];
+    while (boxes.length < 256){
+      boxes.sort((a, b) => b.length - a.length);
+      const box = boxes.shift();
+      if (box.length <= 1){ boxes.push(box); break; }
+      let rMin = 255, rMax = 0, gMin = 255, gMax = 0, bMin = 255, bMax = 0;
+      for (const c of box){
+        const r = c >> 16, g = (c >> 8) & 255, b2 = c & 255;
+        rMin = Math.min(rMin, r); rMax = Math.max(rMax, r);
+        gMin = Math.min(gMin, g); gMax = Math.max(gMax, g);
+        bMin = Math.min(bMin, b2); bMax = Math.max(bMax, b2);
+      }
+      const rr = rMax - rMin, gr = gMax - gMin, br = bMax - bMin;
+      const shift = (gr >= rr && gr >= br) ? 8 : (rr >= br) ? 16 : 0;
+      box.sort((a, b) => ((a >> shift) & 255) - ((b >> shift) & 255));
+      const mid = box.length >> 1;
+      boxes.push(box.slice(0, mid), box.slice(mid));
+    }
+    colors = boxes.map(box => {
+      let r = 0, g = 0, b2 = 0, n = 0;
+      for (const c of box){
+        const w = seen.get(c) || 1;
+        r += (c >> 16) * w; g += ((c >> 8) & 255) * w; b2 += (c & 255) * w; n += w;
+      }
+      return (Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(b2 / n);
+    });
+  }
+  // palette bytes + nearest-color mapper with a bucketed cache
+  const pal = new Uint8Array(256 * 3);
+  colors.forEach((c, i) => { pal[i * 3] = c >> 16; pal[i * 3 + 1] = (c >> 8) & 255; pal[i * 3 + 2] = c & 255; });
+  const exact = new Map(colors.map((c, i) => [c, i]));
+  const cache = new Map();
+  const nearest = (r, g, b2) => {
+    const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b2 >> 3);
+    let idx = cache.get(key);
+    if (idx !== undefined) return idx;
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < colors.length; i++){
+      const dr = pal[i * 3] - r, dg = pal[i * 3 + 1] - g, db = pal[i * 3 + 2] - b2;
+      const d = dr * dr + dg * dg + db * db;
+      if (d < bd){ bd = d; best = i; }
+    }
+    cache.set(key, best);
+    return best;
+  };
+  const idx = new Uint8Array(rgba.length / 4);
+  for (let i = 0, j = 0; i < rgba.length; i += 4, j++){
+    const key = (rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2];
+    const e = exact.get(key);
+    idx[j] = e !== undefined ? e : nearest(rgba[i], rgba[i + 1], rgba[i + 2]);
+  }
+  return { palette: pal, indices: idx, count: colors.length };
+}
+function gifLZW(minCodeSize, pixels){
+  const CLEAR = 1 << minCodeSize, EOI = CLEAR + 1;
+  let codeSize = minCodeSize + 1, next = EOI + 1;
+  let dict = new Map();
+  const bytes = [];
+  let cur = 0, bits = 0;
+  const emit = code => {
+    cur |= code << bits; bits += codeSize;
+    while (bits >= 8){ bytes.push(cur & 255); cur >>= 8; bits -= 8; }
+  };
+  emit(CLEAR);
+  let prefix = pixels[0];
+  for (let i = 1; i < pixels.length; i++){
+    const k = pixels[i];
+    const key = prefix * 256 + k;
+    const hit = dict.get(key);
+    if (hit !== undefined){ prefix = hit; continue; }
+    emit(prefix);
+    dict.set(key, next++);
+    if (next - 1 === (1 << codeSize) && codeSize < 12) codeSize++;
+    if (next === 4096){
+      emit(CLEAR);
+      dict = new Map();
+      next = EOI + 1;
+      codeSize = minCodeSize + 1;
+    }
+    prefix = k;
+  }
+  emit(prefix);
+  emit(EOI);
+  if (bits > 0) bytes.push(cur & 255);
+  return bytes;
+}
+function encodeGIF(frames, w, h, loop){
+  // frames: [{rgba: Uint8ClampedArray, delayCs: number}]
+  const out = [];
+  const push = (...b) => out.push(...b);
+  const pushStr = str => { for (const ch of str) out.push(ch.charCodeAt(0)); };
+  pushStr('GIF89a');
+  push(w & 255, w >> 8, h & 255, h >> 8, 0x70, 0, 0); // no global palette
+  if (loop){
+    push(0x21, 0xFF, 11); pushStr('NETSCAPE2.0'); push(3, 1, 0, 0, 0);
+  }
+  for (const fr of frames){
+    const { palette, indices, count } = gifQuantize(fr.rgba);
+    const palBits = Math.max(1, Math.ceil(Math.log2(Math.max(2, count))));
+    const palSize = 1 << palBits;
+    const d = Math.max(2, Math.round(fr.delayCs));
+    push(0x21, 0xF9, 4, 0x04, d & 255, d >> 8, 0, 0); // GCE: disposal 1
+    push(0x2C, 0, 0, 0, 0, w & 255, w >> 8, h & 255, h >> 8, 0x80 | (palBits - 1));
+    for (let i = 0; i < palSize * 3; i++) push(palette[i] || 0);
+    const minCode = Math.max(2, palBits);
+    push(minCode);
+    const data = gifLZW(minCode, indices);
+    for (let i = 0; i < data.length; i += 255){
+      const chunk = data.slice(i, i + 255);
+      push(chunk.length, ...chunk);
+    }
+    push(0);
+  }
+  push(0x3B);
+  return new Blob([new Uint8Array(out)], { type: 'image/gif' });
+}
+/* frame geometry shared by all pages: board if set, else union of content */
+function gifFrameRect(pageIdxs){
+  if (state.board) return { x: state.board.x, y: state.board.y, w: state.board.w, h: state.board.h };
+  let r = null;
+  for (const i of pageIdxs){
+    const b = sceneBounds(visibleEls(state.pages[i].elements));
+    if (!b) continue;
+    r = r ? { x: Math.min(r.x, b.x), y: Math.min(r.y, b.y),
+      x2: Math.max(r.x2 ?? (r.x + r.w), b.x + b.w), y2: Math.max(r.y2 ?? (r.y + r.h), b.y + b.h) } : { x: b.x, y: b.y, x2: b.x + b.w, y2: b.y + b.h };
+    if (r.x2 !== undefined){ r.w = r.x2 - r.x; r.h = r.y2 - r.y; }
+  }
+  if (!r) return null;
+  const pad = 40;
+  return { x: r.x - pad, y: r.y - pad, w: r.w + pad * 2, h: r.h + pad * 2 };
+}
+async function exportGIF(items, targetW, loop){
+  const rect = gifFrameRect(items.map(it => it.idx));
+  if (!rect){ alert('Nothing to export: the selected pages are empty.'); return; }
+  const scale = Math.min(1.5, targetW / rect.w);
+  const w = Math.round(rect.w * scale), h = Math.round(rect.h * scale);
+  const frames = [];
+  showHint('Rendering ' + items.length + ' frames…');
+  for (const it of items){
+    const off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    const p2 = state.pages[it.idx];
+    renderScene(off.getContext('2d'), visibleEls(p2.elements), {
+      width: w, height: h,
+      camera: { x: -rect.x * scale, y: -rect.y * scale, z: scale },
+      pal: pal(), bg: pageBgOf(p2),
+      grid: state.board ? state.grid : false, gridSize: gsize(),
+      gridColor: gridColorForBg(p2.bg || state.bgColor),
+    });
+    frames.push({ rgba: off.getContext('2d').getImageData(0, 0, w, h).data, delayCs: it.delay * 100 });
+    await new Promise(r => setTimeout(r, 0)); // keep the UI alive
+  }
+  showHint('Encoding GIF…');
+  await new Promise(r => setTimeout(r, 30));
+  const blob = encodeGIF(frames, w, h, loop);
+  const stamp = new Date().toISOString().slice(0, 10);
+  download(`koralpaper-${stamp}.gif`, URL.createObjectURL(blob));
+  showHint('GIF saved: ' + w + 'x' + h + ', ' + items.length + ' frames, ' + (blob.size / 1048576).toFixed(1) + ' MB');
+}
+/* ── GIF dialog ── */
+function openGifDialog(){
+  closeMenus();
+  syncPageRef();
+  const list = $('gifPageList');
+  list.replaceChildren();
+  state.pages.forEach((p2, i) => {
+    const row = document.createElement('div');
+    row.className = 'gifrow';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = true; cb.dataset.i = i;
+    const name = document.createElement('span');
+    name.className = 'gifname';
+    name.textContent = (i + 1) + '. ' + (p2.name || 'Page');
+    const delay = document.createElement('input');
+    delay.type = 'number'; delay.min = '0.1'; delay.max = '30'; delay.step = '0.1';
+    delay.value = '1.5'; delay.className = 'gifdelay'; delay.title = 'Seconds this frame stays on screen';
+    const sec = document.createElement('span');
+    sec.className = 'gifsec'; sec.textContent = 's';
+    row.append(cb, name, delay, sec);
+    list.appendChild(row);
+  });
+  $('gifDialog').classList.remove('hidden');
+}
+$('gifApplyAll').addEventListener('click', () => {
+  const v = Number($('gifMasterDelay').value) || 1.5;
+  document.querySelectorAll('#gifPageList .gifdelay').forEach(inp => { inp.value = v; });
+});
+$('gifExportBtn').addEventListener('click', async () => {
+  const items = [...document.querySelectorAll('#gifPageList .gifrow')]
+    .filter(r => r.querySelector('input[type=checkbox]').checked)
+    .map(r => ({
+      idx: Number(r.querySelector('input[type=checkbox]').dataset.i),
+      delay: clamp(Number(r.querySelector('.gifdelay').value) || 1.5, 0.1, 30),
+    }));
+  if (!items.length){ alert('Tick at least one page.'); return; }
+  $('gifDialog').classList.add('hidden');
+  const targetW = Number($('gifSize').value) || 720;
+  await exportGIF(items, targetW, $('gifLoop').checked);
+});
+$('gifCancelBtn').addEventListener('click', () => $('gifDialog').classList.add('hidden'));
+
 /* ── named snapshots: whole-document checkpoints in local storage ── */
 const SNAP_KEY = 'koralpaper.snapshots';
 const SNAP_MAX = 8;
@@ -6483,6 +6699,7 @@ window.addEventListener('keydown', ev => {
     $('pdfDialog').classList.add('hidden');
     $('chartDialog').classList.add('hidden');
     $('snapDialog').classList.add('hidden');
+    $('gifDialog').classList.add('hidden');
     return; }
   if (ev.key === 'Enter'){
     const sel = selected();
