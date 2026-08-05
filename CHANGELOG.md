@@ -1,5 +1,10 @@
 # KoralPaper — Changelog
 
+## v3.60.1
+
+- The Corners slider now also fine-tunes rectangles: sharp to full pill, same dial as photos. The classic sharp/rounded buttons still work and reset the fine value.
+- Panel polish from the audit: the "Reset spacing" button matches every other panel button, and the font name gets twice the width of the weight button so it stays readable.
+
 ## v3.60.0
 
 - Paste a picture into a shape: select a rectangle, ellipse, diamond or chip and paste an image from your clipboard (Pinterest, a screenshot, anywhere). The picture fills the shape, cover-fitted and clipped by the sketchy outline, rounded corners included. Right-click the shape to remove the image fill. Works in every export as a true clipped vector group.

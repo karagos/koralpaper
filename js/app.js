@@ -1756,7 +1756,7 @@ function reorder(mode){
 }
 
 /* ── copy / paste style ────────────────────────────── */
-const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor','frame','fweight','imgRadius'];
+const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor','frame','fweight','imgRadius','cornerRad'];
 let styleClipboard = null;
 let sizeClipboard = null;
 function copyStyle(){
@@ -2377,12 +2377,14 @@ function syncPanel(){
   show('rowWidth', shapeish || linear || has('image'));
   show('rowSketch', shapeish || linear || has('image'));
   show('rowFrame', has('image'));
-  show('rowImgRadius', has('image'));
+  show('rowImgRadius', has('image') || has('rect'));
   if (document.activeElement !== $('imgRadiusRange')){
-    const firstImgEl = sel.find(e => e.type === 'image');
-    const rv = firstImgEl ? (firstImgEl.imgRadius || 0) : 0;
-    $('imgRadiusRange').value = rv;
-    $('imgRadiusVal').textContent = rv ? rv + '%' : 'sharp';
+    const firstRad = sel.find(e => e.type === 'image' || e.type === 'rect');
+    const rv = !firstRad ? 0
+      : firstRad.type === 'image' ? (firstRad.imgRadius || 0)
+      : (firstRad.cornerRad != null ? firstRad.cornerRad : (firstRad.round ? 'auto' : 0));
+    $('imgRadiusRange').value = rv === 'auto' ? 8 : rv;
+    $('imgRadiusVal').textContent = rv === 'auto' ? 'auto' : rv ? rv + '%' : 'sharp';
   }
   show('rowRound', has('rect'));
   show('rowCurve', has('arrow','line'));
@@ -2505,7 +2507,7 @@ document.addEventListener('click', ev => {
     if (t.dataset.dash) applyStyle({ dash: t.dataset.dash });
     else if (t.dataset.v) applyStyle({ sketch: Number(t.dataset.v), dash: 'solid' });
   }
-  else if (t.closest('#roundSeg') && t.dataset.v) applyStyle({ round: Number(t.dataset.v) });
+  else if (t.closest('#roundSeg') && t.dataset.v) applyStyle({ round: Number(t.dataset.v), cornerRad: null });
   else if (t.closest('#curveSeg') && t.dataset.elbow) applyStyle({ elbow: true, elbowPts: null });
   else if (t.closest('#curveSeg') && t.dataset.v) applyStyle({ curve: Number(t.dataset.v), elbow: false, elbowPts: null });
   else if (t.closest('#artSeg') && t.dataset.art) applyStyle({ artStyle: t.dataset.art });
@@ -2556,7 +2558,10 @@ const ADJ_SLIDERS = [
 ];
 $('imgRadiusRange').addEventListener('input', ev => {
   const v = clamp(Math.round(Number(ev.target.value)), 0, 50);
-  for (const el of selected()) if (el.type === 'image') el.imgRadius = v || null;
+  for (const el of selected()){
+    if (el.type === 'image') el.imgRadius = v || null;
+    else if (el.type === 'rect') el.cornerRad = v || (v === 0 ? 0 : null);
+  }
   $('imgRadiusVal').textContent = v ? v + '%' : 'sharp';
   requestRender();
 });

@@ -332,7 +332,7 @@ body.dark .menu button.danger{color:#F09070;}
   font-size:12px; font-variant-numeric:tabular-nums; color:var(--ink);
 }
 .tyrow input{width:100%; accent-color:var(--coral); height:18px;}
-.tyreset{align-self:flex-start; padding:5px 11px; font-size:11px; margin-top:2px;}
+.tyreset{margin-top:2px;}
 .richwrap{flex:1; display:flex; flex-direction:column; gap:6px; min-width:0;}
 .richseg button{width:34px;}
 .richseg b{font-weight:800;}
@@ -556,7 +556,7 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 #fontSearch:focus{outline:none; border-color:var(--coral);}
 .fontrow{display:flex; gap:5px;}
 .fontrow .fontbtn{width:auto; flex:1; min-width:0;}
-.weightbtn{flex:0 0 60px; min-width:0; justify-content:center;}
+.fontrow .weightbtn{flex:0 0 52px; min-width:0; justify-content:center; padding-left:5px; padding-right:5px;}
 .weightmenu{position:fixed; min-width:170px; max-height:60vh; overflow-y:auto; z-index:60;}
 .weightmenu button.sel{color:var(--coral); font-weight:700;}
 .chartslider input[type=range]{width:86px; height:16px; accent-color:var(--coral);}

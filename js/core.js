@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.60.0';
+const APP_VERSION = '3.60.1';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -499,7 +499,9 @@ function diamondOutline(x, y, w, h){
 function shapeOutline(el){
   const { x, y, w, h } = el;
   switch (el.type){
-    case 'rect': return roundedRectOutline(x, y, w, h, el.round ? Math.min(18, Math.min(w,h)*.25) : 0);
+    case 'rect': return roundedRectOutline(x, y, w, h,
+      el.cornerRad != null ? Math.min(w, h) * (el.cornerRad / 100)
+        : el.round ? Math.min(18, Math.min(w,h)*.25) : 0);
     case 'chip': return roundedRectOutline(x, y, w, h, h / 2);
     case 'ellipse': return ellipseOutline(x + w/2, y + h/2, w/2, h/2);
     case 'diamond': return diamondOutline(x, y, w, h);
