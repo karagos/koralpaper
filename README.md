@@ -17,7 +17,7 @@
 </tr>
 <tr>
 <td align="center" width="33%"><b>Mind-map folding</b><br><sub>Collapse and expand branches live</sub><br><img src="docs/shots/07-mind-map.png" alt="A mind map with folded branches and +N badges"></td>
-<td align="center" width="33%"><b>Present & replay</b><br><sub>Laser pen, draw-on replay, .webm export</sub><br><img src="docs/shots/08-present.webm" alt="Presentation mode with the laser pen"></td>
+<td align="center" width="33%"><b>Present & replay</b><br><sub>Laser pen, draw-on replay, .webm export</sub><br><img src="docs/shots/08-present.gif" alt="Presentation mode with the laser pen"></td>
 <td align="center" width="33%"><b>Photos become art</b><br><sub>13 algorithmic styles, tintable SVG logos</sub><br><img src="docs/shots/09-photo-art.png" alt="A photo rendered as stipple art next to a tinted SVG logo"></td>
 </tr>
 <tr>
