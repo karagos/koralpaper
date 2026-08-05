@@ -571,7 +571,16 @@ function internImage(el){
   el._src = src;
 }
 function adoptImages(els){
-  for (const el of els) if (el.type === 'image') internImage(el);
+  for (const el of els){
+    if (el.type === 'image') internImage(el);
+    // shape image fills: hydrate the runtime src, intern template-embedded pixels
+    if (el.imgFillSrc){
+      el.imgFillId = imageHash(el.imgFillSrc);
+      state.images[el.imgFillId] = el.imgFillSrc;
+      delete el.imgFillSrc;
+    }
+    if (el.imgFillId && state.images[el.imgFillId]) el._imgFillSrc = state.images[el.imgFillId];
+  }
 }
 function usedImages(){
   const used = {};
@@ -579,6 +588,8 @@ function usedImages(){
     for (const el of p.elements)
       if (el.type === 'image' && el.imgId && state.images[el.imgId] !== undefined)
         used[el.imgId] = state.images[el.imgId];
+      else if (el.imgFillId && state.images[el.imgFillId] !== undefined)
+        used[el.imgFillId] = state.images[el.imgFillId];
   return used;
 }
 function commit(){
@@ -1745,7 +1756,7 @@ function reorder(mode){
 }
 
 /* ── copy / paste style ────────────────────────────── */
-const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor','frame','fweight'];
+const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor','frame','fweight','imgRadius'];
 let styleClipboard = null;
 let sizeClipboard = null;
 function copyStyle(){
@@ -1978,6 +1989,11 @@ function openCtxMenu(ev){
       add('Edit text', () => openTextEditor(sel[0], false));
     if (sel[0].chart)
       add('Edit chart data…', () => chartOpen(sel[0]));
+    if (sel.length === 1 && sel[0].imgFillId)
+      add('Remove image fill', () => {
+        delete sel[0].imgFillId; delete sel[0]._imgFillSrc;
+        commit(); requestRender();
+      });
     if (sel.length === 1 && sel[0].type === 'text' && sel[0].wrap)
       add('Fit width to text (unwrap)', () => {
         sel[0].wrap = false;
@@ -2361,6 +2377,13 @@ function syncPanel(){
   show('rowWidth', shapeish || linear || has('image'));
   show('rowSketch', shapeish || linear || has('image'));
   show('rowFrame', has('image'));
+  show('rowImgRadius', has('image'));
+  if (document.activeElement !== $('imgRadiusRange')){
+    const firstImgEl = sel.find(e => e.type === 'image');
+    const rv = firstImgEl ? (firstImgEl.imgRadius || 0) : 0;
+    $('imgRadiusRange').value = rv;
+    $('imgRadiusVal').textContent = rv ? rv + '%' : 'sharp';
+  }
   show('rowRound', has('rect'));
   show('rowCurve', has('arrow','line'));
   show('rowHeads', has('arrow','line'));
@@ -2531,6 +2554,13 @@ const ADJ_SLIDERS = [
   ['adjGamma', 'gamma', v => Number(v) / 100],
   ['adjSharp', 'sharp', v => Number(v)],
 ];
+$('imgRadiusRange').addEventListener('input', ev => {
+  const v = clamp(Math.round(Number(ev.target.value)), 0, 50);
+  for (const el of selected()) if (el.type === 'image') el.imgRadius = v || null;
+  $('imgRadiusVal').textContent = v ? v + '%' : 'sharp';
+  requestRender();
+});
+$('imgRadiusRange').addEventListener('change', () => { commit(); syncPanel(); });
 let adjTimer = null;
 for (const [id, prop, parse] of ADJ_SLIDERS){
   $(id).addEventListener('input', ev => {
@@ -3624,6 +3654,21 @@ function downscaleDataURL(srcURL, mime, cb){
   };
   img.src = srcURL;
 }
+/* paste a picture INTO the selected shape: it becomes the shape's fill,
+   clipped by the outline (rounded corners and all), cover-fitted */
+function pasteImageIntoShape(file, shapeId){
+  const reader = new FileReader();
+  reader.onload = () => downscaleDataURL(reader.result, file.type, dataURL => {
+    const el = byId(shapeId);
+    if (!el) return;
+    el.imgFillId = imageHash(dataURL);
+    state.images[el.imgFillId] = dataURL;
+    el._imgFillSrc = dataURL;
+    commit(); syncPanel(); requestRender();
+    showHint('Picture pasted into the shape: it follows the outline, corners included. Right-click to remove it');
+  });
+  reader.readAsDataURL(file);
+}
 function insertImageFiles(files, sx, sy){
   const list = [...files].filter(f => f.type.startsWith('image/'));
   if (!list.length) return;
@@ -3672,7 +3717,13 @@ document.addEventListener('paste', ev => {
   ev.preventDefault();
   if (imgItem && txt !== CLIP_MARKER){
     const f = imgItem.getAsFile();
-    if (f){ insertImageFiles([f], null, null); return; }
+    if (f){
+      const sel = selected();
+      const target = (sel.length === 1 && ['rect', 'diamond', 'ellipse', 'chip'].includes(sel[0].type))
+        ? sel[0] : null;
+      if (target){ pasteImageIntoShape(f, target.id); return; }
+      insertImageFiles([f], null, null); return;
+    }
   }
   paste();
 });
@@ -4876,6 +4927,7 @@ function tplSnapshot(name, scope){
     // templates outlive this document, so they carry their own pixels
     for (const el of out)
       if (el.type === 'image' && el.imgId && state.images[el.imgId]) el.src = state.images[el.imgId];
+      if (el.imgFillId && state.images[el.imgFillId]) el.imgFillSrc = state.images[el.imgFillId];
     return out;
   };
   const pages = scope === 'all'

@@ -209,6 +209,10 @@
       <div class="adjrow"><span>Sharpen</span><input type="range" id="adjSharp" min="0" max="100" step="5" value="0"></div>
       <button class="minipill" id="adjResetBtn" title="Reset brightness / contrast / gamma / sharpness">Reset adjustments</button>
     </div>
+    <div class="row" id="rowImgRadius"><label>Corners <b class="labelval" id="imgRadiusVal">sharp</b></label>
+      <input type="range" id="imgRadiusRange" min="0" max="50" step="1" value="0"
+        title="Round the photo's corners: 0 is sharp, 50 is a full pill">
+    </div>
     <div class="row" id="rowFrame"><label>Frame</label>
       <div class="segment">
         <button id="frameOff" title="No frame">Off</button>
@@ -648,6 +652,9 @@
       <tr><td><b>Resizing with text:</b> side handles stretch a shape and keep its
         font size; on a text element they set the wrapping width (right-click →
         Fit width to text to undo). Corner handles scale the text along with it</td></tr>
+      <tr><td><b>Pictures in shapes:</b> select a shape and paste an image (⌘V):
+        it fills the shape, clipped by the outline. Photos also get a <b>Corners</b>
+        slider in the panel, from sharp to a full pill</td></tr>
       <tr><td><b>Snapshots:</b> ☰ → Snapshots saves a named checkpoint of the whole
         document and restores it anytime</td></tr>
       <tr><td><b>Color single letters:</b> while typing, select the characters and pick a

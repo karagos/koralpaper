@@ -1,5 +1,10 @@
 # KoralPaper — Changelog
 
+## v3.60.0
+
+- Paste a picture into a shape: select a rectangle, ellipse, diamond or chip and paste an image from your clipboard (Pinterest, a screenshot, anywhere). The picture fills the shape, cover-fitted and clipped by the sketchy outline, rounded corners included. Right-click the shape to remove the image fill. Works in every export as a true clipped vector group.
+- Rounded corners for photos: image elements get a Corners slider in the panel, from sharp (0) to a full pill (50). The radius scales with the image, the hand-drawn frame follows it, and it applies to tinted SVGs and all 13 art styles too.
+
 ## v3.59.1
 
 - Panel polish: the font and weight buttons share one line, and the exact-size field sits inline with S / M / L / XL at the same 30 px height, like a fifth button, instead of stretching taller and wrapping.

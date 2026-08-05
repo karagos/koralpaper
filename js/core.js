@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.59.1';
+const APP_VERSION = '3.60.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -2038,7 +2038,7 @@ function artPrims(el, entry){
 function drawImageFrame(ctx, el, pal, b){
   if (!el.frame || el.stroke === 'none') return;
   const col = resolveStroke(pal, el.stroke) || pal.stroke.ink;
-  const base = roundedRectOutline(b.x, b.y, b.w, b.h, el.round ? 9 : 0);
+  const base = roundedRectOutline(b.x, b.y, b.w, b.h, imgCornerRad(el, b) || (el.round ? 9 : 0));
   ctx.save();
   ctx.strokeStyle = col;
   ctx.lineWidth = el.sw;
@@ -2059,6 +2059,9 @@ function drawImageFrame(ctx, el, pal, b){
   ctx.setLineDash([]);
   ctx.restore();
 }
+function imgCornerRad(el, b){
+  return el.imgRadius ? Math.min(b.w, b.h) * (el.imgRadius / 100) : 0;
+}
 function drawImageEl(ctx, el, pal){
   const b = boundsOf(el);
   if (!el._src) return;
@@ -2072,6 +2075,14 @@ function drawImageEl(ctx, el, pal){
     return;
   }
   const A = getAdjusted(el);
+  const cornerRad = imgCornerRad(el, b);
+  const clipCorners = () => {
+    if (!cornerRad) return false;
+    ctx.save();
+    traceFillPath(ctx, roundedRectOutline(b.x, b.y, b.w, b.h, cornerRad), true);
+    ctx.clip();
+    return true;
+  };
   if (!el.artStyle || el.artStyle === 'photo'){
     let src = A.canvas;
     /* SVG tint: recolor the whole mark (alpha preserved) with the Outline
@@ -2099,12 +2110,15 @@ function drawImageEl(ctx, el, pal){
         t2.fillRect(0, 0, tc.width, tc.height);
         el._tintCv = tc; el._tintKey = key;
       }
+      const ccT = clipCorners();
       ctx.drawImage(el._tintCv, b.x, b.y, b.w, b.h);
+      if (ccT) ctx.restore();
       drawImageFrame(ctx, el, pal, b);
       return;
     }
     const nw = src.naturalWidth || src.width, nh = src.naturalHeight || src.height;
     const c = el.crop;
+    const ccP = clipCorners();
     if (c){
       ctx.drawImage(src,
         c[0] * nw, c[1] * nh, Math.max(1, (c[2] - c[0]) * nw), Math.max(1, (c[3] - c[1]) * nh),
@@ -2112,11 +2126,13 @@ function drawImageEl(ctx, el, pal){
     } else {
       ctx.drawImage(src, b.x, b.y, b.w, b.h);
     }
+    if (ccP) ctx.restore();
     drawImageFrame(ctx, el, pal, b);
     return;
   }
   const prims = artPrims(el, A.entry);
   const col = resolveStroke(pal, el.stroke) || pal.stroke.ink;
+  const ccA = clipCorners();
   ctx.save();
   ctx.translate(b.x, b.y); // prims are element-local
   for (const t of prims.tris){
@@ -2167,6 +2183,7 @@ function drawImageEl(ctx, el, pal){
     }
   }
   ctx.restore();
+  if (ccA) ctx.restore();
   drawImageFrame(ctx, el, pal, b);
 }
 
@@ -2274,6 +2291,20 @@ function drawElement(ctx, el, pal, bg){
         ctx.fillStyle = fillColor;
         ctx.fill();
       }
+    }
+  }
+  /* image fill: a pasted picture clipped by the shape, cover-fit */
+  if (el._imgFillSrc){
+    const fe = getImageEntry(el._imgFillSrc);
+    if (fe.ready){
+      const img = fe.img;
+      const nw = img.naturalWidth || 1, nh = img.naturalHeight || 1;
+      const sc = Math.max(b.w / nw, b.h / nh);
+      ctx.save();
+      traceFillPath(ctx, outline, el.sketch === 0);
+      ctx.clip();
+      ctx.drawImage(img, b.x + (b.w - nw * sc) / 2, b.y + (b.h - nh * sc) / 2, nw * sc, nh * sc);
+      ctx.restore();
     }
   }
   if (strokeColor){
@@ -2645,16 +2676,23 @@ function renderSceneSVG(elements, opts){
         }
         const unadjusted = !A || A.canvas === baseEntry.img;
         const inlined = unadjusted ? inlineSvgMarkup(el, eb) : null;
+        const svgRad = imgCornerRad(el, eb);
+        const roundClip = () => {
+          const id = 'imclip' + (clipN++);
+          defs.push(`<clipPath id="${id}"><rect x="${svgNum(eb.x)}" y="${svgNum(eb.y)}" width="${svgNum(eb.w)}" height="${svgNum(eb.h)}" rx="${svgNum(svgRad)}"/></clipPath>`);
+          return id;
+        };
         if (inlined){
-          parts.push(tintAttr ? `<g${tintAttr}>${inlined}</g>` : inlined);
+          const body2 = tintAttr ? `<g${tintAttr}>${inlined}</g>` : inlined;
+          parts.push(svgRad ? `<g clip-path="url(#${roundClip()})">${body2}</g>` : body2);
         } else if (el.crop){
           // scale the full image so the crop window fills the element, clipped
           const c = el.crop;
           const fw = eb.w / Math.max(0.001, c[2] - c[0]);
           const fh = eb.h / Math.max(0.001, c[3] - c[1]);
-          const id = 'imclip' + (clipN++);
-          defs.push(`<clipPath id="${id}"><rect x="${svgNum(eb.x)}" y="${svgNum(eb.y)}" width="${svgNum(eb.w)}" height="${svgNum(eb.h)}"/></clipPath>`);
-          parts.push(`<g clip-path="url(#${id})"${tintAttr}><image x="${svgNum(eb.x - c[0] * fw)}" y="${svgNum(eb.y - c[1] * fh)}" width="${svgNum(fw)}" height="${svgNum(fh)}" href="${photoHref()}" preserveAspectRatio="none"/></g>`);
+          parts.push(`<g clip-path="url(#${roundClip()})"${tintAttr}><image x="${svgNum(eb.x - c[0] * fw)}" y="${svgNum(eb.y - c[1] * fh)}" width="${svgNum(fw)}" height="${svgNum(fh)}" href="${photoHref()}" preserveAspectRatio="none"/></g>`);
+        } else if (svgRad){
+          parts.push(`<g clip-path="url(#${roundClip()})"><image x="${svgNum(eb.x)}" y="${svgNum(eb.y)}" width="${svgNum(eb.w)}" height="${svgNum(eb.h)}" href="${photoHref()}" preserveAspectRatio="none"${tintAttr}/></g>`);
         } else {
           parts.push(`<image x="${svgNum(eb.x)}" y="${svgNum(eb.y)}" width="${svgNum(eb.w)}" height="${svgNum(eb.h)}" href="${photoHref()}" preserveAspectRatio="none"${tintAttr}/>`);
         }
@@ -2694,11 +2732,18 @@ function renderSceneSVG(elements, opts){
           inner.push(`<g fill="none" stroke="${col}"${stringy ? ' stroke-opacity="0.82"' : ''} stroke-width="${svgNum(baseW)}" stroke-linecap="round">${strokes.join('')}</g>`);
         }
         // prims are element-local — translate into place
-        parts.push(`<g transform="translate(${svgNum(eb.x)} ${svgNum(eb.y)})">${inner.join('')}</g>`);
+        const artRad = imgCornerRad(el, eb);
+        let artClipAttr = '';
+        if (artRad){
+          const acid = 'imclip' + (clipN++);
+          defs.push(`<clipPath id="${acid}"><rect x="${svgNum(eb.x)}" y="${svgNum(eb.y)}" width="${svgNum(eb.w)}" height="${svgNum(eb.h)}" rx="${svgNum(artRad)}"/></clipPath>`);
+          artClipAttr = ` clip-path="url(#${acid})"`;
+        }
+        parts.push(`<g transform="translate(${svgNum(eb.x)} ${svgNum(eb.y)})"${artClipAttr}>${inner.join('')}</g>`);
       }
       if (el.frame && el.stroke !== 'none'){
         const fcol = resolveStroke(pal, el.stroke) || pal.stroke.ink;
-        const base = roundedRectOutline(eb.x, eb.y, eb.w, eb.h, el.round ? 9 : 0);
+        const base = roundedRectOutline(eb.x, eb.y, eb.w, eb.h, imgCornerRad(el, eb) || (el.round ? 9 : 0));
         const dashAttr = el.dash === 'dotted'
           ? ` stroke-dasharray="${svgNum(Math.max(1.2, el.sw * 0.9))} ${svgNum(el.sw * 2.4)}"`
           : el.dash === 'dashed' ? ` stroke-dasharray="${svgNum(el.sw * 2.6)} ${svgNum(el.sw * 1.9)}"` : '';
@@ -2791,6 +2836,15 @@ function renderSceneSVG(elements, opts){
           parts.push(svgPatternGroup(el, fillColor, dFillPath(outline, el.sketch === 0)));
         else
           parts.push(`<path d="${dFillPath(outline, el.sketch === 0)}" fill="${fillColor}"/>`);
+      }
+      if (el._imgFillSrc){
+        const fe2 = getImageEntry(el._imgFillSrc);
+        const nw2 = (fe2.ready && fe2.img.naturalWidth) || 1;
+        const nh2 = (fe2.ready && fe2.img.naturalHeight) || 1;
+        const sc2 = Math.max(eb.w / nw2, eb.h / nh2);
+        const sid = 'shclip' + (clipN++);
+        defs.push(`<clipPath id="${sid}"><path d="${dFillPath(outline, el.sketch === 0)}"/></clipPath>`);
+        parts.push(`<g clip-path="url(#${sid})"><image x="${svgNum(eb.x + (eb.w - nw2 * sc2) / 2)}" y="${svgNum(eb.y + (eb.h - nh2 * sc2) / 2)}" width="${svgNum(nw2 * sc2)}" height="${svgNum(nh2 * sc2)}" href="${el._imgFillSrc}" preserveAspectRatio="none"/></g>`);
       }
       if (resolveStroke(pal, el.stroke)){
         for (const poly of sketchPolylines(outline, true, el, el.sketch))
