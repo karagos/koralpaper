@@ -584,8 +584,8 @@
       <button class="minipill tlbtn" id="tlPlayBtn" title="Preview the animation with all motion, right here">▶ Preview</button>
       <span class="tlcount" id="tlCount">no frames yet</span>
       <div class="tlprog hidden" id="tlProg"><div class="tlprogfill" id="tlProgFill"></div></div>
-      <label class="tlfade" title="Fade: elements that appear or disappear between frames fade in and out. Off = hard cuts">
-        <input type="checkbox" id="tlFade" checked> Fade
+      <label class="tlfade" title="Fade: elements that appear or disappear between frames fade in and out. Off (the default) = hard cuts, the classic time-lapse feel">
+        <input type="checkbox" id="tlFade"> Fade
       </label>
       <select id="tlFps" class="brandselect tlsize" title="Smoothness of the motion (frames per second)">
         <option value="10">10 fps</option>
@@ -612,8 +612,9 @@
       <span class="tllab" title="Seconds of animated motion into the next frame. 0 = hard cut">move</span>
       <input type="number" id="tlMoveDur" class="gifdelay" min="0" max="10" step="0.1" value="0.6"
         title="Seconds of animated motion into the next frame. 0 = hard cut">
-      <select id="tlEase" class="brandselect tlsize" title="Personality of the motion">
-        <option value="smooth" selected>Smooth</option>
+      <select id="tlEase" class="brandselect tlsize" title="Personality of the motion. Stop-motion = discrete shaky steps, the true time-lapse feel">
+        <option value="step" selected>Stop-motion</option>
+        <option value="smooth">Smooth</option>
         <option value="snappy">Snappy</option>
         <option value="over">Overshoot</option>
         <option value="linear">Linear</option>
@@ -744,8 +745,10 @@
         slider in the panel, from sharp to a full pill</td></tr>
       <tr><td><b>Time-lapse:</b> ☰ → Time-lapse recorder. <b>F</b> snaps the page as a
         frame; ● auto-records every change while you work. Each frame has a <b>hold</b>
-        time and a <b>move</b> time: during the move, elements glide, fade, resize and
-        recolor into the next frame with the easing you pick. 🎥 records camera zooms,
+        time and a <b>move</b> time: during the move, elements travel to the next frame
+        in shaky stop-motion steps (the default), or glide smoothly if you pick another
+        easing. Appearing and disappearing elements cut hard, or fade if you tick Fade.
+        🎥 records camera zooms,
         👻 shows the last frame as a ghost while you build the next one, and ▶ previews
         the whole animation before you export it as a GIF or video</td></tr>
       <tr><td><b>Animated GIF:</b> ⬇ → Animated GIF turns your pages into a looping

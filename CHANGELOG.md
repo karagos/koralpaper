@@ -1,5 +1,10 @@
 # KoralPaper — Changelog
 
+## v3.64.0
+
+- Stop-motion is now the soul of the time-lapse, and the default. A real time-lapse is not smooth motion design: things move in discrete, slightly shaky steps, like photos taken one by one. The new Stop-motion easing moves elements in about 8 distinct positions per second, adds a tiny deterministic hand-shake to every element on every step, and re-seeds the sketchy strokes so the whole drawing "boils" as if redrawn by hand for each photo. On hold frames everything settles perfectly still. The camera still glides smoothly between camera keyframes, like a rig, while the objects step.
+- Fade now defaults OFF: elements that appear or disappear hard-cut, the traditional time-lapse feel. Tick Fade only when you want cross-fades. Smooth, Snappy, Overshoot and Linear remain available per frame when a story calls for motion design instead.
+
 ## v3.63.0
 
 - Time-lapse v2, from slideshow to motion design. Every keyframe now has a hold time (how long it stays still) and a move time (how long it animates into the next frame). During the move, elements with the same identity glide between positions, resize, rotate, fade and recolor smoothly; elements that appear or disappear fade in and out, or hard-cut if you switch Fade off. Four easing personalities: Smooth, Snappy, Overshoot (a bounce past the target, then settle) and Linear, plus 10 / 20 / 25 fps for export smoothness. Frames captured before v2 keep working exactly as before: move defaults to 0, which is the old hard cut.

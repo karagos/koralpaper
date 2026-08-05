@@ -4404,7 +4404,9 @@ function download(name, url){
    camera keyframes pan/zoom the viewport between frames. */
 const tl = { open: false, auto: false, frames: [], sel: -1, lastJson: null, lastAutoT: 0,
   camOn: false, onion: false };
+const TL_STEP_RATE = 8;   // stop-motion: discrete positions per second of move
 const TL_EASES = {
+  step: t => t,           // quantized in tlStateAt, listed here for validation
   linear: t => t,
   smooth: t => t * t * (3 - 2 * t),
   snappy: t => 1 - Math.pow(1 - t, 3),
@@ -4428,7 +4430,7 @@ function tlSnap(fromAuto){
     board: state.board ? { ...state.board } : null,
     delay: clamp(Number($('tlDelay').value) || 0.5, 0.1, 30),
     move: clamp(Number($('tlMoveDur').value) || 0, 0, 10),
-    ease: TL_EASES[$('tlEase').value] ? $('tlEase').value : 'smooth',
+    ease: TL_EASES[$('tlEase').value] ? $('tlEase').value : 'step',
     cam: tl.camOn ? tlViewRect() : null,
   });
   tl.sel = tl.frames.length - 1;
@@ -4447,7 +4449,7 @@ function tlRestore(frames){
     id: f.id || uid(), els: f.els, bg: f.bg || null, board: f.board || null,
     delay: clamp(Number(f.delay) || 0.5, 0.1, 30),
     move: clamp(Number(f.move) || 0, 0, 10),
-    ease: TL_EASES[f.ease] ? f.ease : 'smooth',
+    ease: TL_EASES[f.ease] ? f.ease : 'step',
     cam: (f.cam && f.cam.w > 0 && f.cam.h > 0) ? f.cam : null,
   }));
   tl.sel = -1; tl.lastJson = null;
@@ -4480,6 +4482,13 @@ function tlFrameRect(){
 }
 
 /* ── interpolation ── */
+function tlShakeRnd(id, step, salt){
+  /* deterministic hand-shake: same frame always renders the same wobble */
+  let h = 2166136261 ^ (salt * 977);
+  const s = id + '|' + step;
+  for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 8) & 1023) / 1023 - 0.5;
+}
 function tlParseHex(c){
   if (typeof c !== 'string' || c[0] !== '#') return null;
   let x = c.slice(1);
@@ -4497,7 +4506,7 @@ function tlMixColor(a, b, t){
 }
 const TL_NUMS = ['x', 'y', 'w', 'h', 'size', 'sw', 'angle', 'imgRadius', 'cornerRad', 'curve'];
 const TL_COLS = ['stroke', 'fill', 'textColor'];
-function tlTweenEl(a, b, t){
+function tlTweenEl(a, b, t, shake){
   const e = { ...(t < 0.5 ? a : b) };               // discrete props snap mid-move
   for (const k of TL_NUMS)
     if (typeof a[k] === 'number' && typeof b[k] === 'number') e[k] = a[k] + (b[k] - a[k]) * t;
@@ -4508,15 +4517,24 @@ function tlTweenEl(a, b, t){
   if (Array.isArray(a.points) && Array.isArray(b.points) && a.points.length === b.points.length)
     e.points = a.points.map((p, i) =>
       [p[0] + (b.points[i][0] - p[0]) * t, p[1] + (b.points[i][1] - p[1]) * t]);
+  if (shake){
+    /* stop-motion: every element wobbles a little on every step, and the
+       sketchy strokes are re-seeded so the drawing "boils" like a hand
+       redrew it for each photo */
+    e.x = (e.x || 0) + tlShakeRnd(a.id, shake, 1) * 7;
+    e.y = (e.y || 0) + tlShakeRnd(a.id, shake, 2) * 7;
+    e.angle = (e.angle || 0) + tlShakeRnd(a.id, shake, 3) * 0.022;
+    e.seed = (a.seed || 1) + shake * 13;
+  }
   return e;
 }
-function tlTweenEls(fa, fb, t, fade){
+function tlTweenEls(fa, fb, t, fade, shake){
   const mapA = new Map(fa.els.map(e => [e.id, e]));
   const mapB = new Map(fb.els.map(e => [e.id, e]));
   const out = [];
   for (const a of fa.els){
     const b = mapB.get(a.id);
-    if (b){ out.push(tlTweenEl(a, b, t)); continue; }
+    if (b){ out.push(tlTweenEl(a, b, t, shake)); continue; }
     if (!fade){ out.push(a); continue; }           // hard cut: stays until arrival
     const o = (a.opacity == null ? 100 : a.opacity) * (1 - clamp(t, 0, 1));
     if (o > 1) out.push({ ...a, opacity: o });     // exit: fade away
@@ -4553,7 +4571,7 @@ function tlSegments(loop){
     const j = i + 1 < n ? i + 1 : (loop ? 0 : -1);
     const mv = Number(f.move) || 0;
     if (j >= 0 && mv > 0)
-      segs.push({ kind: 'move', i, j, dur: mv, ease: TL_EASES[f.ease] ? f.ease : 'smooth' });
+      segs.push({ kind: 'move', i, j, dur: mv, ease: TL_EASES[f.ease] ? f.ease : 'step' });
   }
   return { segs, total: segs.reduce((s, x) => s + x.dur, 0) };
 }
@@ -4566,12 +4584,22 @@ function tlStateAt(time, segs, fade, baseRect){
       return { els: f.els, bg: f.bg, cam: f.cam || null };
     }
     const fa = tl.frames[s.i], fb = tl.frames[s.j];
-    const k = TL_EASES[s.ease](clamp(t / s.dur, 0, 1));
+    const raw = clamp(t / s.dur, 0, 1);
+    let k, shake = null;
+    if (s.ease === 'step'){
+      const n = Math.max(2, Math.round(s.dur * TL_STEP_RATE));
+      const st = Math.min(n - 1, Math.floor(raw * n));
+      k = st / n;
+      if (st > 0) shake = st;
+    } else {
+      k = TL_EASES[s.ease](raw);
+    }
     const ra = fa.cam || baseRect, rb = fb.cam || baseRect;
+    const camK = s.ease === 'step' ? TL_EASES.smooth(raw) : k;  // camera rigs glide, objects step
     return {
-      els: tlTweenEls(fa, fb, k, fade),
+      els: tlTweenEls(fa, fb, k, fade, shake),
       bg: tlMixColor(fa.bg || pal().bg, fb.bg || pal().bg, clamp(k, 0, 1)),
-      cam: (fa.cam || fb.cam) ? tlLerpRect(ra, rb, k) : null,
+      cam: (fa.cam || fb.cam) ? tlLerpRect(ra, rb, camK) : null,
     };
   }
   const f = tl.frames[tl.frames.length - 1];
@@ -4676,7 +4704,7 @@ function tlSyncInputs(){
   if (!f) return;
   $('tlDelay').value = f.delay;
   $('tlMoveDur').value = f.move || 0;
-  $('tlEase').value = TL_EASES[f.ease] ? f.ease : 'smooth';
+  $('tlEase').value = TL_EASES[f.ease] ? f.ease : 'step';
 }
 function tlMove(dir){
   const i = tl.sel;
@@ -4709,6 +4737,10 @@ function tlBuildPlan(fps, loop){
   for (const s of segs){
     if (s.kind === 'hold'){
       plan.push({ time: cursor + 0.001, delayCs: Math.round(s.dur * 100) });
+    } else if (s.ease === 'step'){
+      const n = Math.max(2, Math.round(s.dur * TL_STEP_RATE));
+      for (let k = 1; k < n; k++)
+        plan.push({ time: cursor + ((k + 0.5) / n) * s.dur, delayCs: Math.max(2, Math.round(100 * s.dur / n)) });
     } else {
       const steps = Math.max(1, Math.round(s.dur * fps));
       for (let k = 1; k < steps; k++)
@@ -4892,7 +4924,7 @@ $('tlEase').addEventListener('change', () => {
 $('tlDelayAll').addEventListener('click', () => {
   const d = clamp(Number($('tlDelay').value) || 0.5, 0.1, 30);
   const m = clamp(Number($('tlMoveDur').value) || 0, 0, 10);
-  const e = TL_EASES[$('tlEase').value] ? $('tlEase').value : 'smooth';
+  const e = TL_EASES[$('tlEase').value] ? $('tlEase').value : 'step';
   for (const f of tl.frames){ f.delay = d; f.move = m; f.ease = e; }
   tlRender();
   showHint('Every frame: hold ' + d + 's, move ' + m + 's');
