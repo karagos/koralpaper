@@ -215,16 +215,19 @@ const COORDS_HELP = 'Coordinates: y grows downward, origin is the artboard top-l
 const TOOLS = [
   {
     name: 'koralpaper_status',
+    annotations: { title: 'Check KoralPaper connection', readOnlyHint: true, openWorldHint: false },
     description: 'Check whether the KoralPaper app is open and linked. Call this first if unsure.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'koralpaper_read_document',
+    annotations: { title: 'Read the document', readOnlyHint: true, openWorldHint: false },
     description: 'Read the current KoralPaper document: every page with its elements (positions, sizes, text, colors, arrow connections). Use it before editing so you work with what is really on the paper.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'koralpaper_create_page',
+    annotations: { title: 'Create a page and draw', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Create a NEW page in KoralPaper and draw elements on it. Shapes first, then arrows that reference shape ids via from/to (they glue to the shapes and follow them). ' + COORDS_HELP,
     inputSchema: {
       type: 'object',
@@ -239,6 +242,7 @@ const TOOLS = [
   },
   {
     name: 'koralpaper_add_elements',
+    annotations: { title: 'Add elements to the page', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Add elements to the CURRENT page (read the document first to see what is there and where free space is). Same element format as koralpaper_create_page. ' + COORDS_HELP,
     inputSchema: {
       type: 'object',
@@ -248,6 +252,7 @@ const TOOLS = [
   },
   {
     name: 'koralpaper_update_elements',
+    annotations: { title: 'Update elements by id', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Change existing elements on the current page by id (ids come from koralpaper_read_document or the ids you assigned). Provide only the properties to change: x, y, w, h, text, stroke, fill, fillStyle, dash, size, font, align.',
     inputSchema: {
       type: 'object',
@@ -259,6 +264,7 @@ const TOOLS = [
   },
   {
     name: 'koralpaper_delete_elements',
+    annotations: { title: 'Delete elements by id', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     description: 'Delete elements from the current page by id.',
     inputSchema: {
       type: 'object',
@@ -268,6 +274,7 @@ const TOOLS = [
   },
   {
     name: 'koralpaper_render_page',
+    annotations: { title: 'Render a page preview', readOnlyHint: true, openWorldHint: false },
     description: 'See the current page as an image. ALWAYS call this after creating or changing a design to check your layout with your own eyes — fix overlaps or crowding before telling the user you are done.',
     inputSchema: { type: 'object', properties: {} },
   },
@@ -328,7 +335,7 @@ function onMessage(msg){
     reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'koralpaper', version: '1.3.0' },
+      serverInfo: { name: 'koralpaper', version: '1.4.0' },
       instructions: 'These tools draw directly in the KoralPaper app (hand-drawn diagram studio) running in the user\'s browser. Workflow: koralpaper_status → koralpaper_read_document (if editing) → create/add/update → koralpaper_render_page to visually check the result, and iterate until the layout is clean.',
     });
     return;

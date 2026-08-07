@@ -374,6 +374,13 @@ and Settings.
 | `examples/` | Ready-to-open documents (the KoralPaper tour) |
 | `docs/` | README assets |
 
+## Privacy
+
+KoralPaper collects nothing. No account, no analytics, no server: your work
+lives in your browser's storage and in files you save yourself. The MCP bridge
+runs only on 127.0.0.1 and keeps no data. Full policy:
+[privacy.html](https://karagos.github.io/koralpaper/docs/privacy.html).
+
 ## License & credits
 
 [MIT](LICENSE): free to use, modify, and share.

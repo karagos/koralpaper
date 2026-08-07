@@ -37,5 +37,14 @@ paper, including things you drew by hand.
 
 Rebuild the bundle after editing: `zip -j koralpaper.mcpb manifest.json server.js`
 
+## Privacy Policy
+
+KoralPaper and this bridge collect nothing. All drawings and settings live only
+in your browser's local storage or in files you save yourself. The bridge runs
+entirely on your machine and connects Claude Desktop to the app over 127.0.0.1;
+it accepts no remote connections, keeps no logs, and stores no data. Your
+conversation with Claude is handled by Anthropic under their own privacy
+policy. Full policy: https://karagos.github.io/koralpaper/docs/privacy.html
+
 **KoralPaper is a creation by Stefanos Karagos, CAIO Group ·
 [wearecaio.com](https://wearecaio.com)** · MIT

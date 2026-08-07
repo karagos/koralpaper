@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "koralpaper",
   "display_name": "KoralPaper",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Let Claude design diagrams directly on your KoralPaper paper.",
   "long_description": "Connects Claude Desktop to the KoralPaper app running in your browser. Describe a diagram in plain words and Claude draws it as fully editable hand-drawn-style elements: flowcharts, carousels, decision trees. Claude can also read the current page, look at a rendered picture of it, and tidy or restyle what is already there. Nothing leaves your machine except your conversation with Claude.",
   "author": {
@@ -16,7 +16,42 @@
     "entry_point": "server.js",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/server.js"]
+      "args": [
+        "${__dirname}/server.js"
+      ]
     }
-  }
+  },
+  "privacy_policies": [
+    "https://karagos.github.io/koralpaper/docs/privacy.html"
+  ],
+  "tools": [
+    {
+      "name": "koralpaper_status",
+      "description": "Check whether the KoralPaper app is open and linked."
+    },
+    {
+      "name": "koralpaper_read_document",
+      "description": "Read every page and element of the current document."
+    },
+    {
+      "name": "koralpaper_create_page",
+      "description": "Create a new page and draw editable elements on it."
+    },
+    {
+      "name": "koralpaper_add_elements",
+      "description": "Add elements to the current page."
+    },
+    {
+      "name": "koralpaper_update_elements",
+      "description": "Change existing elements by id."
+    },
+    {
+      "name": "koralpaper_delete_elements",
+      "description": "Delete elements from the current page by id."
+    },
+    {
+      "name": "koralpaper_render_page",
+      "description": "Render the current page as an image to verify the layout."
+    }
+  ]
 }
