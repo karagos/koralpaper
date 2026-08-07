@@ -16,8 +16,6 @@ HTML file. No account, no server, no install; your work never leaves your machin
 [Files](#files) ·
 [License](#license--credits)
 
-![KoralPaper in motion: a hand-drawn flow, a chart and the Claude chip building themselves in stop-motion](docs/hero.gif)
-
 ![KoralPaper, the tour: wobbly shapes, glued arrows, Google fonts and icons, fill styles, and a photo turned into algorithmic art](docs/screenshot.png)
 
 A local, offline vector diagram and sketch studio: warm cream paper, faint
@@ -119,6 +117,8 @@ available via ☰ → "Load the KoralPaper tour", and the card replays from
 ? → Settings). A blank canvas shows gentle starter hints until your first
 element lands. Press **?** inside the app for shortcuts, the Claude setup,
 and Settings.
+
+![KoralPaper in motion: a hand-drawn flow, a chart and the Claude chip building themselves in stop-motion](docs/hero.gif)
 
 ## What it does
 
