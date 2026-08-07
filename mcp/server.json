@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.karagos/koralpaper",
+  "title": "KoralPaper",
+  "description": "A design studio where AI draws, charts and animates: agents create fully editable hand-drawn vector graphics, build charts from data, and their edits become stop-motion animations. Free, offline, zero dependencies.",
+  "repository": {
+    "url": "https://github.com/karagos/koralpaper",
+    "source": "github"
+  },
+  "websiteUrl": "https://karagos.github.io/koralpaper/",
+  "version": "1.4.0",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/karagos/koralpaper/releases/download/v3.65.0/koralpaper.mcpb",
+      "fileSha256": "e7b04f71efd9113c5b2b252b78ef1a995d7ef6bfcc86ec5f4d6d71a1106b80f5",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
