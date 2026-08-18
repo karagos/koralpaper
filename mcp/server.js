@@ -50,6 +50,17 @@ function flushQueue(res){
    Any other website gets no CORS approval AND a 403, and the working
    endpoints additionally require the X-Koralpaper header, which forces
    a preflight that unknown origins can never pass. */
+function hostAllowed(hostHeader){
+  /* anti-DNS-rebinding: a browser page that rebinds its own domain to
+     127.0.0.1 sends the request with Host = its domain, which the Origin
+     checks below may not catch (rebound requests look same-origin). The
+     app itself always reaches us at 127.0.0.1/localhost, so we accept only
+     those hostnames and reject everything else outright. HTTP/1.1 requires
+     a Host header; a missing one is rejected too. */
+  if (!hostHeader) return false;
+  const host = String(hostHeader).replace(/:\d+$/, '').toLowerCase();
+  return host === '127.0.0.1' || host === 'localhost' || host === '[::1]' || host === '::1';
+}
 function originAllowed(o){
   return !o || o === 'null'
     || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o)
@@ -66,6 +77,9 @@ function corsHeaders(origin, extra){
   return Object.assign(h, extra || {});
 }
 const server = http.createServer((req, res) => {
+  if (!hostAllowed(req.headers.host)){
+    res.writeHead(403, { 'Cache-Control': 'no-store' }); res.end(); return;
+  }
   const origin = req.headers.origin;
   if (origin && !originAllowed(origin)){
     res.writeHead(403, { 'Cache-Control': 'no-store' }); res.end(); return;
@@ -335,7 +349,7 @@ function onMessage(msg){
     reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'koralpaper', version: '1.4.0' },
+      serverInfo: { name: 'koralpaper', version: '1.4.1' },
       instructions: 'These tools draw directly in the KoralPaper app (hand-drawn diagram studio) running in the user\'s browser. Workflow: koralpaper_status → koralpaper_read_document (if editing) → create/add/update → koralpaper_render_page to visually check the result, and iterate until the layout is clean.',
     });
     return;

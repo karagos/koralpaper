@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.65.1
+
+Security hardening (MCP bridge). Full audit of the app and the bridge after listing in public directories.
+- The local bridge now allow-lists the HTTP Host header (127.0.0.1 / localhost only), closing a DNS-rebinding vector: a malicious website that rebinds its domain to 127.0.0.1 is now rejected outright, on top of the existing Origin and custom-header checks. Bridge is 1.4.1; rebuild/reinstall the .mcpb to get it.
+- Audit results (no other changes needed): no HTML-injection sinks (all UI text via textContent), all document text escaped in SVG and self-contained HTML exports, gallery SVGs sanitized (script/foreignObject/on*/javascript: stripped), the bridge action handler is a strict allow-list with typed and clamped inputs, no filesystem/shell/eval anywhere in the bridge, CSP unchanged and strict, and no secrets or private paths anywhere in the repo or its history.
+
 ## v3.65.0
 
 Stability milestone: full application audit after the time-lapse era (v3.61 to v3.64.1).
