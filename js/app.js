@@ -3007,7 +3007,8 @@ function brandDefaults(){
     primary: '#d97757', secondary: '#5b72c9',
     palette: ['#6e9e63', '#7c5aa0', '#c9a227', '#4d9891'],
     ink: '#26221c', muted: '#8a8378', paper: '#f6ece1', usePaper: false,
-    headFont: 'serif', bodyFont: 'sans' });
+    headFont: 'serif', bodyFont: 'sans',
+    style: { sketch: 0, dash: 'solid', weight: 'medium', round: 1, fillStyle: 'solid', startHead: 'none', endHead: 'arrow' } });
 }
 function brandFontOptions(sel, current){
   sel.replaceChildren();
@@ -3034,6 +3035,15 @@ function brandCollect(){
     usePaper: $('brandPaperOn').checked,
     headFont: $('brandHeadFont').value,
     bodyFont: $('brandBodyFont').value,
+    style: {
+      sketch: Number($('bstyleSketch').value),
+      dash: $('bstyleDash').value,
+      weight: $('bstyleWeight').value,
+      round: Number($('bstyleRound').value),
+      fillStyle: $('bstyleFill').value,
+      startHead: $('bstyleStart').value,
+      endHead: $('bstyleEnd').value,
+    },
   });
 }
 // full brand → UI (used on load, generate, import, reset)
@@ -3051,8 +3061,25 @@ function brandSyncUI(){
   $('brandPaperOn').checked = !!b.usePaper;
   brandFontOptions($('brandHeadFont'), b.headFont);
   brandFontOptions($('brandBodyFont'), b.bodyFont);
+  brandStyleUI();
   renderBrandPalette();
   brandUpdateReadouts();
+}
+const HEAD_LABELS = { none:'None', arrow:'Arrow', triangle:'Triangle', 'triangle-filled':'Triangle (filled)',
+  diamond:'Diamond', 'diamond-filled':'Diamond (filled)', circle:'Circle', 'circle-filled':'Circle (filled)', bar:'Bar' };
+// full brand.style → the Style selects
+function brandStyleUI(){
+  const st = (brand && brand.style) || normalizeBrandStyle(null);
+  for (const sel of ['bstyleStart', 'bstyleEnd']){
+    const el = $(sel); if (!el.options.length){ for (const k of HEAD_KINDS){ const o = document.createElement('option'); o.value = k; o.textContent = HEAD_LABELS[k] || k; el.appendChild(o); } }
+  }
+  $('bstyleSketch').value = String(st.sketch);
+  $('bstyleDash').value = st.dash;
+  $('bstyleWeight').value = st.weight;
+  $('bstyleRound').value = String(st.round);
+  $('bstyleFill').value = st.fillStyle;
+  $('bstyleStart').value = st.startHead;
+  $('bstyleEnd').value = st.endHead;
 }
 // keep hex labels, the muted enable state and the contrast check in sync
 function brandUpdateReadouts(){
@@ -3101,7 +3128,7 @@ function renderBrandPalette(){
   if (addBtn) addBtn.disabled = brand.palette.length >= 10;
 }
 // persist current fields + a mutated palette, then refresh everything downstream
-function brandPersist(){ saveBrand(); brandEnsureFonts(); buildSwatches(); syncPanel(); brandUpdateReadouts(); }
+function brandPersist(){ saveBrand(); brandEnsureFonts(); if (brandActive()) applyBrandStyleToDefaults(); buildSwatches(); syncPanel(); brandUpdateReadouts(); }
 function brandApply(){ brandCollect(); brandPersist(); }
 function accentAdd(){ brandCollect(); if (brand.palette.length >= 10) return; brand.palette.push(brandFromSeed(brand.primary).palette[brand.palette.length % 4]); saveBrand(); renderBrandPalette(); brandPersist(); }
 function accentRemove(i){ brandCollect(); brand.palette.splice(i, 1); saveBrand(); renderBrandPalette(); brandPersist(); }
@@ -3194,7 +3221,8 @@ function initBrandUI(){
   if (!brand) brand = brandDefaults();
   brandSyncUI();
   const SCALARS = ['brandActiveChk', 'brandName', 'brandPrimary', 'brandSecondary',
-    'brandInk', 'brandMuted', 'brandMutedOn', 'brandPaper', 'brandPaperOn', 'brandHeadFont', 'brandBodyFont'];
+    'brandInk', 'brandMuted', 'brandMutedOn', 'brandPaper', 'brandPaperOn', 'brandHeadFont', 'brandBodyFont',
+    'bstyleSketch', 'bstyleDash', 'bstyleWeight', 'bstyleRound', 'bstyleFill', 'bstyleStart', 'bstyleEnd'];
   SCALARS.forEach(id => $(id).addEventListener('change', brandApply));
   // live hex readout + contrast while the native picker is open
   for (const id of ['brandPrimary', 'brandSecondary', 'brandInk', 'brandMuted', 'brandPaper'])
@@ -3204,8 +3232,8 @@ function initBrandUI(){
   $('brandGenBtn').addEventListener('click', brandGenerate);
   $('brandActiveChk').addEventListener('change', () => {
     if ($('brandActiveChk').checked){
-      defaults.font = $('brandBodyFont').value;
-      showHint('Brand kit on: charts, swatches, headlines and new documents follow it now');
+      applyBrandStyleToDefaults();
+      showHint('Brand kit on: charts, swatches, headlines, line style and new documents follow it now');
     }
   });
   $('brandExportBtn').addEventListener('click', () => {
@@ -3239,7 +3267,7 @@ function initBrandUI(){
     brand = brandDefaults();
     saveBrand(); brandSyncUI(); buildSwatches(); syncPanel();
   });
-  if (brandActive()) brandEnsureFonts();
+  if (brandActive()){ brandEnsureFonts(); applyBrandStyleToDefaults(); syncPanel(); }
 }
 function registerSavedGFonts(){
   for (const fam of savedGFonts()){
@@ -4535,21 +4563,26 @@ function restyleFonts(els){
     if (el.type === 'text') autosizeText(el);
   }
 }
-function restyleHandDrawn(els){
+// the house look when no brand kit is active
+function houseStyle(){ return { sketch: 1, dash: 'solid', weight: 'medium', round: 1, fillStyle: 'solid', startHead: 'none', endHead: 'arrow' }; }
+// apply the brand's style basics — line style, weight, corners, fill, arrowheads — uniformly
+function restyleStyle(els){
+  const st = (brandActive() && brand.style) ? brand.style : houseStyle();
+  const sw = swForWeight(st.weight);
   for (const el of els){
     if (el.type === 'image' || el.type === 'text') continue;
-    el.sketch = 1;                                    // sketch EVERYTHING, arrows included, so the look is uniform
-    el.seed = Math.floor(Math.random() * 2 ** 31);    // fresh wobble: never looks stamped
+    el.sketch = st.sketch;
+    if (typeof el.sw === 'number') el.sw = sw;
+    if (st.sketch) el.seed = Math.floor(Math.random() * 2 ** 31);  // fresh wobble only when hand-drawn
+    if (isLinear(el)){
+      el.dash = st.dash;
+      if (el.endHead && el.endHead !== 'none') el.endHead = st.endHead;     // restyle existing arrowheads; never add heads to plain lines
+      if (el.startHead && el.startHead !== 'none') el.startHead = st.startHead;
+    } else {
+      el.round = st.round;
+      if (el.fill && el.fill !== 'none' && 'fillStyle' in el) el.fillStyle = st.fillStyle;
+    }
     delete el._prims; delete el._pkey;
-  }
-}
-function restyleWeights(els){
-  const stops = [widths.fine, widths.medium, widths.thick];
-  for (const el of els){
-    if (typeof el.sw !== 'number') continue;
-    let best = stops[0], bd = Infinity;
-    for (const s of stops){ const d = Math.abs(s - el.sw); if (d < bd){ bd = d; best = s; } }
-    el.sw = best; delete el._prims; delete el._pkey;
   }
 }
 function makeItMine(opts){
@@ -4565,8 +4598,7 @@ function makeItMine(opts){
   for (const els of targets){
     if (opts.colors) restyleColors(els);
     if (opts.fonts) restyleFonts(els);
-    if (opts.hand) restyleHandDrawn(els);
-    if (opts.weights) restyleWeights(els);
+    if (opts.style) restyleStyle(els);
   }
   if (opts.colors && !sel && brandActive() && brand.usePaper && brand.paper){
     if (allPages) state.pages.forEach(p => p.bg = brand.paper);
@@ -4577,7 +4609,7 @@ function makeItMine(opts){
   commit(); requestRender(); syncPanel(); if (typeof syncPaperUI === 'function') syncPaperUI();
   if (opts.tidy) tidyLayout();                          // its own undo step; only moves glued flows on this page
   const scope = allPages ? 'all ' + state.pages.length + ' pages' : 'this page';
-  showHint(brandActive() ? 'Made ' + scope + ' yours: your colors, fonts and hand ✳ (⌘Z to undo)'
+  showHint(brandActive() ? 'Made ' + scope + ' yours: your colors, fonts and style ✳ (⌘Z to undo)'
     : 'Restyled ' + scope + ' in the house look ✳ set a Brand kit in Settings to use your own (⌘Z to undo)');
 }
 function openRestyleDialog(){
@@ -4600,7 +4632,7 @@ function openRestyleDialog(){
 $('restyleApplyBtn').addEventListener('click', () => {
   $('restyleDialog').classList.add('hidden');
   makeItMine({ colors: $('rsColors').checked, fonts: $('rsFonts').checked,
-    hand: $('rsHand').checked, weights: $('rsWeights').checked, tidy: $('rsTidy').checked,
+    style: $('rsStyle').checked, tidy: $('rsTidy').checked,
     allPages: $('rsAllPages').checked });
 });
 $('restyleCancelBtn').addEventListener('click', () => $('restyleDialog').classList.add('hidden'));
@@ -7003,6 +7035,28 @@ const BRAND_KEY = 'koralpaper.brand';
    roles into the ordered list charts and "Make it mine" consume, so the
    role order IS the mapping. Old single-array kits migrate automatically. */
 function brandHex(v){ return (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ? v.toLowerCase() : null; }
+/* the "basic elements" a brand carries beyond color+fonts: how lines, shapes,
+   fills and arrows look. Stored as portable labels; weight resolves against the
+   user's own width presets at apply time. */
+const BRAND_STYLE_ENUMS = {
+  sketch: [0, 1, 2], dash: ['solid', 'dashed', 'dotted'], weight: ['fine', 'medium', 'thick'],
+  round: [0, 1], fillStyle: ['solid', 'hachure', 'dense', 'cross', 'dots', 'waves'],
+};
+function normalizeBrandStyle(s){
+  s = (s && typeof s === 'object') ? s : {};
+  const pick = (k, fb) => BRAND_STYLE_ENUMS[k].includes(s[k]) ? s[k] : fb;
+  const head = (v, fb) => HEAD_KINDS.includes(v) ? v : fb;
+  return {
+    sketch: pick('sketch', 0),            // a brand kit defaults to Neat lines (clean); the app itself defaults to hand-drawn
+    dash: pick('dash', 'solid'),
+    weight: pick('weight', 'medium'),
+    round: pick('round', 1),
+    fillStyle: pick('fillStyle', 'solid'),
+    startHead: head(s.startHead, 'none'),
+    endHead: head(s.endHead, 'arrow'),
+  };
+}
+function swForWeight(w){ return widths[w] != null ? widths[w] : widths.medium; }
 function normalizeBrand(b){
   if (!b || typeof b !== 'object') return null;
   const hex = brandHex;
@@ -7026,7 +7080,22 @@ function normalizeBrand(b){
     usePaper: !!b.usePaper,
     headFont: fontKey(b.headFont, 'serif'),
     bodyFont: fontKey(b.bodyFont, 'sans'),
+    style: normalizeBrandStyle(b.style),
   };
+}
+// push the brand's style into the drawing defaults, so new documents and every
+// new element you draw start on-brand
+function applyBrandStyleToDefaults(){
+  if (!brandActive() || !brand.style) return;
+  const st = brand.style;
+  defaults.sketch = st.sketch;
+  defaults.dash = st.dash;
+  defaults.round = st.round;
+  defaults.sw = swForWeight(st.weight);
+  defaults.fillStyle = st.fillStyle;
+  defaults.startHead = st.startHead;
+  defaults.endHead = st.endHead;
+  defaults.font = brand.bodyFont;
 }
 let brand = (() => {
   try { return normalizeBrand(JSON.parse(localStorage.getItem(BRAND_KEY))); }
@@ -8809,7 +8878,8 @@ async function claudeExecute(action, args){
         paper: (brand.usePaper && brand.paper) || null,
         headingFont: brand.headFont.replace(/^cg:/, ''),
         bodyFont: brand.bodyFont.replace(/^cg:/, ''),
-        note: 'A brand kit is active. Use colors by role: primary = hero / first chart series / headline accent / the ✳; secondary = support / second series; palette = extra categorical colors; ink = outlines and body text; paper = background. Charts should run primary, secondary, then palette in order.',
+        style: brand.style,
+        note: 'A brand kit is active. Use colors by role: primary = hero / first chart series / headline accent / the ✳; secondary = support / second series; palette = extra categorical colors; ink = outlines and body text; paper = background. Charts should run primary, secondary, then palette in order. Also match the brand style: draw shapes with sketch=style.sketch (0 neat, 1 sketchy, 2 scribbly), dash=style.dash, corners round=style.round, fill fillStyle=style.fillStyle, and arrows with style.startHead/endHead. Weight "' + brand.style.weight + '" ≈ sw ' + swForWeight(brand.style.weight) + '.',
       } : null,
       theme: state.theme,
       pages: state.pages.map((p, i) => ({

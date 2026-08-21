@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.77.0
+
+**Your Brand kit now carries style, not just color and fonts.** A new **Style** section defines the basic look of your work: **line style** (neat / sketchy / scribbly), **line pattern** (solid / dashed / dotted), **line weight**, **corners** (rounded / sharp), **fill style** (solid, hatched, cross-hatch, dots, waves) and default **arrowheads** (start and end). This closes the gap that made restyling feel inconsistent: your line treatment is now part of your identity, defined once.
+
+Because the kit drives everything, this style flows through the whole app:
+
+- **New documents** start in your style.
+- **Every new element you draw** starts in your style, no need to set line style each time.
+- **"Make it mine"** applies it: the old separate "Hand-drawn" and "Line weights" toggles are replaced by a single **Style** toggle that matches your kit exactly. If your kit says neat lines, restyle keeps them neat; if it says sketchy, everything (including arrows) is uniformly sketchy. Arrowheads on existing arrows adopt your style, but plain lines never sprout new heads.
+- **Claude** reads your style through the MCP bridge and draws on-brand.
+
+Weight is stored as a label (Fine / Medium / Thick), so it always tracks your own thickness presets. New kits default to neat, solid, medium, rounded. Old kits pick up these defaults automatically.
+
 ## v3.76.3
 
 **"Make it mine" handles near-neutral brands and unifies card backgrounds.** More fixes from restyling a real deck with a black-and-dark-red kit:
