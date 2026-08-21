@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.73.0
+
+Four workflow fixes.
+- **Paste keeps its place across pages.** Copy an element or group on one page and paste it on another, and it lands in exactly the same spot (pasting on the same page still offsets so the copy is visible).
+- **Choose where sketches save.** In Settings → Backup & reset you can now set a default save folder; "Save sketch (.json)" writes straight into it, or lets you pick the location each time, instead of always going to Downloads. (Chrome and Edge; other browsers keep saving to Downloads.)
+- **Add a page left or right.** Right-click a page in the bottom strip to insert a new blank page immediately before or after it, not just at the end.
+- **Eraser has no style panel.** Selecting the eraser no longer shows outline and opacity controls that do not apply to it.
+
 ## v3.72.1
 
 Freehand recognition improvements: pentagons and hexagons now snap correctly (they were being read as circles), and a freehand curve is now smoothed into a clean line instead of staying jittery. Recognition covers triangle through hexagon plus circle, ellipse, rectangle, diamond, straight line, and smooth curves.

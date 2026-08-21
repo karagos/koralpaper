@@ -931,3 +931,5 @@ body.dark #tooltip{box-shadow:0 4px 14px -4px rgba(0,0,0,.7);}
 .setsecbody{padding:2px 13px 13px;}
 .setsecbody .setdesc:first-child{margin-top:0;}
 .setintro{opacity:.65; margin:2px 0 4px;}
+
+.setsavedir{font-size:12px; color:var(--ink-soft); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}

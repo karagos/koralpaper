@@ -817,7 +817,7 @@
         (internet needed once per new icon).</td></tr></table></div></details>
       <details class="setsec"><summary>More</summary><div class="setsecbody"><table><tr><td><b>Right-click</b> anything for the context menu · ☰ → <b>Templates</b> for ready-made pages · the <b>∞ / size button</b>
         (bottom left) sets exact canvas sizes for social formats.</td></tr>
-      <tr><td><b>Pages:</b> the strip at the bottom holds multi-page documents. <b>Shift-click</b> a range or <b>⌘/Ctrl-click</b> to select several, then right-click to move, duplicate or delete them together.</td></tr>
+      <tr><td><b>Pages:</b> the strip at the bottom holds multi-page documents. Right-click a page to <b>add a page left or right</b>, rename, duplicate, move or delete. <b>Shift-click</b> a range or <b>⌘/Ctrl-click</b> to select several, then right-click to move, duplicate or delete them together. Copy on one page and paste on another keeps the same position.</td></tr>
       <tr><td><b>Environments (? → Settings):</b> save your canvas size, colors, grid, style and fonts as a named setup. Apply one anytime, or set a default that new documents start from.</td></tr></table></div></details>
     
     </div>
@@ -923,6 +923,14 @@
           <div class="setactions">
             <button class="minipill" id="setExportBtn">Export settings…</button>
             <button class="minipill" id="setImportBtn">Import settings…</button>
+          </div>
+          <p class="setdesc" style="margin-top:14px"><b>Default save folder.</b> Choose where
+            "Save sketch (.json)" writes. With a folder set, sketches save straight into it; otherwise
+            you pick the location each time. (Chrome and Edge only; other browsers save to Downloads.)</p>
+          <div class="setrow"><span class="setsavedir" id="setSaveDir">This browser saves to Downloads</span></div>
+          <div class="setactions">
+            <button class="minipill" id="setSaveDirBtn">Choose folder…</button>
+            <button class="minipill hidden" id="setSaveDirClear">Clear folder</button>
           </div>
           <div class="setactions">
             <button class="minipill" id="setShowWelcome">Show the welcome screen again</button>

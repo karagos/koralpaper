@@ -71,6 +71,7 @@ let bindHoverAnchor = null;  // 'n'|'e'|'s'|'w' when an anchor dot is magnetized
 let editing = null;          // { el, isNew }
 let cropTarget = null;       // element id while crop mode is armed
 let clipboard = null;        // serialized elements
+let clipboardPageId = null;  // page a copy was made on (paste elsewhere keeps position)
 let pasteCount = 0;
 let spaceDown = false;
 let history = [];
@@ -1752,6 +1753,7 @@ function copySelection(){
   const sel = selected();
   if (!sel.length) return;
   clipboard = JSON.stringify(sel, (k,v) => k.startsWith('_') ? undefined : v);
+  clipboardPageId = state.pages[state.pageIndex] && state.pages[state.pageIndex].id;
   pasteCount = 0;
   // mark the system clipboard so ⌘V knows our internal copy is the fresh one
   if (navigator.clipboard && navigator.clipboard.writeText)
@@ -1759,9 +1761,13 @@ function copySelection(){
 }
 function paste(){
   if (!clipboard) return;
-  pasteCount++;
   const els = JSON.parse(clipboard);
-  const clones = duplicateElements(els, 20 * pasteCount, 20 * pasteCount);
+  const curId = state.pages[state.pageIndex] && state.pages[state.pageIndex].id;
+  const crossPage = clipboardPageId && curId !== clipboardPageId;
+  let dx, dy;
+  if (crossPage){ dx = 0; dy = 0; pasteCount = 0; }   // land at the same spot on the new page
+  else { pasteCount++; dx = 20 * pasteCount; dy = 20 * pasteCount; }
+  const clones = duplicateElements(els, dx, dy);
   // duplicateElements pushed originals-with-new-ids; but els are detached copies
   updateBoundArrows(state.elements);
   setSelection(new Set(clones.map(e => e.id)));
@@ -2432,6 +2438,7 @@ function syncPanel(){
   const panel = $('stylePanel');
   const sel = selected();
   const tool = state.tool;
+  if (tool === 'eraser'){ panel.classList.add('hidden'); return; }   // eraser has no style
   const creating = !['select','hand'].includes(tool);
   if (!sel.length && !creating){ panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
@@ -3654,6 +3661,9 @@ $('gridSizeRange').addEventListener('change', scheduleAutosave);
 $('gridMenu').addEventListener('click', ev => ev.stopPropagation());
 $('recognizeBtn').addEventListener('click', () => { setRecognize(!recognizeOn()); showHint(recognizeOn() ? 'Freehand snaps to clean shapes' : 'Freehand stays exactly as you draw it'); });
 syncRecognizeBtn();
+fsStoredDir().then(h => { if (h){ saveDirName = h.name; syncSaveDirUI(); } });
+$('setSaveDirBtn').addEventListener('click', fsPickSaveDir);
+$('setSaveDirClear').addEventListener('click', fsClearSaveDir);
 $('snapBtn').addEventListener('click', () => {
   state.snap = !state.snap; syncToggles(); scheduleAutosave();
 });
@@ -3952,14 +3962,17 @@ function switchPage(i){
   updateBoundArrows(state.elements);
   buildPageStrip(); syncPanel(); requestRender(); scheduleAutosave();
 }
-function addPage(){
+function addPage(){ insertPageAt(state.pageIndex + 1); }
+function insertPageAt(at){
   syncPageRef();
-  state.pages.splice(state.pageIndex + 1, 0, makePage([], `Page ${state.pages.length + 1}`));
-  state.pageIndex += 1;
+  at = clamp(at, 0, state.pages.length);
+  state.pages.splice(at, 0, makePage([], `Page ${state.pages.length + 1}`));
+  state.pageIndex = at;
   state.elements = state.pages[state.pageIndex].elements;
   state.selection = new Set();
+  if (typeof pageSel !== 'undefined') pageSel = new Set([state.pages[at].id]);
   commit(); buildPageStrip(); syncPanel(); requestRender();
-  showHint('New page: right-click a page tab for rename, duplicate, delete');
+  showHint('New page added: right-click a page tab for rename, duplicate, delete');
 }
 function deletePage(i){
   if (state.pages.length <= 1){ showHint('This is the only page'); return; }
@@ -4149,6 +4162,9 @@ function openPageMenu(ev, i){
     else b.addEventListener('click', () => { closeMenus(); fn(); });
     menu.appendChild(b);
   };
+  add('Add page left', () => insertPageAt(i));
+  add('Add page right', () => insertPageAt(i + 1));
+  menu.appendChild(document.createElement('hr'));
   add('Rename page…', () => renamePage(i));
   add('Duplicate page', () => duplicatePage(i));
   add('Move left', () => movePage(i, -1), i === 0);
@@ -4353,6 +4369,7 @@ $('tabClaude').addEventListener('click', () => setPanelTab('claude'));
 $('tabSettings').addEventListener('click', () => {
   setPanelTab('settings');
   buildEnvList();
+  syncSaveDirUI();
   const mb = docSizeMB();
   $('setDocSize').textContent =
     `This document: ${mb < 0.1 ? (mb * 1024).toFixed(0) + ' KB' : mb.toFixed(1) + ' MB'} · ` +
@@ -5835,7 +5852,51 @@ function openSnapDialog(){
   $('snapName').placeholder = (localStorage.getItem('asterisk.docname') || 'Before the big change');
   $('snapDialog').classList.remove('hidden');
 }
-function saveJSON(){
+/* ── default save folder (File System Access API) ────
+   Where supported (Chrome/Edge), the user can pick a folder once; sketches
+   then save straight into it. A tiny IndexedDB store keeps the folder handle
+   (localStorage cannot). Elsewhere (Safari/Firefox) we fall back to Downloads. */
+const HAS_FS = typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';
+let saveDirName = null;
+function idbOpen(){
+  return new Promise((res, rej) => {
+    const rq = indexedDB.open('koralpaper-fs', 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore('kv');
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error);
+  });
+}
+async function idbSet(k, v){ const db = await idbOpen(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = res; t.onerror = () => rej(t.error); }); }
+async function idbGet(k){ const db = await idbOpen(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readonly'); const r = t.objectStore('kv').get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function idbDel(k){ const db = await idbOpen(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').delete(k); t.oncomplete = res; t.onerror = () => rej(t.error); }); }
+async function fsStoredDir(){ try { return await idbGet('saveDir'); } catch (e){ return null; } }
+async function fsEnsurePerm(handle, request){
+  if (!handle || !handle.queryPermission) return false;
+  const opts = { mode: 'readwrite' };
+  if ((await handle.queryPermission(opts)) === 'granted') return true;
+  if (request && (await handle.requestPermission(opts)) === 'granted') return true;
+  return false;
+}
+async function fsPickSaveDir(){
+  if (!window.showDirectoryPicker){ alert('This browser cannot choose a folder, so sketches save to your Downloads folder.'); return; }
+  try {
+    const dir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'koralpaper-save' });
+    await idbSet('saveDir', dir);
+    saveDirName = dir.name; syncSaveDirUI();
+    showHint('Default save folder set: ' + dir.name);
+  } catch (e){ /* cancelled */ }
+}
+async function fsClearSaveDir(){ try { await idbDel('saveDir'); } catch (e){} saveDirName = null; syncSaveDirUI(); showHint('Default save folder cleared: sketches will ask each time'); }
+function syncSaveDirUI(){
+  const el = $('setSaveDir'); if (!el) return;
+  el.textContent = saveDirName ? ('Saving to: ' + saveDirName)
+    : (HAS_FS ? 'No default folder: you will choose each time' : 'This browser saves to Downloads');
+  const pick = $('setSaveDirBtn'); if (pick) pick.disabled = !window.showDirectoryPicker;
+  const clr = $('setSaveDirClear'); if (clr) clr.classList.toggle('hidden', !saveDirName);
+}
+
+function saveJSON(){ return saveJSONAsync(); }
+async function saveJSONAsync(){
   const doc = JSON.parse(serialize());
   const data = {
     app: 'koralpaper', version: 6, appVersion: APP_VERSION,
@@ -5846,14 +5907,37 @@ function saveJSON(){
     timelapse: tl.frames.length ? { frames: tl.frames } : undefined,
   };
   const stamp = new Date().toISOString().slice(0, 10);
-  let name = prompt('File name for the sketch:',
-    localStorage.getItem('asterisk.docname') || `koralpaper-${stamp}`);
-  if (name === null) return;
-  name = name.trim().replace(/\.json$/i, '').replace(/[\/\\:*?"<>|]/g, '-');
-  if (!name) name = `koralpaper-${stamp}`;
+  const remembered = localStorage.getItem('asterisk.docname') || `koralpaper-${stamp}`;
+  const blob = () => new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  const clean = s => s.trim().replace(/\.json$/i, '').replace(/[\/\\:*?"<>|]/g, '-') || `koralpaper-${stamp}`;
+
+  if (HAS_FS){
+    try {
+      const dir = await fsStoredDir();
+      if (dir && await fsEnsurePerm(dir, true)){
+        const name = clean(prompt('File name for the sketch:', remembered) ?? '');
+        if (!name) return;
+        try { localStorage.setItem('asterisk.docname', name); } catch (e){}
+        const fh = await dir.getFileHandle(name + '.json', { create: true });
+        const w = await fh.createWritable(); await w.write(blob()); await w.close();
+        showHint('Saved to ' + dir.name + ': ' + name + '.json');
+        return;
+      }
+      // no default folder: native picker chooses name and location together
+      const fh = await window.showSaveFilePicker({
+        suggestedName: clean(remembered) + '.json',
+        types: [{ description: 'KoralPaper sketch', accept: { 'application/json': ['.json'] } }],
+      });
+      const w = await fh.createWritable(); await w.write(blob()); await w.close();
+      try { localStorage.setItem('asterisk.docname', fh.name.replace(/\.json$/i, '')); } catch (e){}
+      showHint('Saved: ' + fh.name);
+      return;
+    } catch (e){ if (e && e.name === 'AbortError') return; /* else fall back to download */ }
+  }
+  const name = clean(prompt('File name for the sketch:', remembered) ?? '');
+  if (!name) return;
   try { localStorage.setItem('asterisk.docname', name); } catch (e){}
-  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
-  download(`${name}.json`, URL.createObjectURL(blob));
+  download(`${name}.json`, URL.createObjectURL(blob()));
 }
 $('imgInput').addEventListener('change', () => {
   insertImageFiles($('imgInput').files, null, null);
