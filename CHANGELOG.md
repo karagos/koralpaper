@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.76.2
+
+**"Make it mine" is more faithful and predictable.** Three fixes from real use:
+
+- **Text always reads as ink now.** Numbers, labels and body text go to your brand Ink instead of being recolored to an accent, so a big "93%" can never end up a pale color that vanishes into its card. All text stays one consistent, legible color.
+- **Card backgrounds rebrand instead of keeping the template's color.** Light filled shapes (a peach stat card, a tinted callout) now take on your brand hue while keeping their lightness, so a light card stays a light card, just in your colors. Plain white and near-white fills are left alone.
+- **Clean lines stay clean.** The "Hand-drawn" step is now off by default, so applying your brand kit preserves fine, straight and elbow lines exactly as they were. Turn it on only when you want a sketch look, and it now sketches every shape including arrows, so you never get a mix of sketchy boxes and clean connectors.
+
 ## v3.76.1
 
 **Make it mine can now restyle every page at once.** The restyle dialog gained an **“All pages”** option: on a multi-page document, tick it to recast the whole document into your look in one step (each page recolored to your roles, its background set to your brand paper), all reverted by a single undo. It appears only when it makes sense — a whole-page restyle of a document with more than one page — and hides when you have elements selected. Without it, restyle still applies to just the current page as before.

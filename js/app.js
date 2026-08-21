@@ -4460,10 +4460,11 @@ function rsHsl(hex){
   const s = d === 0 ? 0 : d / (1 - Math.abs(2*l-1));
   return { s, l };
 }
-function rsColored(hex){                        // saturated, mid-luma → an accent color (not structure)
+function rsColored(hex){                        // a design color (has hue): accent OR light tint, not structure
   if (!hex) return false;
   const { s, l } = rsHsl(hex);
-  return s >= 0.13 && l > 0.12 && l < 0.93;   // muted pastels count; true grays (s<0.13) do not
+  if (l >= 0.965 || l <= 0.10) return false;  // near-white/paper and near-black/ink are structure, left alone
+  return s >= 0.13;                            // pastels and pale card tints count; true grays (s<0.13) do not
 }
 function rsAccents(){
   const list = brandActive() ? brandAccents() : RS_HOUSE.map(t => rsHex(t)).filter(Boolean);
@@ -4480,24 +4481,31 @@ function restyleColors(els){
   }
   const ranked = [...weight.entries()].sort((a,b) => b[1]-a[1]).map(e => e[0]);
   const map = new Map(); ranked.forEach((h,i) => map.set(h, accents[i % accents.length]));
+  const INK = brandActive() ? brand.ink : 'ink';                              // all text and readable outlines land here
   const remap = val => { const h = rsHex(val); return (h && map.has(h)) ? map.get(h) : val; };
   const colored = val => { const h = rsHex(val); return !!(h && rsColored(h)); };
+  // fills rebrand to the mapped accent, but a LIGHT card keeps its lightness so it stays a light card in your hue
+  const remapFill = val => {
+    const h = rsHex(val); if (!(h && map.has(h))) return val;                 // neutral / near-white fills kept as-is
+    const acc = map.get(h), src = hexToHsl(h);
+    if (src.l > 0.72){ const a = hexToHsl(acc); return hslToHex(a.h, Math.min(a.s, src.s + 0.05), src.l); }
+    return acc;                                                               // solid fill: adopt the brand accent outright
+  };
   for (const el of els){
     if (isLinear(el)){
-      if (el.stroke && el.stroke !== 'none') el.stroke = remap(el.stroke);   // arrows/lines take the accent
+      if (el.stroke && el.stroke !== 'none' && colored(el.stroke)) el.stroke = remap(el.stroke); // recolor colored arrows; gray connectors kept
     } else if (el.type === 'text'){
-      if (el.stroke) el.stroke = remap(el.stroke);                            // text color = its stroke
-      if (el.textColor) el.textColor = remap(el.textColor);
+      el.stroke = INK;                                                        // standalone text always reads as ink (consistent, legible)
+      if (el.textColor && el.textColor !== 'auto') el.textColor = INK;
     } else {
       const filled = el.fill && el.fill !== 'none';
       if (filled){
-        el.fill = remap(el.fill);
-        // keep the outline readable so auto text (which follows the outline) stays visible
-        if (el.stroke && el.stroke !== 'none' && colored(el.stroke)) el.stroke = brandActive() ? brand.ink : 'ink';
-      } else if (el.stroke && el.stroke !== 'none'){
+        el.fill = remapFill(el.fill);
+        if (el.stroke && el.stroke !== 'none' && colored(el.stroke)) el.stroke = INK; // readable outline; auto label follows it
+      } else if (el.stroke && el.stroke !== 'none' && colored(el.stroke)){
         el.stroke = remap(el.stroke);                                         // outline-only shape takes the accent
       }
-      if (el.textColor) el.textColor = remap(el.textColor);
+      if (el.textColor && el.textColor !== 'auto' && colored(el.textColor)) el.textColor = INK; // a shape's own colored label → ink; auto stays auto
     }
     delete el._prims; delete el._pkey; delete el._tintCv;
   }
@@ -4518,7 +4526,7 @@ function restyleFonts(els){
 function restyleHandDrawn(els){
   for (const el of els){
     if (el.type === 'image' || el.type === 'text') continue;
-    if (!isLinear(el)) el.sketch = 1;                 // uniform hand-drawn body
+    el.sketch = 1;                                    // sketch EVERYTHING, arrows included, so the look is uniform
     el.seed = Math.floor(Math.random() * 2 ** 31);    // fresh wobble: never looks stamped
     delete el._prims; delete el._pkey;
   }
