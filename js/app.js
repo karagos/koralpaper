@@ -2553,8 +2553,10 @@ function syncPanel(){
     ? !!val('elbow')
     : (!val('elbow') && Number(b.dataset.v) === val('curve')));
   const fontVal = val('font');
+  // register a Google font BEFORE looking it up, or the label reads "—" for any
+  // font not yet used in this session
+  if (typeof fontVal === 'string' && !FONTS[fontVal]) ensureCustomFont(fontVal);
   const fSel = (typeof fontVal === 'string' && FONTS[fontVal]) ? fontVal : null;
-  if (fSel) ensureCustomFont(fSel);
   $('fontBtnLabel').textContent = (fSel && FONTS[fSel]) ? FONTS[fSel].label : '—';
   $('fontBtnLabel').style.fontFamily = (fSel && FONTS[fSel]) ? FONTS[fSel].stack : '';
   const fwCur = sel.length ? (sel[0].fweight || null) : null;
@@ -8622,20 +8624,27 @@ function claudeColor(v, keys, fallback){
 function claudeBuildElement(spec, idMap){
   const kind = ['rect', 'diamond', 'ellipse', 'polygon', 'chip', 'text', 'arrow', 'line'].includes(spec.type)
     ? spec.type : 'rect';
+  // When a brand kit is active it supplies every value Claude did not specify, so
+  // anything drawn over the bridge comes out in the same line style, weight,
+  // corners, fill style, arrowheads, ink and body font as the rest of your work.
+  const BK = brandActive() ? brand : null;
+  const BS = BK ? BK.style : null;
   const style = {
-    stroke: claudeColor(spec.stroke, STROKE_KEYS, 'ink'),
+    stroke: claudeColor(spec.stroke, STROKE_KEYS, BK ? BK.ink : 'ink'),
     fill: claudeColor(spec.fill, FILL_KEYS,
       kind === 'text' || kind === 'arrow' || kind === 'line' ? 'none' : defaults.fillByType[kind] || 'none'),
-    fillStyle: ['solid', 'hachure', 'dense', 'cross', 'dots', 'waves'].includes(spec.fillStyle) ? spec.fillStyle : 'solid',
-    dash: ['solid', 'dotted', 'dashed'].includes(spec.dash) ? spec.dash : 'solid',
-    sw: Number(spec.sw) > 0 ? clamp(Number(spec.sw), 0.5, 40) : widths.medium,
-    sketch: spec.sketch === 0 ? 0 : 1, round: 1,
+    fillStyle: ['solid', 'hachure', 'dense', 'cross', 'dots', 'waves'].includes(spec.fillStyle)
+      ? spec.fillStyle : (BS ? BS.fillStyle : 'solid'),
+    dash: ['solid', 'dotted', 'dashed'].includes(spec.dash) ? spec.dash : (BS ? BS.dash : 'solid'),
+    sw: Number(spec.sw) > 0 ? clamp(Number(spec.sw), 0.5, 40) : (BS ? swForWeight(BS.weight) : widths.medium),
+    sketch: [0, 1, 2].includes(spec.sketch) ? spec.sketch : (BS ? BS.sketch : 1),
+    round: [0, 1].includes(spec.round) ? spec.round : (BS ? BS.round : 1),
     opacity: spec.opacity != null ? clamp(Number(spec.opacity), 0, 100) : 100,
     fillOpacity: spec.fillOpacity != null ? clamp(Number(spec.fillOpacity), 0, 100) : 100,
     font: (typeof spec.font === 'string' && FONTS[spec.font]) ? spec.font
       : (typeof spec.font === 'string' && spec.font.startsWith('cg:') && ensureCustomFont(spec.font)) ? spec.font
       : (typeof spec.font === 'string' && /^[A-Z][A-Za-z0-9 ]{2,30}$/.test(spec.font) && ensureCustomFont('cg:' + spec.font)) ? 'cg:' + spec.font
-      : 'sans',
+      : (BK ? BK.bodyFont : 'sans'),
     size: Number(spec.size) > 0 ? clamp(Number(spec.size), 8, 600)
       : (kind === 'chip' || kind === 'arrow' || kind === 'line' ? 16 : 21),
     align: ['left', 'center', 'right'].includes(spec.align) ? spec.align : (kind === 'text' ? 'left' : 'center'),
@@ -8660,8 +8669,9 @@ function claudeBuildElement(spec, idMap){
   if (kind === 'arrow' || kind === 'line'){
     el.curve = 0;
     el.elbow = !!spec.elbow;
-    el.startHead = HEAD_KINDS.includes(spec.startHead) ? spec.startHead : 'none';
-    el.endHead = HEAD_KINDS.includes(spec.endHead) ? spec.endHead : (kind === 'arrow' ? 'arrow' : 'none');
+    el.startHead = HEAD_KINDS.includes(spec.startHead) ? spec.startHead : (BS ? BS.startHead : 'none');
+    el.endHead = HEAD_KINDS.includes(spec.endHead) ? spec.endHead
+      : (kind === 'arrow' ? (BS ? BS.endHead : 'arrow') : 'none');   // a plain line never sprouts a head
     const fromId = spec.from && idMap.get(String(spec.from));
     const toId = spec.to && idMap.get(String(spec.to));
     if (fromId && toId && fromId !== toId){

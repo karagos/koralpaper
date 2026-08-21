@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.81.0
+
+**Everything Claude draws now follows your Brand kit.** It did not before. Elements arriving over the MCP bridge were built from hardcoded house values: line style was pinned to sketchy, the font to Sans, and weight, corners, fill style, outline color and arrowheads all ignored the kit. So a kit set to Neat lines still produced sketchy shapes, and text came out in a different font from the rest of the document.
+
+Now any value Claude does not explicitly specify comes from your kit: **line style, line pattern, weight, corners, fill style, outline color (Ink), body font, and both arrowheads.** A plain line still never gains an arrowhead. Anything Claude does specify still wins, so it can still deliberately draw a red dashed line when the drawing calls for it.
+
+**Fixed: the font name showed as "—" in the style panel.** Selecting text set in a Google font displayed a dash instead of the font's name, because the panel looked the font up before registering it. It now shows the name and previews it in that face.
+
 ## v3.80.1
 
 **The Brand kit now says where it applies.** Its description still mentioned the removed restyle, and never listed what it actually governs. It now spells it out: charts use your colors in role order, every new element you draw starts in your line style, weight, corners, fill and arrowheads, new documents open on your paper, templates and headlines use your heading font, your colors appear as extra swatches, and Claude draws on brand through the MCP bridge.
