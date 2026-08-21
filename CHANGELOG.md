@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.76.1
+
+**Make it mine can now restyle every page at once.** The restyle dialog gained an **“All pages”** option: on a multi-page document, tick it to recast the whole document into your look in one step (each page recolored to your roles, its background set to your brand paper), all reverted by a single undo. It appears only when it makes sense — a whole-page restyle of a document with more than one page — and hides when you have elements selected. Without it, restyle still applies to just the current page as before.
+
+**Generate system now asks before replacing your colors.** Building a system from your Primary rebuilds the secondary, accent palette and neutrals, so it now confirms first and spells out exactly what it will replace (your Primary is always kept). The helper text makes the same thing clear up front: generate to start, then fine-tune any color by hand.
+
 ## v3.76.0
 
 **Brand kit becomes a real design system.** Colors now carry roles instead of sitting in one flat list, so the whole app knows which color goes where. **Primary** drives the hero: the first chart series, headline accents and the ✳. **Secondary** is the support color (second series, secondary emphasis). An expandable **Accent palette** holds extra categorical colors — add, remove and reorder as many as you need (up to ten) rather than being stuck at six. Neutrals are explicit too: **Paper** (document background), **Ink** (outlines and body text) and an optional **Muted** gray for subtle text and fills. A live contrast check warns if ink-on-paper gets hard to read. Best of all, paste a single Primary color and **Generate system ✳** builds a harmonious secondary, accent palette and neutrals around it in KoralPaper's soft register. Charts, template headlines, new documents, "Make it mine" and Claude (through the MCP bridge) all read the roles and design on brand. Old one-array kits migrate automatically, and kit files now export as v2.

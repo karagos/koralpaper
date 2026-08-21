@@ -3109,11 +3109,13 @@ function accentMove(i, d){ brandCollect(); const j = i + d; if (j < 0 || j >= br
 // one seed color → a full harmonious system
 function brandGenerate(){
   brandCollect();
+  // this rebuilds everything except Primary, so warn before discarding hand-picked colors
+  if (!confirm('Generate a full system from your Primary color?\n\nThis replaces your current Secondary, accent palette, Paper, Ink and Muted with a matching set. Your Primary stays. This cannot be undone.')) return;
   const g = brandFromSeed($('brandPrimary').value);
   Object.assign(brand, { secondary: g.secondary, palette: g.palette, paper: g.paper, ink: g.ink, muted: g.muted });
   brand = normalizeBrand(brand);
   saveBrand(); brandSyncUI(); brandEnsureFonts(); buildSwatches(); syncPanel();
-  showHint('Built a full brand system from your primary color ✳');
+  showHint('Built a full system around your Primary color ✳');
 }
 /* ── environment presets ────────────────────────────
    A saved snapshot of the working setup: canvas size, paper color, grid,
@@ -4531,21 +4533,32 @@ function restyleWeights(els){
   }
 }
 function makeItMine(opts){
-  const els = state.selection.size ? selected() : state.elements;
-  if (!els.length){ showHint('Nothing to restyle on this page'); return; }
-  if (opts.colors){
-    restyleColors(els);
-    if (!state.selection.size && brandActive() && brand.usePaper && brand.paper){ syncPageRef(); state.pages[state.pageIndex].bg = brand.paper; }
+  syncPageRef();                                       // flush the live current-page array into state.pages
+  const sel = state.selection.size;
+  const allPages = !!opts.allPages && !sel && state.pages.length > 1;
+  // one or more element arrays to restyle
+  const targets = sel ? [selected()]
+    : allPages ? state.pages.map(p => p.elements)
+    : [state.elements];
+  const total = targets.reduce((n, a) => n + a.length, 0);
+  if (!total){ showHint('Nothing to restyle' + (allPages ? '' : ' on this page')); return; }
+  for (const els of targets){
+    if (opts.colors) restyleColors(els);
+    if (opts.fonts) restyleFonts(els);
+    if (opts.hand) restyleHandDrawn(els);
+    if (opts.weights) restyleWeights(els);
   }
-  if (opts.fonts) restyleFonts(els);
-  if (opts.hand) restyleHandDrawn(els);
-  if (opts.weights) restyleWeights(els);
+  if (opts.colors && !sel && brandActive() && brand.usePaper && brand.paper){
+    if (allPages) state.pages.forEach(p => p.bg = brand.paper);
+    else state.pages[state.pageIndex].bg = brand.paper;
+  }
   preloadDocFonts();
-  updateBoundArrows(state.elements);
+  for (const els of targets) updateBoundArrows(els);
   commit(); requestRender(); syncPanel(); if (typeof syncPaperUI === 'function') syncPaperUI();
-  if (opts.tidy) tidyLayout();                        // its own undo step; only moves glued flows
-  showHint(brandActive() ? 'Made it yours: your colors, fonts and hand ✳ (⌘Z to undo)'
-    : 'Restyled in the house look ✳ set a Brand kit in Settings to use your own (⌘Z to undo)');
+  if (opts.tidy) tidyLayout();                          // its own undo step; only moves glued flows on this page
+  const scope = allPages ? 'all ' + state.pages.length + ' pages' : 'this page';
+  showHint(brandActive() ? 'Made ' + scope + ' yours: your colors, fonts and hand ✳ (⌘Z to undo)'
+    : 'Restyled ' + scope + ' in the house look ✳ set a Brand kit in Settings to use your own (⌘Z to undo)');
 }
 function openRestyleDialog(){
   closeMenus();
@@ -4553,15 +4566,22 @@ function openRestyleDialog(){
   $('restyleBrandNote').textContent = on
     ? 'Recast this page in your brand kit: ' + (brand.name || 'your brand') + '.'
     : 'No brand kit is active, so this uses a house style. Set your own in Settings → Brand kit.';
-  $('restyleScopeNote').textContent = state.selection.size
-    ? 'Applies to your ' + state.selection.size + ' selected element' + (state.selection.size > 1 ? 's' : '') + '.'
-    : 'Applies to the whole page. Select elements first to restyle only those.';
+  const sel = state.selection.size, multi = state.pages.length > 1;
+  // the "all pages" choice only makes sense for a whole-page restyle across a multi-page doc
+  $('rsAllPagesRow').style.display = (!sel && multi) ? '' : 'none';
+  if (sel || !multi) $('rsAllPages').checked = false;
+  $('restyleScopeNote').textContent = sel
+    ? 'Applies to your ' + sel + ' selected element' + (sel > 1 ? 's' : '') + '.'
+    : multi
+      ? 'Applies to this page. Tick “All pages” to restyle the whole document, or select elements first for just those.'
+      : 'Applies to the whole page. Select elements first to restyle only those.';
   $('restyleDialog').classList.remove('hidden');
 }
 $('restyleApplyBtn').addEventListener('click', () => {
   $('restyleDialog').classList.add('hidden');
   makeItMine({ colors: $('rsColors').checked, fonts: $('rsFonts').checked,
-    hand: $('rsHand').checked, weights: $('rsWeights').checked, tidy: $('rsTidy').checked });
+    hand: $('rsHand').checked, weights: $('rsWeights').checked, tidy: $('rsTidy').checked,
+    allPages: $('rsAllPages').checked });
 });
 $('restyleCancelBtn').addEventListener('click', () => $('restyleDialog').classList.add('hidden'));
 
