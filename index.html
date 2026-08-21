@@ -79,7 +79,7 @@
     <button class="toolbtn" data-tool="ellipse" title="Ellipse · O">
       <svg viewBox="0 0 20 20"><path d="M10 3.9 Q16.1 3.9 16.2 10 Q16.1 16.1 10 16.1 Q3.9 16.1 3.8 10 Q3.9 3.9 10 3.9 Z"/></svg>
     </button>
-    <button class="toolbtn" data-tool="polygon" title="Polygon: 3 to 12 sides (set in the panel) · G">
+    <button class="toolbtn" data-tool="polygon" title="Polygon: 3 to 12 sides (set in the Sides slider)">
       <svg viewBox="0 0 20 20"><path d="M10 3 L16 6.6 V13.4 L10 17 L4 13.4 V6.6 Z"/></svg>
     </button>
     <button class="toolbtn" data-tool="chip" title="Label chip · C">
@@ -754,8 +754,10 @@
     <h3>Shortcuts &amp; tips</h3>
     <table>
       <tr><td class="sect">Tools</td></tr>
-      <tr><td><b>V</b> select · <b>H</b> hand · <b>R</b> sticky · <b>D</b> diamond · <b>O</b> ellipse · <b>C</b> chip</td></tr>
-      <tr><td><b>S</b> icon stamps · <b>A</b> arrow · <b>L</b> line · <b>P</b> draw · <b>T</b> text · <b>I</b> import image</td></tr>
+      <tr><td><b>V</b> select · <b>H</b> hand · <b>E</b> eraser · <b>R</b> sticky · <b>D</b> diamond · <b>O</b> ellipse · <b>C</b> chip</td></tr>
+      <tr><td><b>S</b> icon stamps · <b>A</b> arrow · <b>L</b> line · <b>P</b> draw · <b>T</b> text · <b>I</b> import image · <b>polygon</b> (toolbar)</td></tr>
+      <tr><td><b>Eraser (E):</b> click an element to delete it, or hold and drag across several to wipe them. One undo brings the whole stroke back.</td></tr>
+      <tr><td><b>Polygon:</b> a regular shape from 3 to 12 sides, set with the <b>Sides</b> slider in the panel. Fill, text and everything else work like any shape.</td></tr>
       <tr><td class="sect">Editing</td></tr>
       <tr><td><b>⌘Z</b> undo · <b>⇧⌘Z</b> redo · <b>⌘A</b> select all · <b>⌘D</b> duplicate · <b>⌥drag</b> duplicate</td></tr>
       <tr><td><b>⌘C / ⌘X / ⌘V</b> copy, cut &amp; paste · <b>⌥⌘C / ⌥⌘V</b> copy &amp; paste style</td></tr>
@@ -798,6 +800,10 @@
       <tr><td><b>Mind map:</b> right-click a shape → <b>Mark as mind-map root</b>, then click the
         <b>−</b>/<b>+</b> badges to fold and unfold branches: also mid-presentation. Exports show
         exactly what you see; unmark the root to reveal everything again</td></tr>
+      <tr><td class="sect">Shapes &amp; style</td></tr>
+      <tr><td><b>Fill opacity:</b> a slider in the panel fades only the fill, leaving the outline and text solid: translucent highlights, tints behind text, Venn overlaps.</td></tr>
+      <tr><td><b>Arrowheads:</b> pick a head for each end of a line: open arrow, hollow or solid triangle, hollow or solid diamond, hollow or solid circle, or a bar stop.</td></tr>
+      <tr><td><b>Import SVG:</b> drag in or press <b>I</b> with an .svg file and it comes in as a true vector, crisp at any size and vector in exports.</td></tr>
       <tr><td class="sect">Files &amp; view</td></tr>
       <tr><td><b>⌘S</b> save .json · <b>⌘O</b> open · <b>⌥⌘N</b> new document · <b>Esc</b> closes anything</td></tr>
       <tr><td><b>Space-drag</b> or middle mouse pans · <b>⌘ + scroll</b> zooms · <b>⇧1</b> zoom to fit</td></tr>
@@ -815,84 +821,121 @@
         <b>right-click an icon to pin it</b>. Pinned ★ and recently-used icons lead the grid
         (internet needed once per new icon).</td></tr>
       <tr><td class="sect">More</td></tr>
-      <tr><td><b>Right-click</b> anything for the context menu · <b>page strip</b> at the bottom for
-        multi-page documents · ☰ → <b>Templates</b> for ready-made pages · the <b>∞ / size button</b>
+      <tr><td><b>Right-click</b> anything for the context menu · ☰ → <b>Templates</b> for ready-made pages · the <b>∞ / size button</b>
         (bottom left) sets exact canvas sizes for social formats.</td></tr>
+      <tr><td><b>Pages:</b> the strip at the bottom holds multi-page documents. <b>Shift-click</b> a range or <b>⌘/Ctrl-click</b> to select several, then right-click to move, duplicate or delete them together.</td></tr>
+      <tr><td><b>Environments (? → Settings):</b> save your canvas size, colors, grid, style and fonts as a named setup. Apply one anytime, or set a default that new documents start from.</td></tr>
     </table>
     </div>
     <div id="settingsPane" class="hidden">
       <h3>Settings</h3>
-      <p class="setdesc"><b>Environments.</b> Save your whole working setup, the canvas size, paper
-        color, grid, line and shape style, and fonts, as a named environment. Apply one anytime, or
-        set a default that every new document starts from. Handy for switching between, say, a
-        "LinkedIn carousel" setup and a "clean flowchart" one.</p>
-      <div class="setrow"><label>Save as</label>
-        <input type="text" id="envName" class="brandtextinput" placeholder="e.g. LinkedIn carousel" autocomplete="off">
-        <button class="minipill" id="envSaveBtn">Save current</button></div>
-      <div id="envList" class="envlist"></div>
-      <p class="setdesc" style="margin-top:16px"><b>Brand kit.</b> Your identity in one place: when active, charts use the
-        accent colors, chart and template headlines use the heading font, new documents start on
-        the brand paper, and the accents appear as extra color swatches. Claude reads the kit too
-        and designs on brand. Export the kit as a file to give your whole team the same look.</p>
-      <div class="setrow"><label>Active</label><input type="checkbox" id="brandActiveChk" class="brandchk"></div>
-      <div class="setrow"><label>Name</label><input type="text" id="brandName" class="brandtextinput" placeholder="e.g. CAIO" autocomplete="off"></div>
-      <div class="setrow brandrow"><label>Accents</label><div class="brandaccents" id="brandAccents">
-        <span class="brandacc"><input type="color" id="brandC1"><span class="brandhex" id="brandC1Hex"></span></span>
-        <span class="brandacc"><input type="color" id="brandC2"><span class="brandhex" id="brandC2Hex"></span></span>
-        <span class="brandacc"><input type="color" id="brandC3"><span class="brandhex" id="brandC3Hex"></span></span>
-        <span class="brandacc"><input type="color" id="brandC4"><span class="brandhex" id="brandC4Hex"></span></span>
-        <span class="brandacc"><input type="color" id="brandC5"><span class="brandhex" id="brandC5Hex"></span></span>
-        <span class="brandacc"><input type="color" id="brandC6"><span class="brandhex" id="brandC6Hex"></span></span>
-      </div></div>
-      <div class="setrow brandrow"><label>Paper</label>
-        <span class="brandacc"><input type="color" id="brandPaper"><span class="brandhex" id="brandPaperHex"></span></span>
-        <label class="chartcheck" title="New documents start with this paper color"><input type="checkbox" id="brandPaperOn"> new documents</label></div>
-      <div class="setrow"><label>Headings</label><select id="brandHeadFont" class="brandselect"></select></div>
-      <div class="setrow"><label>Body</label><select id="brandBodyFont" class="brandselect"></select></div>
-      <div class="setactions">
-        <button class="minipill" id="brandExportBtn">Export kit (.json)</button>
-        <button class="minipill" id="brandImportBtn">Import kit…</button>
-        <button class="minipill danger" id="brandResetBtn">Reset kit</button>
-      </div>
-      <p class="setdesc" style="margin-top:14px"></p>
-      <p class="setdesc">Line width presets: these values power the Fine / Medium / Thick
-        buttons in the style panel and every new element you draw.</p>
-      <div class="setrow"><label>Fine</label>
-        <input type="range" id="setFine" min="0.5" max="8" step="0.1"><b id="setFineVal"></b></div>
-      <div class="setrow"><label>Medium</label>
-        <input type="range" id="setMedium" min="0.5" max="10" step="0.1"><b id="setMediumVal"></b></div>
-      <div class="setrow"><label>Thick</label>
-        <input type="range" id="setThick" min="0.5" max="14" step="0.1"><b id="setThickVal"></b></div>
-      <div class="setactions"><button class="minipill setreset" id="setResetWidths">Reset line widths</button></div>
-      <p class="setdesc" style="margin-top:14px">Text size presets: the S / M / L / XL buttons.</p>
-      <div class="setrow"><label>S</label>
-        <input type="range" id="setSizeS" min="8" max="60" step="1"><b id="setSizeSVal"></b></div>
-      <div class="setrow"><label>M</label>
-        <input type="range" id="setSizeM" min="8" max="80" step="1"><b id="setSizeMVal"></b></div>
-      <div class="setrow"><label>L</label>
-        <input type="range" id="setSizeL" min="10" max="120" step="1"><b id="setSizeLVal"></b></div>
-      <div class="setrow"><label>XL</label>
-        <input type="range" id="setSizeXl" min="12" max="160" step="1"><b id="setSizeXlVal"></b></div>
-      <div class="setactions"><button class="minipill setreset" id="setResetSizes">Reset text sizes</button></div>
-      <p class="setdesc" style="margin-top:14px">Text spacing defaults: used by every new text
-        and by the "Reset spacing" button in the style panel.</p>
-      <div class="setrow"><label>Lines</label>
-        <input type="range" id="setTypoLh" min="0.5" max="2.5" step="0.05"><b id="setTypoLhVal"></b></div>
-      <div class="setrow"><label>Paragraph</label>
-        <input type="range" id="setTypoPgap" min="0" max="48" step="1"><b id="setTypoPgapVal"></b></div>
-      <div class="setrow"><label>Letters</label>
-        <input type="range" id="setTypoLs" min="-7" max="15" step="0.5"><b id="setTypoLsVal"></b></div>
-      <div class="setactions"><button class="minipill setreset" id="setResetTypo">Reset text spacing</button></div>
-      <p class="setdesc" style="margin-top:14px">Settings file: save every value above (plus your
-        pinned icons) to a .json you can reload anytime, or move to another machine.</p>
-      <div class="setactions">
-        <button class="minipill" id="setExportBtn">Export settings…</button>
-        <button class="minipill" id="setImportBtn">Import settings…</button>
-      </div>
-      <div class="setactions">
-        <button class="minipill" id="setShowWelcome">Show the welcome screen again</button>
-      </div>
-      <p class="docsize" id="setDocSize"></p>
+      <p class="setdesc setintro">Each area is collapsed. Click a heading to open it.</p>
+
+      <details class="setsec">
+        <summary>Environments</summary>
+        <div class="setsecbody">
+          <p class="setdesc">Save your whole working setup, the canvas size, paper color, grid, line
+            and shape style, and fonts, as a named environment. Apply one anytime, or set a default
+            that every new document starts from. Handy for switching between, say, a "LinkedIn
+            carousel" setup and a "clean flowchart" one.</p>
+          <div class="setrow"><label>Save as</label>
+            <input type="text" id="envName" class="brandtextinput" placeholder="e.g. LinkedIn carousel" autocomplete="off">
+            <button class="minipill" id="envSaveBtn">Save current</button></div>
+          <div id="envList" class="envlist"></div>
+        </div>
+      </details>
+
+      <details class="setsec">
+        <summary>Brand kit</summary>
+        <div class="setsecbody">
+          <p class="setdesc">Your identity in one place: when active, charts use the accent colors,
+            chart and template headlines use the heading font, new documents start on the brand
+            paper, and the accents appear as extra color swatches. Claude reads the kit too and
+            designs on brand. Export the kit as a file to give your whole team the same look.</p>
+          <div class="setrow"><label>Active</label><input type="checkbox" id="brandActiveChk" class="brandchk"></div>
+          <div class="setrow"><label>Name</label><input type="text" id="brandName" class="brandtextinput" placeholder="e.g. CAIO" autocomplete="off"></div>
+          <div class="setrow brandrow"><label>Accents</label><div class="brandaccents" id="brandAccents">
+            <span class="brandacc"><input type="color" id="brandC1"><span class="brandhex" id="brandC1Hex"></span></span>
+            <span class="brandacc"><input type="color" id="brandC2"><span class="brandhex" id="brandC2Hex"></span></span>
+            <span class="brandacc"><input type="color" id="brandC3"><span class="brandhex" id="brandC3Hex"></span></span>
+            <span class="brandacc"><input type="color" id="brandC4"><span class="brandhex" id="brandC4Hex"></span></span>
+            <span class="brandacc"><input type="color" id="brandC5"><span class="brandhex" id="brandC5Hex"></span></span>
+            <span class="brandacc"><input type="color" id="brandC6"><span class="brandhex" id="brandC6Hex"></span></span>
+          </div></div>
+          <div class="setrow brandrow"><label>Paper</label>
+            <span class="brandacc"><input type="color" id="brandPaper"><span class="brandhex" id="brandPaperHex"></span></span>
+            <label class="chartcheck" title="New documents start with this paper color"><input type="checkbox" id="brandPaperOn"> new documents</label></div>
+          <div class="setrow"><label>Headings</label><select id="brandHeadFont" class="brandselect"></select></div>
+          <div class="setrow"><label>Body</label><select id="brandBodyFont" class="brandselect"></select></div>
+          <div class="setactions">
+            <button class="minipill" id="brandExportBtn">Export kit (.json)</button>
+            <button class="minipill" id="brandImportBtn">Import kit…</button>
+            <button class="minipill danger" id="brandResetBtn">Reset kit</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="setsec">
+        <summary>Line widths</summary>
+        <div class="setsecbody">
+          <p class="setdesc">These values power the Fine / Medium / Thick buttons in the style panel
+            and every new element you draw.</p>
+          <div class="setrow"><label>Fine</label>
+            <input type="range" id="setFine" min="0.5" max="8" step="0.1"><b id="setFineVal"></b></div>
+          <div class="setrow"><label>Medium</label>
+            <input type="range" id="setMedium" min="0.5" max="10" step="0.1"><b id="setMediumVal"></b></div>
+          <div class="setrow"><label>Thick</label>
+            <input type="range" id="setThick" min="0.5" max="14" step="0.1"><b id="setThickVal"></b></div>
+          <div class="setactions"><button class="minipill setreset" id="setResetWidths">Reset line widths</button></div>
+        </div>
+      </details>
+
+      <details class="setsec">
+        <summary>Text sizes</summary>
+        <div class="setsecbody">
+          <p class="setdesc">The S / M / L / XL buttons.</p>
+          <div class="setrow"><label>S</label>
+            <input type="range" id="setSizeS" min="8" max="60" step="1"><b id="setSizeSVal"></b></div>
+          <div class="setrow"><label>M</label>
+            <input type="range" id="setSizeM" min="8" max="80" step="1"><b id="setSizeMVal"></b></div>
+          <div class="setrow"><label>L</label>
+            <input type="range" id="setSizeL" min="10" max="120" step="1"><b id="setSizeLVal"></b></div>
+          <div class="setrow"><label>XL</label>
+            <input type="range" id="setSizeXl" min="12" max="160" step="1"><b id="setSizeXlVal"></b></div>
+          <div class="setactions"><button class="minipill setreset" id="setResetSizes">Reset text sizes</button></div>
+        </div>
+      </details>
+
+      <details class="setsec">
+        <summary>Text spacing</summary>
+        <div class="setsecbody">
+          <p class="setdesc">Used by every new text and by the "Reset spacing" button in the style panel.</p>
+          <div class="setrow"><label>Lines</label>
+            <input type="range" id="setTypoLh" min="0.5" max="2.5" step="0.05"><b id="setTypoLhVal"></b></div>
+          <div class="setrow"><label>Paragraph</label>
+            <input type="range" id="setTypoPgap" min="0" max="48" step="1"><b id="setTypoPgapVal"></b></div>
+          <div class="setrow"><label>Letters</label>
+            <input type="range" id="setTypoLs" min="-7" max="15" step="0.5"><b id="setTypoLsVal"></b></div>
+          <div class="setactions"><button class="minipill setreset" id="setResetTypo">Reset text spacing</button></div>
+        </div>
+      </details>
+
+      <details class="setsec">
+        <summary>Backup &amp; reset</summary>
+        <div class="setsecbody">
+          <p class="setdesc">Settings file: save everything above, your saved <b>environments</b>, and
+            your pinned icons to a .json you can reload anytime or move to another machine. (Your
+            drawings are separate: use ☰ → Save sketch for those.)</p>
+          <div class="setactions">
+            <button class="minipill" id="setExportBtn">Export settings…</button>
+            <button class="minipill" id="setImportBtn">Import settings…</button>
+          </div>
+          <div class="setactions">
+            <button class="minipill" id="setShowWelcome">Show the welcome screen again</button>
+          </div>
+          <p class="docsize" id="setDocSize"></p>
+        </div>
+      </details>
     </div>
     <p class="credit"><b>KoralPaper</b> is a creation by <b>Stefanos Karagos</b>, CAIO Group ·
       <a href="https://wearecaio.com" target="_blank" rel="noopener">wearecaio.com</a></p>

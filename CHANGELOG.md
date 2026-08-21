@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.70.0
+
+Settings and Help tidy-up.
+- **The Settings tab is now organized into collapsible sections** (Environments, Brand kit, Line widths, Text sizes, Text spacing, Backup & reset). Everything starts collapsed; click a heading to open just what you need, so the tab is no longer one long scroll.
+- **The settings file now includes your environments.** Export settings saves your presets, your saved environments (with the default), and your pinned icons in one .json; Import restores them all. The description spells out exactly what is and isn't included.
+- **Help refreshed** to the current app: it now covers the eraser, the polygon and its Sides slider, fill opacity, the full set of arrowheads, SVG import, multi-select pages, and environments.
+- Fixed a shortcut clash: the polygon tool is on the toolbar (G stays the grid toggle).
+
 ## v3.69.1
 
 Polygon fixes.

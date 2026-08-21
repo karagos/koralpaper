@@ -919,3 +919,15 @@ body.dark #tooltip{box-shadow:0 4px 14px -4px rgba(0,0,0,.7);}
   font-size:12.5px; font-weight:600;}
 .envrow .minipill{flex:0 0 auto; padding:5px 9px; font-size:11.5px;}
 .envrow .minipill.danger{padding:5px 8px;}
+
+/* collapsible settings sections */
+.setsec{border:1.5px solid var(--line-soft); border-radius:11px; margin:9px 0; overflow:hidden; background:var(--card);}
+.setsec summary{cursor:pointer; padding:11px 13px; font-weight:700; font-size:13px;
+  list-style:none; display:flex; align-items:center; justify-content:space-between; user-select:none;}
+.setsec summary::-webkit-details-marker{display:none;}
+.setsec summary::after{content:'\25B8'; color:var(--ink-soft); font-size:12px; transition:transform .15s ease;}
+.setsec[open] summary::after{transform:rotate(90deg);}
+.setsec summary:hover{background:var(--card-2);}
+.setsecbody{padding:2px 13px 13px;}
+.setsecbody .setdesc:first-child{margin-top:0;}
+.setintro{opacity:.65; margin:2px 0 4px;}

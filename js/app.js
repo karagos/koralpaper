@@ -4458,6 +4458,7 @@ function exportSettings(){
   const data = {
     app: 'koralpaper-settings', version: 1, appVersion: APP_VERSION,
     settings: { widths: { ...widths }, sizes: { ...sizes }, typo: { ...typo } },
+    environments: envList(), defaultEnvId: envDefaultId(),
     pinnedIcons: miPinned(),
   };
   const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
@@ -4480,6 +4481,11 @@ function importSettingsData(data){
       localStorage.setItem('koralpaper.mi.pinned',
         JSON.stringify(data.pinnedIcons.filter(n => typeof n === 'string').slice(0, 18)));
     } catch (e){}
+  }
+  if (Array.isArray(data.environments)){
+    try { localStorage.setItem(ENV_KEY, JSON.stringify(data.environments)); } catch (e){}
+    if (typeof data.defaultEnvId === 'string'){ try { localStorage.setItem(ENVDEF_KEY, data.defaultEnvId); } catch (e){} }
+    buildEnvList();
   }
   defaults.sw = widths.medium;
   defaults.size = sizes.m;
@@ -7562,7 +7568,7 @@ function exportSVG(transparent){
 
 /* ── keyboard ──────────────────────────────────────── */
 const TOOL_KEYS = { v:'select', h:'hand', e:'eraser', r:'rect', d:'diamond', o:'ellipse',
-  g:'polygon', c:'chip', s:'icon', a:'arrow', l:'line', p:'draw', t:'text' };
+  c:'chip', s:'icon', a:'arrow', l:'line', p:'draw', t:'text' };  // polygon is click-only (g is grid)
 
 window.addEventListener('keydown', ev => {
   if (replaying){ ev.preventDefault(); stopReplay(); return; }
