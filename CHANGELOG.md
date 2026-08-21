@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.68.0
+
+Multi-select pages. In the page strip you can now select more than one page at once: Shift-click for a range, Cmd or Ctrl-click to add or remove individual pages (selected pages get a coral outline). Right-click the selection to **duplicate**, **move left/right**, or **delete** the whole group in one action. Single-page click, drag-to-reorder, and the single-page menu all work exactly as before.
+
 ## v3.67.0
 
 New tools and shapes.

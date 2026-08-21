@@ -3816,6 +3816,7 @@ document.addEventListener('paste', ev => {
 
 /* ── pages ─────────────────────────────────────────── */
 function switchPage(i){
+  if (state.pages[i] && !pageSel.has(state.pages[i].id) && pageSel.size <= 1) pageSel = new Set([state.pages[i].id]);
   i = clamp(i, 0, state.pages.length - 1);
   if (i === state.pageIndex) return;
   if (editing) commitTextEdit();
@@ -3962,6 +3963,8 @@ function refreshThumb(i){
   const cv = document.querySelector(`#pageStrip .pagethumb[data-i="${i}"] canvas`);
   if (cv) renderThumbInto(cv, state.pages[i]);
 }
+let pageSel = new Set();  // ids of pages selected in the strip (multi-select)
+function pageSelIdxs(){ return state.pages.map((p,i)=>[p.id,i]).filter(([id])=>pageSel.has(id)).map(([,i])=>i); }
 function buildPageStrip(){
   const strip = $('pageStrip');
   if (!strip) return;
@@ -3969,7 +3972,8 @@ function buildPageStrip(){
   strip.replaceChildren();
   state.pages.forEach((page, i) => {
     const b = document.createElement('button');
-    b.className = 'pagethumb' + (i === state.pageIndex ? ' active' : '');
+    b.className = 'pagethumb' + (i === state.pageIndex ? ' active' : '')
+      + (pageSel.size > 1 && pageSel.has(page.id) ? ' selected' : '');
     b.dataset.i = i;
     b.title = page.name;
     const cv = document.createElement('canvas');
@@ -3978,10 +3982,26 @@ function buildPageStrip(){
     num.className = 'pagenum';
     num.textContent = i + 1;
     b.appendChild(num);
-    b.addEventListener('click', () => { if (!stripDragged) switchPage(i); });
+    b.addEventListener('click', ev => {
+      if (stripDragged) return;
+      if (ev.shiftKey){
+        const a = state.pageIndex, lo = Math.min(a, i), hi = Math.max(a, i);
+        pageSel = new Set(state.pages.slice(lo, hi + 1).map(p => p.id));
+        switchPage(i); buildPageStrip(); return;
+      }
+      if (ev.metaKey || ev.ctrlKey){
+        if (!pageSel.size) pageSel.add(state.pages[state.pageIndex].id);
+        if (pageSel.has(page.id) && pageSel.size > 1) pageSel.delete(page.id);
+        else pageSel.add(page.id);
+        switchPage(i); buildPageStrip(); return;
+      }
+      pageSel = new Set([page.id]);
+      switchPage(i);
+    });
     b.addEventListener('contextmenu', ev => {
       ev.preventDefault(); ev.stopPropagation();
-      openPageMenu(ev, i);
+      if (pageSel.size > 1 && pageSel.has(page.id)) openPageMultiMenu(ev);
+      else { pageSel = new Set([page.id]); openPageMenu(ev, i); }
     });
     attachThumbDrag(b, i, strip);
     strip.appendChild(b);
@@ -4014,6 +4034,78 @@ function openPageMenu(ev, i){
   menu.classList.remove('hidden');
   menu.style.left = clamp(ev.clientX, 8, window.innerWidth - 200) + 'px';
   menu.style.top = clamp(ev.clientY - 190, 8, window.innerHeight - 220) + 'px';
+}
+
+function openPageMultiMenu(ev){
+  const menu = $('ctxMenu');
+  menu.replaceChildren();
+  const n = pageSel.size;
+  const add = (label, fn, disabled) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (disabled) b.disabled = true;
+    else b.addEventListener('click', () => { closeMenus(); fn(); });
+    menu.appendChild(b);
+  };
+  const idxs = pageSelIdxs();
+  add(`Duplicate ${n} pages`, duplicatePages);
+  add('Move left', () => movePages(-1), idxs[0] === 0);
+  add('Move right', () => movePages(1), idxs[idxs.length - 1] === state.pages.length - 1);
+  menu.appendChild(document.createElement('hr'));
+  add(`Delete ${n} pages…`, deletePages, n >= state.pages.length);
+  closeMenus();
+  menu.classList.remove('hidden');
+  menu.style.left = clamp(ev.clientX, 8, window.innerWidth - 200) + 'px';
+  menu.style.top = clamp(ev.clientY - 190, 8, window.innerHeight - 220) + 'px';
+}
+function duplicatePages(){
+  syncPageRef();
+  const idxs = pageSelIdxs();
+  if (!idxs.length) return;
+  const copies = idxs.map(i => {
+    const src2 = state.pages[i];
+    const els = JSON.parse(JSON.stringify(src2.elements, (k, v) => k.startsWith('_') ? undefined : v));
+    return { id: uid(), name: src2.name + ' copy', bg: src2.bg || null, elements: els };
+  });
+  const at = idxs[idxs.length - 1] + 1;
+  state.pages.splice(at, 0, ...copies);
+  state.pageIndex = at;
+  state.elements = state.pages[state.pageIndex].elements;
+  pageSel = new Set(copies.map(p => p.id));
+  state.selection = new Set();
+  commit(); buildPageStrip(); syncPanel(); requestRender();
+  showHint(`Duplicated ${copies.length} pages`);
+}
+function movePages(dir){
+  syncPageRef();
+  const idxs = pageSelIdxs().sort((a, b) => a - b);
+  if (!idxs.length) return;
+  if (dir < 0 && idxs[0] === 0) return;
+  if (dir > 0 && idxs[idxs.length - 1] === state.pages.length - 1) return;
+  const cur = state.pages[state.pageIndex];
+  const picked = idxs.map(i => state.pages[i]);
+  const rest = state.pages.filter(p => !pageSel.has(p.id));
+  // insertion slot = first-selected index shifted by dir, measured in the rest array
+  let insert = idxs[0] + dir;
+  insert = clamp(insert, 0, rest.length);
+  state.pages = [...rest.slice(0, insert), ...picked, ...rest.slice(insert)];
+  state.pageIndex = state.pages.indexOf(cur);
+  state.elements = state.pages[state.pageIndex].elements;
+  commit(); buildPageStrip();
+  showHint(`Moved ${picked.length} pages ${dir < 0 ? 'left' : 'right'}`);
+}
+function deletePages(){
+  const idxs = pageSelIdxs();
+  if (!idxs.length || idxs.length >= state.pages.length){ showHint('Keep at least one page'); return; }
+  if (!confirm(`Delete ${idxs.length} pages? (You can undo.)`)) return;
+  syncPageRef();
+  state.pages = state.pages.filter(p => !pageSel.has(p.id));
+  state.pageIndex = clamp(state.pageIndex, 0, state.pages.length - 1);
+  state.elements = state.pages[state.pageIndex].elements;
+  pageSel = new Set([state.pages[state.pageIndex].id]);
+  state.selection = new Set();
+  commit(); buildPageStrip(); syncPanel(); requestRender();
+  showHint('Pages deleted');
 }
 
 /* ── artboard / canvas size ────────────────────────── */

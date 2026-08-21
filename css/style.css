@@ -384,6 +384,7 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
 }
 .pagethumb:hover{transform:translateY(-2px);}
 .pagethumb.active{border-color:var(--coral); box-shadow:0 0 0 2px var(--coral-soft);}
+.pagethumb.selected{outline:2px solid var(--coral); outline-offset:1px;}
 .pagethumb canvas{display:block;}
 .pagenum{
   position:absolute; bottom:2px; left:4px; font-size:9.5px; font-weight:700;
