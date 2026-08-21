@@ -4488,11 +4488,13 @@ function rsHsl(hex){
   const s = d === 0 ? 0 : d / (1 - Math.abs(2*l-1));
   return { s, l };
 }
-function rsColored(hex){                        // a design color (has hue): accent OR light tint, not structure
+function rsColored(hex){                        // a real design color, as opposed to structure
   if (!hex) return false;
   const { s, l } = rsHsl(hex);
   if (l >= 0.965 || l <= 0.10) return false;  // near-white/paper and near-black/ink are structure, left alone
-  return s >= 0.13;                            // pastels and pale card tints count; true grays (s<0.13) do not
+  // pale tints of gray (a #cbd5e0 divider rule) are structure, not brand color: as a color gets
+  // lighter it must be more saturated to count, or thin footer rules steal an accent
+  return l > 0.75 ? s >= 0.40 : s >= 0.13;
 }
 function rsAccents(){
   const list = (brandActive() ? brandAccents() : RS_HOUSE.map(t => rsHex(t)).filter(Boolean)).filter(Boolean);
@@ -4502,50 +4504,65 @@ function rsAccents(){
   const chromatic = h => { const { s, l } = rsHsl(h); return (l > 0.10 && l < 0.965 && s >= 0.2) ? 1 : 0; };
   return list.map((h, i) => [h, i]).sort((a, b) => (chromatic(b[0]) - chromatic(a[0])) || (a[1] - b[1])).map(e => e[0]);
 }
-function restyleColors(els){
+/* Build ONE color map for everything being restyled at once. Per-page maps were
+   the bug behind "the footer rule is red on one slide, black on the next, grey on
+   the last": each page ranked its own colors independently. One map means one
+   source color always becomes the same brand color, on every page. */
+function rsBuildMap(arrays){
   const accents = rsAccents();
-  if (!accents.length) return;
   const weight = new Map();
-  const bump = (val, area) => { const h = rsHex(val); if (h && rsColored(h)) weight.set(h, (weight.get(h)||0) + area); };
-  for (const el of els){
-    const b = boundsOf(el), area = Math.max(1, b.w * b.h);
-    bump(el.fill, area); bump(el.stroke, area * 0.35); bump(el.textColor, area * 0.2);
+  const bump = (val, area) => { const h = rsHex(val); if (h && rsColored(h)) weight.set(h, (weight.get(h) || 0) + area); };
+  for (const els of arrays) for (const el of els){
+    if (el.type === 'image' || el.type === 'text') continue;      // text always goes to ink, never to an accent
+    const b = boundsOf(el);
+    if (isLinear(el)){ bump(el.stroke, Math.max(b.w, b.h) * 8); continue; }
+    const area = Math.max(1, b.w * b.h);
+    const fh = rsHex(el.fill), filled = el.fill && el.fill !== 'none' && fh;
+    // only rank colors that will actually consume an accent: light cards go to paper instead
+    if (filled && rsHsl(fh).l < 0.72) bump(el.fill, area);
+    if (!filled) bump(el.stroke, area * 0.5);
   }
-  const ranked = [...weight.entries()].sort((a,b) => b[1]-a[1]).map(e => e[0]);
-  const map = new Map(); ranked.forEach((h,i) => map.set(h, accents[i % accents.length]));
-  const INK = brandActive() ? brand.ink : 'ink';                              // all text and readable outlines land here
+  const ranked = [...weight.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  const map = new Map();
+  ranked.forEach((h, i) => { if (accents.length) map.set(h, accents[i % accents.length]); });
+  return map;
+}
+/* Recolor using ONLY colors that exist in the kit. Never invents a tint: every
+   result is your primary, secondary, a palette accent, your paper, ink or muted. */
+function restyleColors(els, map){
+  if (!map) map = rsBuildMap([els]);
+  const B = brandActive() ? brand : null;
+  const INK   = B ? B.ink : 'ink';
+  const PAPER = B ? B.paper : 'cream';
+  const MUTED = (B && B.muted) ? B.muted : null;
+  const inkHex = rsHex(INK), paperHex = rsHex(PAPER);
   const remap = val => { const h = rsHex(val); return (h && map.has(h)) ? map.get(h) : val; };
-  const colored = val => { const h = rsHex(val); return !!(h && rsColored(h)); };
-  const paperHex = (brandActive() && brand.paper) ? brand.paper.toLowerCase() : null;
-  // fills rebrand to the mapped accent; a LIGHT card keeps its lightness so it stays a light card in your hue
-  const remapFill = val => {
-    const h = rsHex(val); if (!h) return val;
-    const src = hexToHsl(h);
-    // whitish / light-neutral card backgrounds -> your paper, so every card is on-brand (not left as the template's)
-    if (paperHex && src.l >= 0.80 && src.s < 0.22) return paperHex;
-    if (!map.has(h)) return val;                                              // a mid neutral we didn't rank -> structure, leave it
-    const acc = map.get(h), a = hexToHsl(acc);
-    if (a.s < 0.15){                                                          // mapped onto a near-neutral brand color (e.g. black)
-      return (src.l > 0.6 && paperHex) ? paperHex : acc;                      // don't muddy a light card; solid/dark takes the neutral
-    }
-    if (src.l > 0.72) return hslToHex(a.h, Math.min(a.s, src.s + 0.05), src.l); // light tint: keep lightness, adopt brand hue
-    return acc;                                                               // solid chromatic fill: adopt the brand accent
-  };
+  const isCol = val => { const h = rsHex(val); return !!(h && rsColored(h)); };
+  // a neutral line/edge: keep subtle ones subtle (muted) but make everything consistent
+  const neutral = val => { const h = rsHex(val); return (MUTED && h && rsHsl(h).l > 0.55) ? MUTED : INK; };
   for (const el of els){
-    if (isLinear(el)){
-      if (el.stroke && el.stroke !== 'none' && colored(el.stroke)) el.stroke = remap(el.stroke); // recolor colored arrows; gray connectors kept
-    } else if (el.type === 'text'){
-      el.stroke = INK;                                                        // standalone text always reads as ink (consistent, legible)
+    if (el.type === 'image'){ delete el._tintCv; continue; }
+    if (el.type === 'text'){
+      el.stroke = INK;                                            // all text reads as ink: one consistent, legible color
       if (el.textColor && el.textColor !== 'auto') el.textColor = INK;
+    } else if (isLinear(el)){
+      if (el.stroke && el.stroke !== 'none')
+        el.stroke = isCol(el.stroke) ? remap(el.stroke) : neutral(el.stroke);   // colored -> accent, grey/black -> unified
     } else {
-      const filled = el.fill && el.fill !== 'none';
+      const fh = rsHex(el.fill), filled = el.fill && el.fill !== 'none' && fh;
       if (filled){
-        el.fill = remapFill(el.fill);
-        if (el.stroke && el.stroke !== 'none' && colored(el.stroke)) el.stroke = INK; // readable outline; auto label follows it
-      } else if (el.stroke && el.stroke !== 'none' && colored(el.stroke)){
-        el.stroke = remap(el.stroke);                                         // outline-only shape takes the accent
+        const { l } = rsHsl(fh);
+        if (l >= 0.72) el.fill = PAPER;                           // any light card becomes your paper (a kit color, never a tint)
+        else if (rsColored(fh)) el.fill = remap(el.fill);         // solid colored fill takes its brand accent
+        else el.fill = MUTED || INK;                              // mid/dark neutral fill
       }
-      if (el.textColor && el.textColor !== 'auto' && colored(el.textColor)) el.textColor = INK; // a shape's own colored label → ink; auto stays auto
+      if (el.stroke && el.stroke !== 'none')
+        el.stroke = (!filled && isCol(el.stroke)) ? remap(el.stroke) : neutral(el.stroke);
+      // contrast safety: a label always lands on whichever of ink/paper reads on its own fill
+      if (el.text && String(el.text).trim()){
+        const bg = (el.fill && el.fill !== 'none') ? rsHex(el.fill) : paperHex;
+        el.textColor = (bg && inkHex && paperHex && contrastRatio(paperHex, bg) > contrastRatio(inkHex, bg)) ? PAPER : INK;
+      }
     }
     delete el._prims; delete el._pkey; delete el._tintCv;
   }
@@ -4595,14 +4612,17 @@ function makeItMine(opts){
     : [state.elements];
   const total = targets.reduce((n, a) => n + a.length, 0);
   if (!total){ showHint('Nothing to restyle' + (allPages ? '' : ' on this page')); return; }
+  // ONE map for every page in this restyle, so a color maps identically everywhere
+  const cmap = opts.colors ? rsBuildMap(targets) : null;
   for (const els of targets){
-    if (opts.colors) restyleColors(els);
+    if (opts.colors) restyleColors(els, cmap);
     if (opts.fonts) restyleFonts(els);
     if (opts.style) restyleStyle(els);
   }
-  if (opts.colors && !sel && brandActive() && brand.usePaper && brand.paper){
-    if (allPages) state.pages.forEach(p => p.bg = brand.paper);
-    else state.pages[state.pageIndex].bg = brand.paper;
+  // making it yours includes the page itself, so backgrounds stop keeping the template's color
+  if (opts.colors && !sel && brandActive() && brand.paper){
+    if (allPages){ state.pages.forEach(p => p.bg = brand.paper); state.bgColor = brand.paper; }
+    else state.pages[state.pageIndex].bg = brand.paper;   // page-scoped: never repaint pages we did not restyle
   }
   preloadDocFonts();
   for (const els of targets) updateBoundArrows(els);

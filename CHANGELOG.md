@@ -1,5 +1,15 @@
 # KoralPaper — Changelog
 
+## v3.77.1
+
+**"Make it mine" is now consistent across a whole document, and uses only your kit's colors.** Three real bugs, found restyling an 11-page deck:
+
+- **One color map for the whole restyle.** Each page used to rank its own colors independently, so the same footer rule came out red on one slide, black on the next and grey on the last. Now a single map covers every page in the restyle: one source color always becomes the same brand color, everywhere.
+- **No invented colors, ever.** Restyle used to blend a light card into a new tint that existed nowhere in your kit (that faint reddish wash). Every result is now strictly one of your kit's colors: primary, secondary, a palette accent, paper, ink or muted. Light cards become your Paper.
+- **Structural lines stay structural.** A pale grey divider no longer steals a brand accent. Thin rules, hairlines and grey connectors unify to your Muted (or Ink), while genuinely colored arrows still take your accent. Page backgrounds also take your Paper instead of keeping the template's.
+
+Labels are now contrast-checked too: text on a dark brand fill flips to your paper color automatically, so a label can never disappear into its own card.
+
 ## v3.77.0
 
 **Your Brand kit now carries style, not just color and fonts.** A new **Style** section defines the basic look of your work: **line style** (neat / sketchy / scribbly), **line pattern** (solid / dashed / dotted), **line weight**, **corners** (rounded / sharp), **fill style** (solid, hatched, cross-hatch, dots, waves) and default **arrowheads** (start and end). This closes the gap that made restyling feel inconsistent: your line treatment is now part of your identity, defined once.
