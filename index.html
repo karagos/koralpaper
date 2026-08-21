@@ -763,6 +763,7 @@
       <tr><td><b>⇧drag</b> moves in a straight line: locks the selection to the horizontal or vertical axis</td></tr>
       <tr><td><b>Double-click</b> a shape (or arrow) to type on it · <b>Enter</b> edits the selection</td></tr>
       <tr><td><b>Snap freehand to shapes:</b> with the pen (P), a rough box, circle, triangle, diamond or line becomes a clean shape. Toggle it with the wand button in the top bar; <b>⌘Z</b> keeps your raw stroke.</td></tr>
+      <tr><td><b>Command palette (⌘K):</b> fuzzy-search every tool, action, page, template and font, then run it. Try "insert hexagon", "go to page 2", "export png", or a font name.</td></tr>
       <tr><td><b>Lock:</b> right-click an element or group → <b>Lock</b>. Locked elements ignore clicks and drags, so you cannot move or resize them by accident (a small padlock marks them). Right-click again → <b>Unlock</b>.</td></tr>
       <tr><td><b>Merge texts:</b> select several text elements (⇧click in the order you
         want the lines), right-click → <b>Merge texts into one</b>. Add a shape to the
@@ -968,7 +969,12 @@
 </div>
 
 <textarea id="textEditor" class="hidden" spellcheck="false"></textarea>
-<input type="file" id="fileInput" accept=".json,.excalidraw,application/json" hidden>
+<div class="island cmdpalette hidden" id="cmdPalette">
+    <input type="text" id="cmdInput" placeholder="Type a command: tools, insert, pages, export, fonts, templates…" autocomplete="off" spellcheck="false">
+    <div class="cmdlist" id="cmdList"></div>
+    <div class="cmdfoot"><span>↑↓ move</span><span>↵ run</span><span>esc close</span></div>
+  </div>
+  <input type="file" id="fileInput" accept=".json,.excalidraw,application/json" hidden>
 <input type="file" id="imgInput" accept="image/*,.svg,image/svg+xml" multiple hidden>
 <input type="file" id="settingsInput" accept=".json,application/json" hidden>
 <input type="file" id="brandInput" accept=".json,application/json" hidden>

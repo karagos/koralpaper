@@ -4364,6 +4364,183 @@ function setPanelTab(t){
   $('claudePane').classList.toggle('hidden', t !== 'claude');
   $('settingsPane').classList.toggle('hidden', t !== 'settings');
 }
+/* ── command palette (⌘K) ───────────────────────────
+   Fuzzy search over every tool, action, page, template and font. */
+function paletteOpenPanel(tab){
+  $('shortcutsCard').classList.remove('hidden');
+  const btn = { help: 'tabHelp', claude: 'tabClaude', settings: 'tabSettings' }[tab];
+  if (btn && $(btn)) $(btn).click();
+}
+function insertShapeAtCenter(type, extra){
+  const [cx, cy] = toScene(canvas.clientWidth / 2, canvas.clientHeight / 2);
+  const style = { stroke: defaults.stroke, fillStyle: defaults.fillStyle, sw: defaults.sw,
+    sketch: defaults.sketch, round: defaults.round, opacity: defaults.opacity, fillOpacity: defaults.fillOpacity,
+    font: defaults.font, size: defaults.size, align: defaults.align, dash: defaults.dash,
+    fill: (defaults.fillByType[type] || defaults.fill) };
+  Object.assign(style, extra || {});
+  const dim = { rect: [190,92], diamond: [150,110], ellipse: [150,108], polygon: [150,150], chip: [128,38], text: [180,40] }[type] || [160,100];
+  syncPageRef();
+  const el = newElement(type, cx - dim[0]/2, cy - dim[1]/2, style);
+  el.w = dim[0]; el.h = dim[1];
+  state.elements.push(el);
+  setTool('select'); setSelection(new Set([el.id]));
+  commit(); requestRender();
+  if (type === 'text') openTextEditor(el, true);
+  else if (['rect','diamond','ellipse','chip','polygon'].includes(type)) openTextEditor(el, false);
+}
+function paletteApplyFont(fontKey){
+  if (fontKey.startsWith('cg:')){ const fam = fontKey.slice(3); loadFontCssFor(fam); rememberGFont(fam); ensureCustomFont(fontKey); }
+  if (state.selection.size) applyStyle({ font: fontKey });
+  else { defaults.font = fontKey; showHint('Default font set: ' + fontKey.replace(/^cg:/, '')); }
+}
+function buildCommands(){
+  const C = [];
+  const add = (title, cat, run, keys, hint) => C.push({ title, cat, run, keys: keys || '', hint: hint || '' });
+  const fa = a => () => runFileAction(a);
+  // Tools
+  [['Select','select','V'],['Hand / pan','hand','H'],['Eraser','eraser','E'],['Rectangle','rect','R'],
+   ['Diamond','diamond','D'],['Ellipse','ellipse','O'],['Polygon','polygon',''],['Label chip','chip','C'],
+   ['Icon stamp','icon','S'],['Arrow','arrow','A'],['Line','line','L'],['Pen / draw','draw','P'],['Text','text','T']]
+    .forEach(([n,t,k]) => add('Tool: ' + n, 'Tool', () => setTool(t), 'tool ' + t, k));
+  // Insert
+  [['rectangle','rect'],['diamond','diamond'],['ellipse','ellipse'],['circle','ellipse'],['triangle','polygon',{sides:3}],
+   ['pentagon','polygon',{sides:5}],['hexagon','polygon',{sides:6}],['octagon','polygon',{sides:8}],['label chip','chip'],['text box','text']]
+    .forEach(([n,t,extra]) => add('Insert a ' + n, 'Insert', () => insertShapeAtCenter(t, extra || {}), 'add new ' + n + ' ' + t));
+  add('Insert chart or table', 'Insert', () => chartOpen(null), 'graph bar line pie donut spider table data', 'B');
+  // Pages
+  add('Add page to the right', 'Page', () => insertPageAt(state.pageIndex + 1), 'new page after');
+  add('Add page to the left', 'Page', () => insertPageAt(state.pageIndex), 'new page before');
+  add('Duplicate this page', 'Page', () => duplicatePage(state.pageIndex), 'copy page');
+  add('Delete this page', 'Page', () => deletePage(state.pageIndex), 'remove page');
+  add('Next page', 'Page', () => switchPage(Math.min(state.pageIndex + 1, state.pages.length - 1)));
+  add('Previous page', 'Page', () => switchPage(Math.max(state.pageIndex - 1, 0)));
+  state.pages.forEach((p, i) => add('Go to page ' + (i+1) + ': ' + (p.name || 'Page'), 'Page', () => switchPage(i), 'page ' + (i+1)));
+  // View
+  add('Zoom to fit', 'View', zoomToFit, 'fit screen', '⇧1');
+  add('Zoom in', 'View', () => $('zoomInBtn').click(), 'bigger');
+  add('Zoom out', 'View', () => $('zoomOutBtn').click(), 'smaller');
+  add('Cycle grid (lines / dots / off)', 'View', cycleGrid, 'grid', 'G');
+  add('Toggle snapping', 'View', () => $('snapBtn').click(), 'snap align');
+  add('Toggle light / dark paper', 'View', () => $('themeBtn').click(), 'theme dark mode');
+  add((recognizeOn() ? 'Turn off' : 'Turn on') + ' shape recognition', 'View', () => setRecognize(!recognizeOn()), 'freehand snap pen');
+  // Edit
+  add('Undo', 'Edit', undo, '', '⌘Z');
+  add('Redo', 'Edit', redo, '', '⇧⌘Z');
+  add('Select all', 'Edit', () => { setSelection(new Set(state.elements.filter(e => !e.locked).map(e => e.id))); setTool('select'); }, '', '⌘A');
+  add('Duplicate selection', 'Edit', duplicateSelection, '', '⌘D');
+  add('Delete selection', 'Edit', deleteSelection, 'remove');
+  add('Group selection', 'Edit', () => { groupSelection(); syncPanel(); }, '', '⌘G');
+  add('Ungroup', 'Edit', () => { ungroupSelection(); syncPanel(); }, '', '⇧⌘G');
+  add('Lock selection', 'Edit', () => toggleLockSelection(true), 'freeze');
+  add('Unlock selection', 'Edit', () => toggleLockSelection(false), '');
+  add('Copy', 'Edit', copySelection, '', '⌘C');
+  add('Paste', 'Edit', paste, '', '⌘V');
+  add('Tidy the flow / align', 'Edit', () => { if (typeof tidyLayout === 'function') tidyLayout(); }, 'arrange');
+  // File & export
+  add('New document', 'File', fa('new'), '', '⌥⌘N');
+  add('Open sketch…', 'File', fa('open'), '', '⌘O');
+  add('Save sketch (.json)', 'File', fa('save'), 'download', '⌘S');
+  add('Import image…', 'File', fa('image'), 'photo svg', 'I');
+  add('Templates…', 'File', fa('templates'), 'preset layout');
+  add('Snapshots…', 'File', fa('snapshots'), 'checkpoint version');
+  add('Time-lapse recorder', 'File', fa('timelapse'), 'animation gif video');
+  add('Present', 'File', fa('present'), 'slideshow', '⇧⌘P');
+  add('Replay the drawing', 'File', fa('replay'), 'animate');
+  add('Export PNG', 'Export', fa('png'), 'image');
+  add('Export SVG', 'Export', fa('svg'), 'vector');
+  add('Export PDF…', 'Export', fa('pdf'), '');
+  add('Animated GIF…', 'Export', fa('gif'), 'animation loop');
+  add('Copy as PNG', 'Export', fa('copyPng'), 'clipboard', '⇧⌘C');
+  add('Copy as SVG', 'Export', fa('copySvg'), 'clipboard vector');
+  add('Share as web page (.html)', 'Export', fa('shareHtml'), 'link');
+  add('All pages as PNGs (.zip)', 'Export', fa('pngAll'), 'batch');
+  // Panels
+  add('Open Settings', 'Panel', () => paletteOpenPanel('settings'), 'preferences environment brand');
+  add('Open Help & shortcuts', 'Panel', () => paletteOpenPanel('help'), 'keys');
+  add('Open Design with Claude', 'Panel', () => paletteOpenPanel('claude'), 'ai mcp');
+  add('Choose default save folder', 'Panel', () => fsPickSaveDir(), 'directory location');
+  // Templates
+  if (typeof TEMPLATES !== 'undefined') TEMPLATES.forEach(t => add('Template: ' + t.name, 'Template', () => applyTemplate(t), t.cat + ' ' + (t.desc || '')));
+  // Fonts (built-in + Google catalog)
+  const seen = new Set();
+  for (const key of Object.keys(FONTS)){ const f = FONTS[key]; seen.add((f.label || key).toLowerCase().replace(/ ·.*/, '')); add('Font: ' + (f.label || key).replace(/ ·.*/, ''), 'Font', () => paletteApplyFont(key), 'typeface ' + (f.group || '')); }
+  if (typeof GFONT_CATALOG !== 'undefined') for (const name of GFONT_CATALOG){ if (seen.has(name.toLowerCase())) continue; add('Font: ' + name, 'Font', () => paletteApplyFont('cg:' + name), 'typeface google'); }
+  return C;
+}
+function fzMatch(q, text){
+  if (!q) return 0;
+  text = text.toLowerCase();
+  let ti = 0, score = 0, prev = -2;
+  for (let qi = 0; qi < q.length; qi++){
+    const f = text.indexOf(q[qi], ti);
+    if (f < 0) return -Infinity;
+    let s = 1;
+    if (f === prev + 1) s += 5;
+    if (f === 0 || ' :/·-()'.includes(text[f-1])) s += 8;
+    score += s; prev = f; ti = f + 1;
+  }
+  return score - text.length * 0.02;
+}
+let cmdAll = [], cmdShown = [], cmdSel = 0;
+function cmdScore(q, c){
+  return Math.max(fzMatch(q, c.title), 0.65 * fzMatch(q, c.title + ' ' + c.keys), 0.4 * fzMatch(q, c.cat));
+}
+function renderCmdList(){
+  const q = $('cmdInput').value.trim().toLowerCase();
+  let list;
+  if (!q) list = cmdAll.slice(0, 60);
+  else list = cmdAll.map(c => ({ c, s: cmdScore(q, c) })).filter(x => x.s > -Infinity)
+    .sort((a,b) => b.s - a.s).slice(0, 50).map(x => x.c);
+  cmdShown = list; cmdSel = 0;
+  const wrap = $('cmdList');
+  wrap.replaceChildren();
+  if (!list.length){ const e = document.createElement('div'); e.className = 'cmdempty'; e.textContent = 'No matching command'; wrap.appendChild(e); return; }
+  list.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'cmditem' + (i === 0 ? ' sel' : '');
+    const cat = document.createElement('span'); cat.className = 'cmdcat'; cat.textContent = c.cat;
+    const title = document.createElement('span'); title.className = 'cmdtitle'; title.textContent = c.title;
+    row.append(cat, title);
+    if (c.hint){ const h = document.createElement('span'); h.className = 'cmdhint'; h.textContent = c.hint; row.appendChild(h); }
+    row.addEventListener('mousemove', () => setCmdSel(i));
+    row.addEventListener('click', () => runCmd(i));
+    wrap.appendChild(row);
+  });
+}
+function setCmdSel(i){
+  const rows = $('cmdList').children;
+  if (!rows.length) return;
+  cmdSel = clamp(i, 0, cmdShown.length - 1);
+  for (let k = 0; k < rows.length; k++) rows[k].classList.toggle('sel', k === cmdSel);
+  rows[cmdSel].scrollIntoView({ block: 'nearest' });
+}
+function runCmd(i){
+  const c = cmdShown[i != null ? i : cmdSel];
+  closeCmdPalette();
+  if (c) try { c.run(); } catch (e){ showHint('That command could not run'); }
+}
+function openCmdPalette(){
+  closeMenus();
+  cmdAll = buildCommands();
+  $('cmdPalette').classList.remove('hidden');
+  const inp = $('cmdInput'); inp.value = '';
+  renderCmdList();
+  inp.focus();
+}
+function closeCmdPalette(){ $('cmdPalette').classList.add('hidden'); }
+function cmdPaletteOpen(){ return !$('cmdPalette').classList.contains('hidden'); }
+$('cmdInput').addEventListener('input', renderCmdList);
+$('cmdInput').addEventListener('keydown', ev => {
+  if (ev.key === 'ArrowDown'){ ev.preventDefault(); setCmdSel(cmdSel + 1); }
+  else if (ev.key === 'ArrowUp'){ ev.preventDefault(); setCmdSel(cmdSel - 1); }
+  else if (ev.key === 'Enter'){ ev.preventDefault(); runCmd(); }
+  else if (ev.key === 'Escape'){ ev.preventDefault(); closeCmdPalette(); }
+  ev.stopPropagation();
+});
+document.addEventListener('click', ev => {
+  if (cmdPaletteOpen() && !ev.target.closest('#cmdPalette')) closeCmdPalette();
+});
+
 $('tabHelp').addEventListener('click', () => setPanelTab('help'));
 $('tabClaude').addEventListener('click', () => setPanelTab('claude'));
 $('tabSettings').addEventListener('click', () => {
@@ -7879,6 +8056,7 @@ window.addEventListener('keydown', ev => {
   if (ev.key === ' '){ spaceDown = true; canvas.classList.add('tool-hand'); return; }
 
   if (mod && k === 'z'){ ev.preventDefault(); ev.shiftKey ? redo() : undo(); return; }
+  if (mod && k === 'k'){ ev.preventDefault(); cmdPaletteOpen() ? closeCmdPalette() : openCmdPalette(); return; }
   if (mod && k === 'y'){ ev.preventDefault(); redo(); return; }
   if (mod && k === 'a'){ ev.preventDefault(); setSelection(new Set(visibleEls(state.elements).map(e => e.id))); setTool('select'); return; }
   if (mod && ev.altKey && k === 'c'){ ev.preventDefault(); copyStyle(); return; }
