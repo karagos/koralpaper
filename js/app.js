@@ -675,27 +675,36 @@ function setStorageWarn(on){
   autosaveFailing = on;
   $('storageWarn').classList.toggle('hidden', !on);
 }
+// the one place the document is written to local storage. Returns true on success
+// so callers that MUST persist (a whole-document restyle) can react to a failure
+// instead of silently losing the work on the next reload.
+function writeAutosave(){
+  try {
+    const doc = JSON.parse(serialize());
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      v: 6, appVersion: APP_VERSION,
+      pages: doc.pages, pageIndex: doc.pageIndex,
+      images: { ...usedImages(), ...tlImages() },
+      camera: state.camera, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
+      theme: state.theme, bgColor: state.bgColor, board: state.board,
+      timelapse: tl.frames.length ? { frames: tl.frames } : undefined,
+    }));
+    setStorageWarn(false);
+    return true;
+  } catch (e){
+    // storage full/unavailable — the sketch still lives in memory, but
+    // the user must KNOW a reload would lose it
+    console.error('autosave failed:', e);
+    setStorageWarn(true);
+    return false;
+  }
+}
 function scheduleAutosave(){
   clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(() => {
-    try {
-      const doc = JSON.parse(serialize());
-      localStorage.setItem(STORE_KEY, JSON.stringify({
-        v: 6, appVersion: APP_VERSION,
-        pages: doc.pages, pageIndex: doc.pageIndex,
-        images: { ...usedImages(), ...tlImages() },
-        camera: state.camera, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
-        theme: state.theme, bgColor: state.bgColor, board: state.board,
-        timelapse: tl.frames.length ? { frames: tl.frames } : undefined,
-      }));
-      setStorageWarn(false);
-    } catch (e) {
-      // storage full/unavailable — the sketch still lives in memory, but
-      // the user must KNOW a reload would lose it
-      setStorageWarn(true);
-    }
-  }, 350);
+  autosaveTimer = setTimeout(writeAutosave, 350);
 }
+// write right now, skipping the debounce
+function flushAutosave(){ clearTimeout(autosaveTimer); return writeAutosave(); }
 function docSizeMB(){
   try { return serialize().length / 1048576; } catch (e){ return 0; }
 }
@@ -4175,10 +4184,13 @@ function scheduleThumbRefresh(){
   thumbTimer = setTimeout(() => refreshThumb(state.pageIndex), 350);
 }
 function renderThumbInto(cv, page){
-  const els = page.elements;
-  const b = state.board
-    ? { x: state.board.x, y: state.board.y, w: state.board.w, h: state.board.h }
-    : sceneBounds(els);
+  const els = (page && Array.isArray(page.elements)) ? page.elements : [];
+  let b;
+  try {
+    b = state.board
+      ? { x: state.board.x, y: state.board.y, w: state.board.w, h: state.board.h }
+      : sceneBounds(els);
+  } catch (e){ b = null; }
   const ratio = b ? clamp(b.h / b.w, 0.4, 1.8) : 1.25;
   const th = 52, tw = clamp(Math.round(th / ratio), 30, 88);
   const dpr = 2;
@@ -4247,7 +4259,13 @@ function buildPageStrip(){
     });
     attachThumbDrag(b, i, strip);
     strip.appendChild(b);
-    renderThumbInto(cv, page);
+    // a single unrenderable element must never abort the loop: that truncated the
+    // strip mid-build and looked exactly like "all my pages were deleted"
+    try { renderThumbInto(cv, page); }
+    catch (e){
+      console.error('thumbnail failed for page', i + 1, e);
+      try { const c = cv.getContext('2d'); c.fillStyle = pageBgOf(page); c.fillRect(0, 0, cv.width, cv.height); } catch (e2){}
+    }
   });
   const add = document.createElement('button');
   add.className = 'pageadd';
@@ -4638,19 +4656,38 @@ function restyleStyle(els){
     delete el._prims; delete el._pkey;
   }
 }
+/* the document invariants a restyle must never break. Checked after the run:
+   if any of them fails we roll the whole document back rather than leave the
+   user with a canvas that looks like pages went missing. */
+function docIntact(expectPages){
+  if (!Array.isArray(state.pages) || state.pages.length !== expectPages) return false;
+  if (!(state.pageIndex >= 0 && state.pageIndex < state.pages.length)) return false;
+  for (const p of state.pages) if (!p || !Array.isArray(p.elements)) return false;
+  if (state.elements !== state.pages[state.pageIndex].elements) return false;
+  return true;
+}
 function makeItMine(opts){
   syncPageRef();                                       // flush the live current-page array into state.pages
   const sel = state.selection.size;
   const allPages = !!opts.allPages && !sel && state.pages.length > 1;
+  const pageCount = state.pages.length;
   // one or more element arrays to restyle
   const targets = sel ? [selected()]
     : allPages ? state.pages.map(p => p.elements)
     : [state.elements];
   const total = targets.reduce((n, a) => n + a.length, 0);
   if (!total){ showHint('Nothing to restyle' + (allPages ? '' : ' on this page')); return; }
-  // ATOMIC: a restyle touches every page, so one bad element must never leave the
-  // document half-changed. Snapshot first; on any error put the document back exactly.
-  const before = serialize();
+  // ATOMIC: a restyle touches every page, so nothing may leave the document
+  // half-changed. Snapshot first; on any error put it back exactly as it was.
+  let before;
+  try { before = serialize(); }
+  catch (e){ console.error('restyle: could not snapshot the document', e);
+    showHint('Could not restyle: this document could not be safely copied first'); return; }
+  const rollback = why => {
+    try { restore(before); } catch (e){ console.error('rollback failed', e); }
+    console.error('Make it mine failed:', why);
+    showHint('Could not restyle: the document was put back unchanged');
+  };
   try {
     // ONE map for every page in this restyle, so a color maps identically everywhere
     const cmap = opts.colors ? rsBuildMap(targets) : null;
@@ -4664,19 +4701,30 @@ function makeItMine(opts){
       if (allPages){ state.pages.forEach(p => p.bg = brand.paper); state.bgColor = brand.paper; }
       else state.pages[state.pageIndex].bg = brand.paper;  // page-scoped: never repaint pages we did not restyle
     }
-    preloadDocFonts();
-    for (const els of targets) updateBoundArrows(els);
-  } catch (err){
-    restore(before);                                   // full rollback: nothing lost
-    console.error('Make it mine failed:', err);
-    showHint('Could not restyle: the document was put back unchanged');
+    for (const els of targets){ try { updateBoundArrows(els); } catch (e){ console.error('bound arrows', e); } }
+    try { preloadDocFonts(); } catch (e){ console.error('font preload', e); }
+  } catch (err){ rollback(err); return; }
+  // the restyle itself succeeded; verify we did not corrupt the document
+  if (!docIntact(pageCount)){ rollback('document invariants broken'); return; }
+  // PERSIST FIRST, before any UI work: a later UI error must never cost the user
+  // the restyle itself (that is why a reload used to show the old, unstyled deck)
+  let saved = true;
+  try { commit(); } catch (e){ console.error('commit failed', e); }
+  try { saved = flushAutosave(); } catch (e){ console.error('autosave failed', e); saved = false; }
+  // every UI refresh is independently guarded: one failing repaint cannot stop the rest
+  const ui = [
+    ['page strip', () => buildPageStrip()],
+    ['canvas', () => requestRender()],
+    ['panel', () => syncPanel()],
+    ['paper', () => { if (typeof syncPaperUI === 'function') syncPaperUI(); }],
+  ];
+  for (const [what, fn] of ui){ try { fn(); } catch (e){ console.error('restyle: refreshing the ' + what + ' failed', e); } }
+  if (opts.tidy){ try { tidyLayout(); } catch (e){ console.error('tidy failed', e); } }
+  const scope = allPages ? 'all ' + pageCount + ' pages' : 'this page';
+  if (!saved){
+    showHint('Restyled ' + scope + ', but this browser could not save it: use Save sketch (.json) now');
     return;
   }
-  commit();
-  buildPageStrip();                                    // an all-pages restyle changes every thumbnail
-  requestRender(); syncPanel(); if (typeof syncPaperUI === 'function') syncPaperUI();
-  if (opts.tidy) tidyLayout();                          // its own undo step; only moves glued flows on this page
-  const scope = allPages ? 'all ' + state.pages.length + ' pages' : 'this page';
   showHint(brandActive() ? 'Made ' + scope + ' yours: your colors, fonts and style ✳ (⌘Z to undo)'
     : 'Restyled ' + scope + ' in the house look ✳ set a Brand kit in Settings to use your own (⌘Z to undo)');
 }

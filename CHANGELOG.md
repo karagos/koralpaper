@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.78.1
+
+**The vanishing-pages bug is fixed at the source, and a restyle can no longer be lost.**
+
+Your pages were never actually deleted. The page strip is rebuilt by looping over every page and drawing a thumbnail for each; if one element failed to draw, that loop stopped dead and the strip was left holding only the pages added so far. With the current page drawn first, the result looked exactly like "everything except the page I was on has been deleted". A reload rebuilt the strip and they all came back.
+
+- **A thumbnail can no longer break the strip.** Each page's thumbnail is drawn independently now; one that fails shows an empty card and the other pages still appear.
+- **The restyle is saved before any redrawing happens.** Previously a display error thrown after the restyle stopped the save from running, so reloading brought back the old, unstyled deck: the work really was gone. The document is now written to storage first, then the screen is refreshed, and each refresh step is independent so one failure cannot stop the others.
+- **If the browser cannot save**, you are told to save a copy rather than left to discover it on the next reload.
+- **Document invariants are checked** after every restyle (page count, current page, element links). If anything is off, the whole document is rolled back rather than shown in a broken state.
+
+Verified against a deliberately sabotaged 11-page document: with ten of eleven thumbnails throwing, all eleven pages still render and all eleven persist with the brand rules applied. The same holds when the commit step, the canvas redraw, the side panel, or local storage itself fails.
+
 ## v3.78.0
 
 **Primary and Secondary now go where they belong, and a restyle can never lose your pages.**
