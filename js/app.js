@@ -2988,6 +2988,79 @@ function brandFromUI(){
   buildSwatches();
   syncPanel();
 }
+/* ── environment presets ────────────────────────────
+   A saved snapshot of the working setup: canvas size, paper color, grid,
+   theme, and the drawing defaults (line/shape style, fonts, arrowheads).
+   Apply one anytime; one can be the default that new documents start from. */
+const ENV_KEY = 'koralpaper.environments';
+const ENVDEF_KEY = 'koralpaper.defaultEnvId';
+function envList(){ try { return JSON.parse(localStorage.getItem(ENV_KEY)) || []; } catch (e){ return []; } }
+function envSaveList(list){ try { localStorage.setItem(ENV_KEY, JSON.stringify(list)); return true; } catch (e){ alert('Browser storage is full. Delete an environment and try again.'); return false; } }
+function envDefaultId(){ try { return localStorage.getItem(ENVDEF_KEY) || ''; } catch (e){ return ''; } }
+function captureEnv(){
+  const d = defaults;
+  return {
+    board: state.board ? { w: state.board.w, h: state.board.h, name: state.board.name } : null,
+    bgColor: state.bgColor || null,
+    grid: state.grid, gridSize: state.gridSize, theme: state.theme,
+    defaults: {
+      stroke: d.stroke, fill: d.fill, fillStyle: d.fillStyle, dash: d.dash, sw: d.sw,
+      sketch: d.sketch, round: d.round, opacity: d.opacity, fillOpacity: d.fillOpacity,
+      font: d.font, size: d.size, align: d.align, startHead: d.startHead, endHead: d.endHead,
+      sides: d.sides, fillByType: { ...d.fillByType },
+    },
+  };
+}
+function applyEnv(env, silent){
+  if (!env) return;
+  state.board = (env.board && env.board.w > 0 && env.board.h > 0)
+    ? { name: env.board.name || 'Custom', w: env.board.w, h: env.board.h, x: 0, y: 0 } : null;
+  state.bgColor = (typeof env.bgColor === 'string' && env.bgColor[0] === '#') ? env.bgColor : null;
+  if (typeof env.grid === 'string') state.grid = env.grid;
+  if (Number(env.gridSize) > 0) state.gridSize = clamp(Number(env.gridSize), 6, 120);
+  if (env.theme){ state.theme = env.theme === 'dark' ? 'dark' : 'light'; document.body.classList.toggle('dark', state.theme === 'dark'); }
+  if (env.defaults){ Object.assign(defaults, env.defaults); if (env.defaults.fillByType) defaults.fillByType = { ...env.defaults.fillByType }; }
+  syncPaperUI(); syncToggles(); syncGridMenu(); paintSwatches(); syncBoardBtn(); buildBoardMenuSel();
+  commit(); syncPanel(); requestRender(); scheduleAutosave();
+}
+function buildEnvList(){
+  const wrap = $('envList'); if (!wrap) return;
+  wrap.replaceChildren();
+  const list = envList(), def = envDefaultId();
+  if (!list.length){
+    const p = document.createElement('p'); p.className = 'setdesc'; p.style.opacity = '.7';
+    p.textContent = 'No environments saved yet. Set up your canvas and styles, then Save current.';
+    wrap.appendChild(p); return;
+  }
+  for (const e of list){
+    const row = document.createElement('div'); row.className = 'envrow';
+    const isDef = e.id === def;
+    const name = document.createElement('span'); name.className = 'envname'; name.title = e.name;
+    name.textContent = e.name + (isDef ? ' ★' : '');
+    const apply = document.createElement('button'); apply.className = 'minipill'; apply.textContent = 'Apply';
+    apply.addEventListener('click', () => { applyEnv(e.env); showHint('Environment applied: ' + e.name); });
+    const star = document.createElement('button'); star.className = 'minipill' + (isDef ? ' setreset' : '');
+    star.textContent = isDef ? 'Default' : 'Set default'; star.title = 'New documents start from the default environment';
+    star.addEventListener('click', () => { try { localStorage.setItem(ENVDEF_KEY, isDef ? '' : e.id); } catch (x){} buildEnvList(); });
+    const del = document.createElement('button'); del.className = 'minipill danger'; del.textContent = '×'; del.title = 'Delete this environment';
+    del.addEventListener('click', () => {
+      if (!confirm('Delete environment “' + e.name + '”?')) return;
+      envSaveList(envList().filter(x => x.id !== e.id));
+      if (envDefaultId() === e.id) try { localStorage.removeItem(ENVDEF_KEY); } catch (x){}
+      buildEnvList();
+    });
+    row.append(name, apply, star, del); wrap.appendChild(row);
+  }
+}
+function saveEnvironment(){
+  const name = ($('envName').value || '').trim() || ('Environment ' + (envList().length + 1));
+  const list = envList();
+  list.push({ id: uid(), name, env: captureEnv() });
+  if (envSaveList(list)){ $('envName').value = ''; buildEnvList(); showHint('Saved environment: ' + name); }
+}
+$('envSaveBtn').addEventListener('click', saveEnvironment);
+$('envName').addEventListener('keydown', ev => { if (ev.key === 'Enter'){ ev.preventDefault(); saveEnvironment(); } });
+
 function initBrandUI(){
   brandSyncUI();
   ['brandActiveChk', 'brandName', 'brandPaper', 'brandPaperOn',
@@ -4227,6 +4300,7 @@ $('tabHelp').addEventListener('click', () => setPanelTab('help'));
 $('tabClaude').addEventListener('click', () => setPanelTab('claude'));
 $('tabSettings').addEventListener('click', () => {
   setPanelTab('settings');
+  buildEnvList();
   const mb = docSizeMB();
   $('setDocSize').textContent =
     `This document: ${mb < 0.1 ? (mb * 1024).toFixed(0) + ' KB' : mb.toFixed(1) + ' MB'} · ` +
@@ -4502,8 +4576,11 @@ function newDocument(){
   try { localStorage.removeItem('asterisk.docname'); } catch (e){}
   buildPageStrip();
   syncPaperUI(); syncBoardBtn(); buildBoardMenuSel(); syncZoomLabel();
-  commit(); syncPanel(); requestRender();
-  showHint('New document: ⌘Z brings the previous pages back');
+  const defEnv = envList().find(e => e.id === envDefaultId());
+  if (defEnv) applyEnv(defEnv.env);      // starts new docs from the chosen environment
+  else { commit(); syncPanel(); requestRender(); }
+  showHint(defEnv ? 'New document on your default environment (⌘Z to go back)'
+    : 'New document: ⌘Z brings the previous pages back');
 }
 /* one Transparent-background toggle drives PNG & SVG exports */
 const EXPT_KEY = 'koralpaper.exportT';

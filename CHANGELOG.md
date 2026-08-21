@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.69.0
+
+Environments: save and switch your whole working setup. In Settings, the new Environments section saves your canvas size, paper color, grid, theme, line and shape style, fonts, and arrowhead defaults as a named environment. Apply one anytime, keep as many as you like, and mark one as the default that every new document starts from. Perfect for jumping between, say, a "LinkedIn carousel" setup and a "clean flowchart" one without re-configuring each time.
+
 ## v3.68.0
 
 Multi-select pages. In the page strip you can now select more than one page at once: Shift-click for a range, Cmd or Ctrl-click to add or remove individual pages (selected pages get a coral outline). Right-click the selection to **duplicate**, **move left/right**, or **delete** the whole group in one action. Single-page click, drag-to-reorder, and the single-page menu all work exactly as before.

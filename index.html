@@ -822,7 +822,15 @@
     </div>
     <div id="settingsPane" class="hidden">
       <h3>Settings</h3>
-      <p class="setdesc"><b>Brand kit.</b> Your identity in one place: when active, charts use the
+      <p class="setdesc"><b>Environments.</b> Save your whole working setup, the canvas size, paper
+        color, grid, line and shape style, and fonts, as a named environment. Apply one anytime, or
+        set a default that every new document starts from. Handy for switching between, say, a
+        "LinkedIn carousel" setup and a "clean flowchart" one.</p>
+      <div class="setrow"><label>Save as</label>
+        <input type="text" id="envName" class="brandtextinput" placeholder="e.g. LinkedIn carousel" autocomplete="off">
+        <button class="minipill" id="envSaveBtn">Save current</button></div>
+      <div id="envList" class="envlist"></div>
+      <p class="setdesc" style="margin-top:16px"><b>Brand kit.</b> Your identity in one place: when active, charts use the
         accent colors, chart and template headlines use the heading font, new documents start on
         the brand paper, and the accents appear as extra color swatches. Claude reads the kit too
         and designs on brand. Export the kit as a file to give your whole team the same look.</p>
