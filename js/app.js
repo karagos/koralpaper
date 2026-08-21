@@ -4467,8 +4467,12 @@ function rsColored(hex){                        // a design color (has hue): acc
   return s >= 0.13;                            // pastels and pale card tints count; true grays (s<0.13) do not
 }
 function rsAccents(){
-  const list = brandActive() ? brandAccents() : RS_HOUSE.map(t => rsHex(t)).filter(Boolean);
-  return list.filter(Boolean);
+  const list = (brandActive() ? brandAccents() : RS_HOUSE.map(t => rsHex(t)).filter(Boolean)).filter(Boolean);
+  // For restyle, lead with the CHROMATIC brand colors. A near-neutral primary (e.g. black) would
+  // otherwise swallow every dominant shape, burying your real accent — text/structure already go to
+  // ink separately, so demote near-neutral brand colors to the end. Stable: chromatic order kept.
+  const chromatic = h => { const { s, l } = rsHsl(h); return (l > 0.10 && l < 0.965 && s >= 0.2) ? 1 : 0; };
+  return list.map((h, i) => [h, i]).sort((a, b) => (chromatic(b[0]) - chromatic(a[0])) || (a[1] - b[1])).map(e => e[0]);
 }
 function restyleColors(els){
   const accents = rsAccents();
@@ -4484,12 +4488,20 @@ function restyleColors(els){
   const INK = brandActive() ? brand.ink : 'ink';                              // all text and readable outlines land here
   const remap = val => { const h = rsHex(val); return (h && map.has(h)) ? map.get(h) : val; };
   const colored = val => { const h = rsHex(val); return !!(h && rsColored(h)); };
-  // fills rebrand to the mapped accent, but a LIGHT card keeps its lightness so it stays a light card in your hue
+  const paperHex = (brandActive() && brand.paper) ? brand.paper.toLowerCase() : null;
+  // fills rebrand to the mapped accent; a LIGHT card keeps its lightness so it stays a light card in your hue
   const remapFill = val => {
-    const h = rsHex(val); if (!(h && map.has(h))) return val;                 // neutral / near-white fills kept as-is
-    const acc = map.get(h), src = hexToHsl(h);
-    if (src.l > 0.72){ const a = hexToHsl(acc); return hslToHex(a.h, Math.min(a.s, src.s + 0.05), src.l); }
-    return acc;                                                               // solid fill: adopt the brand accent outright
+    const h = rsHex(val); if (!h) return val;
+    const src = hexToHsl(h);
+    // whitish / light-neutral card backgrounds -> your paper, so every card is on-brand (not left as the template's)
+    if (paperHex && src.l >= 0.80 && src.s < 0.22) return paperHex;
+    if (!map.has(h)) return val;                                              // a mid neutral we didn't rank -> structure, leave it
+    const acc = map.get(h), a = hexToHsl(acc);
+    if (a.s < 0.15){                                                          // mapped onto a near-neutral brand color (e.g. black)
+      return (src.l > 0.6 && paperHex) ? paperHex : acc;                      // don't muddy a light card; solid/dark takes the neutral
+    }
+    if (src.l > 0.72) return hslToHex(a.h, Math.min(a.s, src.s + 0.05), src.l); // light tint: keep lightness, adopt brand hue
+    return acc;                                                               // solid chromatic fill: adopt the brand accent
   };
   for (const el of els){
     if (isLinear(el)){

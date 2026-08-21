@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.76.3
+
+**"Make it mine" handles near-neutral brands and unifies card backgrounds.** More fixes from restyling a real deck with a black-and-dark-red kit:
+
+- **Your accent color actually gets used.** When your Primary is near-black (or any near-neutral), restyle now leads with your chromatic colors, so your real accent (a dark red, a blue) lands on the dominant shapes instead of being buried behind black. Text and structure still go to ink, so the deck reads black-on-paper with your accent for emphasis, consistently across slides.
+- **Card backgrounds come on-brand.** White and light-gray template cards now take your Paper color instead of keeping the template's original fill, so boxes stop looking off-brand. Light colored cards still rebrand to your hue while keeping their lightness.
+- **No more muddy cards.** A light card mapped onto a near-black brand color no longer turns a muddy gray; it goes cleanly to your paper.
+
 ## v3.76.2
 
 **"Make it mine" is more faithful and predictable.** Three fixes from real use:
