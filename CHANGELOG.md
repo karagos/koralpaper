@@ -1,5 +1,12 @@
 # KoralPaper — Changelog
 
+## v3.66.0
+
+Claude can now control line weight, transparency and arrowheads (it could not before), plus more arrowhead styles for everyone.
+- **Fixed:** when Claude drew through the MCP bridge, line width (`sw`) and opacity were silently ignored and every shape came out at the default weight. Claude now honors `sw`, `opacity`, per-end arrowheads, and clean vs hand-drawn (`sketch`), and can change them on existing elements too. The MCP schema documents the ranges (thin 1.5, medium 3.3, thick 5, bold 8 to 14) and tells Claude to use `sketch:0` for clean, precise diagrams and tables. When Claude reads the document it now sees each element's line weight, style and transparency, so follow-up edits are accurate.
+- **New: fill transparency.** A "Fill opacity" slider fades only the fill, leaving the outline and text solid: translucent highlight boxes, tints behind text, and Venn-style overlaps that show through each other. Available to you in the panel and to Claude as `fillOpacity`.
+- **New arrowheads.** Alongside the open arrow, hollow triangle and circle, there are now solid triangle, hollow and solid diamond, solid circle, and a bar (perpendicular stop). Pick any of them independently for the start and end of a line, by hand or via Claude.
+
 ## v3.65.1
 
 Security hardening (MCP bridge). Full audit of the app and the bridge after listing in public directories.

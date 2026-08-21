@@ -215,7 +215,12 @@ const ELEMENT_SCHEMA = {
     bold: { type: 'boolean', description: 'true = render the whole text bold (headlines, table headers).' },
     font: { type: 'string', description: 'serif, sans, hand, or a Google font key like playfair, spacegrotesk, caveat.' },
     align: { type: 'string', enum: ['left', 'center', 'right'] },
-    sketch: { type: 'number', description: '1 = hand-drawn wobble (default), 0 = neat straight lines.' },
+    sketch: { type: 'number', description: 'Line style. 1 = hand-drawn wobble (the default look). 0 = neat, straight, precise lines — use 0 for clean/professional diagrams, tables, UI mockups, and anything that should NOT look hand-sketched.' },
+    sw: { type: 'number', description: 'Stroke (line/outline) width in px. Guide: 1.5 = thin/hairline, 3.3 = medium (default), 5 = thick, 8 to 14 = bold poster lines. Range 0.5 to 40. Thin outlines read as more precise; thick reads as emphasis.' },
+    opacity: { type: 'number', description: 'Opacity of the WHOLE element (outline + fill + text) from 0 (invisible) to 100 (solid, default). Use for ghosted/faded elements.' },
+    fillOpacity: { type: 'number', description: 'Transparency of the FILL ONLY, 0 (transparent fill) to 100 (opaque, default). The outline and text stay solid. Use for translucent highlight boxes, tints behind text, overlapping shapes that should show through each other, or Venn-style overlaps.' },
+    startHead: { type: 'string', enum: ['none','arrow','triangle','triangle-filled','diamond','diamond-filled','circle','circle-filled','bar'], description: 'Arrows/lines only: the marker at the START point. Default none.' },
+    endHead: { type: 'string', enum: ['none','arrow','triangle','triangle-filled','diamond','diamond-filled','circle','circle-filled','bar'], description: 'Arrows/lines only: the marker at the END point. Default arrow for arrows, none for lines. "-filled" variants are solid; "bar" is a perpendicular stop.' },
     from: { type: 'string', description: 'Arrows only: id of the shape this arrow starts from (it glues to the border and follows).' },
     to: { type: 'string', description: 'Arrows only: id of the shape this arrow points to.' },
     elbow: { type: 'boolean', description: 'Arrows only: true = right-angle elbow route instead of a straight/curved line.' },
@@ -224,7 +229,7 @@ const ELEMENT_SCHEMA = {
   },
   required: ['type'],
 };
-const COORDS_HELP = 'Coordinates: y grows downward, origin is the artboard top-left. Typical shape: 190 wide × 92 tall; leave 100 to 120 px gaps. On a 1920×1080 board keep everything inside 60 px margins.';
+const COORDS_HELP = 'Coordinates: y grows downward, origin is the artboard top-left. Typical shape: 190 wide × 92 tall; leave 100 to 120 px gaps. On a 1920×1080 board keep everything inside 60 px margins. Styling: set sketch:0 for clean/precise diagrams and tables (1 is hand-drawn); control line weight with sw (1.5 thin, 3.3 medium, 5 thick); use fillOpacity for translucent fills and opacity to fade a whole element; pick per-end arrowheads with startHead/endHead.';
 
 const TOOLS = [
   {
@@ -349,7 +354,7 @@ function onMessage(msg){
     reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'koralpaper', version: '1.4.1' },
+      serverInfo: { name: 'koralpaper', version: '1.4.2' },
       instructions: 'These tools draw directly in the KoralPaper app (hand-drawn diagram studio) running in the user\'s browser. Workflow: koralpaper_status → koralpaper_read_document (if editing) → create/add/update → koralpaper_render_page to visually check the result, and iterate until the layout is clean.',
     });
     return;

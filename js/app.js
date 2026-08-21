@@ -51,13 +51,14 @@ function saveSettings(){
 
 const defaults = {
   stroke:'ink', fill:'cream', fillStyle:'solid', dash:'solid', sw:widths.medium, sketch:1, round:1,
-  opacity:100, font:'sans', size:sizes.m, align:'center',
+  opacity:100, fillOpacity:100, font:'sans', size:sizes.m, align:'center',
   curve:0, elbow:false, startHead:'none', endHead:'arrow',
   lh:typo.lh, pgap:typo.pgap, lspace:typo.lspace, valign:'middle',
   hlColor:'#F7E36B',
   fillByType: { rect:'cream', diamond:'cream', ellipse:'cream', chip:'periwinkle', icon:'none' },
 };
 let iconKind = 'asterisk'; // last-picked stamp from the icon menu
+const HEAD_KINDS = ['none','arrow','triangle','triangle-filled','diamond','diamond-filled','circle','circle-filled','bar'];
 const GRID = 22;
 const gsize = () => state.gridSize || GRID;
 const STORE_KEY = 'asterisk.sketch.v1';
@@ -107,6 +108,7 @@ function migrateElements(els, ver){
     if (el.type === 'asterisk'){ el.type = 'icon'; el.kind = 'asterisk'; }
     if (el.type === 'icon' && !el.kind) el.kind = 'asterisk';
     if (!el.dash) el.dash = 'solid';
+    if (el.fillOpacity == null) el.fillOpacity = 100;
     if (el.font === 'archivo') el.font = 'spacegrotesk'; // short-lived v3.7.0 font
     // legacy boolean arrowheads → named head kinds
     if (el.startHead === undefined && 'startArrow' in el){
@@ -1015,6 +1017,7 @@ function onPointerDown(ev){
   const style = {
     stroke: defaults.stroke, fillStyle: defaults.fillStyle, sw: defaults.sw,
     sketch: defaults.sketch, round: defaults.round, opacity: defaults.opacity,
+    fillOpacity: defaults.fillOpacity,
     font: defaults.font, size: state.tool === 'chip' ? Math.min(defaults.size, 16) : defaults.size,
     align: defaults.align,
     lh: defaults.lh, pgap: defaults.pgap, lspace: defaults.lspace, valign: defaults.valign,
@@ -2403,6 +2406,12 @@ function syncPanel(){
   show('rowValign', has('rect','diamond','ellipse','chip'));
   show('rowOpacity', true);
   $('opacityVal').textContent = ((sel.length ? sel[0].opacity : defaults.opacity) ?? 100) + '%';
+  const fillRowOn = !$('rowFill').classList.contains('hidden');
+  show('rowFillOpacity', fillRowOn);
+  if (fillRowOn){
+    const fo = (sel.length ? sel[0].fillOpacity : defaults.fillOpacity) ?? 100;
+    $('fillOpacityRange').value = fo; $('fillOpacityVal').textContent = fo + '%';
+  }
   const nUnits = sel.length ? alignUnits().length : 0;
   show('rowArrange', nUnits >= 2);
   $('distH').disabled = $('distV').disabled = nUnits < 3;
@@ -2536,6 +2545,12 @@ $('opacityRange').addEventListener('input', ev => {
   requestRender();
 });
 $('opacityRange').addEventListener('change', () => { if (state.selection.size) commitCoalesced('opacity', 1500); });
+$('fillOpacityRange').addEventListener('input', ev => {
+  const v = clamp(Number(ev.target.value) || 0, 0, 100);
+  applyStyle({ fillOpacity: v });
+  $('fillOpacityVal').textContent = v + '%';
+});
+$('fillOpacityRange').addEventListener('change', () => { if (state.selection.size) commitCoalesced('fillOpacity', 1500); });
 $('toFrontBtn').addEventListener('click', () => reorder('front'));
 $('toBackBtn').addEventListener('click', () => reorder('back'));
 $('forwardBtn').addEventListener('click', () => reorder('forward'));
@@ -7687,7 +7702,10 @@ function claudeBuildElement(spec, idMap){
       kind === 'text' || kind === 'arrow' || kind === 'line' ? 'none' : defaults.fillByType[kind] || 'none'),
     fillStyle: ['solid', 'hachure', 'dense', 'cross', 'dots', 'waves'].includes(spec.fillStyle) ? spec.fillStyle : 'solid',
     dash: ['solid', 'dotted', 'dashed'].includes(spec.dash) ? spec.dash : 'solid',
-    sw: widths.medium, sketch: spec.sketch === 0 ? 0 : 1, round: 1, opacity: 100,
+    sw: Number(spec.sw) > 0 ? clamp(Number(spec.sw), 0.5, 40) : widths.medium,
+    sketch: spec.sketch === 0 ? 0 : 1, round: 1,
+    opacity: spec.opacity != null ? clamp(Number(spec.opacity), 0, 100) : 100,
+    fillOpacity: spec.fillOpacity != null ? clamp(Number(spec.fillOpacity), 0, 100) : 100,
     font: (typeof spec.font === 'string' && FONTS[spec.font]) ? spec.font
       : (typeof spec.font === 'string' && spec.font.startsWith('cg:') && ensureCustomFont(spec.font)) ? spec.font
       : (typeof spec.font === 'string' && /^[A-Z][A-Za-z0-9 ]{2,30}$/.test(spec.font) && ensureCustomFont('cg:' + spec.font)) ? 'cg:' + spec.font
@@ -7715,8 +7733,8 @@ function claudeBuildElement(spec, idMap){
   if (kind === 'arrow' || kind === 'line'){
     el.curve = 0;
     el.elbow = !!spec.elbow;
-    el.startHead = 'none';
-    el.endHead = kind === 'arrow' ? 'arrow' : 'none';
+    el.startHead = HEAD_KINDS.includes(spec.startHead) ? spec.startHead : 'none';
+    el.endHead = HEAD_KINDS.includes(spec.endHead) ? spec.endHead : (kind === 'arrow' ? 'arrow' : 'none');
     const fromId = spec.from && idMap.get(String(spec.from));
     const toId = spec.to && idMap.get(String(spec.to));
     if (fromId && toId && fromId !== toId){
@@ -7743,9 +7761,16 @@ function claudeCompact(el){
   if (el.text) c.text = el.text;
   if (el.stroke && el.stroke !== 'ink') c.stroke = el.stroke;
   if (el.fill && el.fill !== 'none') c.fill = el.fill;
+  if (el.sw != null) c.sw = Math.round(el.sw * 10) / 10;
+  if (el.sketch === 0) c.sketch = 0;
+  if (el.fillStyle && el.fillStyle !== 'solid') c.fillStyle = el.fillStyle;
+  if (el.opacity != null && el.opacity < 100) c.opacity = el.opacity;
+  if (el.fillOpacity != null && el.fillOpacity < 100) c.fillOpacity = el.fillOpacity;
   if (el.type === 'arrow' || el.type === 'line'){
     if (el.startBind) c.from = el.startBind;
     if (el.endBind) c.to = el.endBind;
+    if (el.startHead && el.startHead !== 'none') c.startHead = el.startHead;
+    if (el.endHead) c.endHead = el.endHead;
   }
   if (el.type === 'icon') c.icon = el.kind;
   if (el.textColor) c.textColor = el.textColor;
@@ -7841,6 +7866,11 @@ async function claudeExecute(action, args){
         if (!u.mindRoot) delete el.mindRoot;
       }
       if (u.sketch !== undefined) el.sketch = u.sketch === 0 ? 0 : 1;
+      if (u.sw !== undefined && Number(u.sw) > 0) el.sw = clamp(Number(u.sw), 0.5, 40);
+      if (u.opacity !== undefined && Number(u.opacity) >= 0) el.opacity = clamp(Number(u.opacity), 0, 100);
+      if (u.fillOpacity !== undefined && Number(u.fillOpacity) >= 0) el.fillOpacity = clamp(Number(u.fillOpacity), 0, 100);
+      if (u.startHead !== undefined && HEAD_KINDS.includes(u.startHead)) el.startHead = u.startHead;
+      if (u.endHead !== undefined && HEAD_KINDS.includes(u.endHead)) el.endHead = u.endHead;
       if (el.type === 'text') autosizeText(el);
       delete el._prims; delete el._pkey;
     }

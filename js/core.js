@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.65.1';
+const APP_VERSION = '3.66.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -1245,22 +1245,40 @@ function drawArrowhead(ctx, x, y, angle, size, el){
   ctx.lineTo(x + Math.cos(a2) * size, y + Math.sin(a2) * size);
   ctx.stroke();
 }
-/* head kinds: 'arrow' open V · 'triangle' hollow outline · 'circle' ring */
+/* head kinds: 'arrow' open V · 'triangle'/'triangle-filled' · 'diamond'/'diamond-filled'
+   · 'circle'/'circle-filled' · 'bar' (perpendicular stop). '-filled' paints the stroke color. */
 function headGeometry(el, kind, x, y, angle, size){
   const rnd = new Rand(el.seed + 5);
-  if (kind === 'triangle'){
+  const filled = /-filled$/.test(kind);
+  const base = kind.replace(/-filled$/, '');
+  if (base === 'triangle'){
     const spread = 0.5;
     const a1 = angle + Math.PI - spread + rnd.jitter(0.04);
     const a2 = angle + Math.PI + spread + rnd.jitter(0.04);
-    return { tri: [
+    return { filled, tri: [
       [x, y],
       [x + Math.cos(a1) * size * 1.15, y + Math.sin(a1) * size * 1.15],
       [x + Math.cos(a2) * size * 1.15, y + Math.sin(a2) * size * 1.15],
     ] };
   }
-  if (kind === 'circle'){
+  if (base === 'diamond'){
+    const ux = Math.cos(angle), uy = Math.sin(angle), px = -uy, py = ux;
+    const L = size * 1.6, half = size * 0.55;
+    const mx = x - ux * L / 2, my = y - uy * L / 2;
+    return { filled, poly: [
+      [x, y],
+      [mx + px * half, my + py * half],
+      [x - ux * L, y - uy * L],
+      [mx - px * half, my - py * half],
+    ] };
+  }
+  if (base === 'circle'){
     const r = size * 0.42;
-    return { circ: [x - Math.cos(angle) * r, y - Math.sin(angle) * r, r] };
+    return { filled, circ: [x - Math.cos(angle) * r, y - Math.sin(angle) * r, r] };
+  }
+  if (base === 'bar'){
+    const px = -Math.sin(angle), py = Math.cos(angle), half = size * 0.75;
+    return { seg: [[x + px * half, y + py * half], [x - px * half, y - py * half]] };
   }
   return null;
 }
@@ -1268,16 +1286,28 @@ function drawHead(ctx, el, kind, x, y, angle, size, bg){
   if (kind === 'arrow'){ drawArrowhead(ctx, x, y, angle, size, el); return; }
   const g = headGeometry(el, kind, x, y, angle, size);
   if (!g) return;
+  if (g.seg){                                   // bar: a plain perpendicular stroke
+    ctx.beginPath();
+    ctx.moveTo(g.seg[0][0], g.seg[0][1]);
+    ctx.lineTo(g.seg[1][0], g.seg[1][1]);
+    ctx.stroke();
+    return;
+  }
+  const poly = g.tri || g.poly;
   ctx.beginPath();
-  if (g.tri){
-    ctx.moveTo(g.tri[0][0], g.tri[0][1]);
-    ctx.lineTo(g.tri[1][0], g.tri[1][1]);
-    ctx.lineTo(g.tri[2][0], g.tri[2][1]);
+  if (poly){
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0], poly[i][1]);
     ctx.closePath();
   } else {
     ctx.arc(g.circ[0], g.circ[1], g.circ[2], 0, TAU);
   }
-  if (bg){ ctx.fillStyle = bg; ctx.fill(); } // hollow: paper shows through
+  if (g.filled){
+    ctx.fillStyle = ctx.strokeStyle;            // filled: paint in the stroke color
+    ctx.fill();
+  } else if (bg){
+    ctx.fillStyle = bg; ctx.fill();             // hollow: paper shows through
+  }
   ctx.stroke();
 }
 
@@ -2286,6 +2316,9 @@ function drawElement(ctx, el, pal, bg){
   if (el.fill && el.fill !== 'none'){
     const fillColor = resolveFill(pal, el.fill);
     if (fillColor){
+      const fo = el.fillOpacity == null ? 100 : el.fillOpacity;
+      const baseA = ctx.globalAlpha;                 // fillOpacity fades ONLY the fill
+      if (fo < 100) ctx.globalAlpha = baseA * fo / 100;
       if (el.fillStyle && el.fillStyle !== 'solid'){
         patternFill(ctx, outline, el, fillColor);
       } else {
@@ -2293,6 +2326,7 @@ function drawElement(ctx, el, pal, bg){
         ctx.fillStyle = fillColor;
         ctx.fill();
       }
+      if (fo < 100) ctx.globalAlpha = baseA;
     }
   }
   /* image fill: a pasted picture clipped by the shape, cover-fit */
@@ -2648,11 +2682,15 @@ function renderSceneSVG(elements, opts){
     if (kind === 'arrow') return arrowheadSVG(el, x, y, angle, size);
     const g = headGeometry(el, kind, x, y, angle, size);
     if (!g) return '';
-    const fill = opts.transparent ? 'none' : (opts.bg || pal.bg);
     const col = resolveStroke(pal, el.stroke) || pal.stroke.ink;
+    if (g.seg)
+      return `<path d="M${svgNum(g.seg[0][0])} ${svgNum(g.seg[0][1])}L${svgNum(g.seg[1][0])} ${svgNum(g.seg[1][1])}" fill="none" stroke="${col}" stroke-width="${svgNum(el.sw)}" stroke-linecap="round"/>`;
+    const hollowFill = opts.transparent ? 'none' : (opts.bg || pal.bg);
+    const fill = g.filled ? col : hollowFill;
     const attrs = `fill="${fill}" stroke="${col}" stroke-width="${svgNum(el.sw)}" stroke-linejoin="round"`;
-    if (g.tri)
-      return `<path d="${dPolygon(g.tri, true)}" ${attrs}/>`;
+    const poly = g.tri || g.poly;
+    if (poly)
+      return `<path d="${dPolygon(poly, true)}" ${attrs}/>`;
     return `<circle cx="${svgNum(g.circ[0])}" cy="${svgNum(g.circ[1])}" r="${svgNum(g.circ[2])}" ${attrs}/>`;
   };
 

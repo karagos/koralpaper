@@ -180,6 +180,9 @@
   <div class="island stylePanel hidden" id="stylePanel">
     <div class="row" id="rowStroke"><label id="strokeLabel">Outline</label><div class="swatches" id="strokeSwatches"></div></div>
     <div class="row" id="rowFill"><label>Fill</label><div class="swatches" id="fillSwatches"></div></div>
+    <div class="row" id="rowFillOpacity"><label>Fill opacity <span class="labelval" id="fillOpacityVal"></span></label>
+      <input type="range" id="fillOpacityRange" min="0" max="100" step="5" value="100">
+    </div>
     <div class="row" id="rowArt"><label>Photo style</label>
       <div class="segment" id="artSeg">
         <button data-art="photo" title="Original photo">Photo</button>
@@ -268,14 +271,24 @@
           <option value="none">Start: none</option>
           <option value="arrow">Start: ← arrow</option>
           <option value="triangle">Start: ◁ triangle</option>
+          <option value="triangle-filled">Start: ◀ solid triangle</option>
+          <option value="diamond">Start: ◇ diamond</option>
+          <option value="diamond-filled">Start: ◆ solid diamond</option>
           <option value="circle">Start: ○ circle</option>
+          <option value="circle-filled">Start: ● solid circle</option>
+          <option value="bar">Start: | bar</option>
         </select>
         <select id="endHeadSel" class="fontselect" title="Head at the end of the line">
           <option value="" hidden>—</option>
           <option value="none">End: none</option>
           <option value="arrow">End: → arrow</option>
           <option value="triangle">End: ▷ triangle</option>
+          <option value="triangle-filled">End: ▶ solid triangle</option>
+          <option value="diamond">End: ◇ diamond</option>
+          <option value="diamond-filled">End: ◆ solid diamond</option>
           <option value="circle">End: ○ circle</option>
+          <option value="circle-filled">End: ● solid circle</option>
+          <option value="bar">End: | bar</option>
         </select>
       </div>
     </div>
