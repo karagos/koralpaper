@@ -6878,7 +6878,7 @@ const BRAND_KEY = 'koralpaper.brand';
    secondary (support, second series), an expandable palette (extra
    categorical variety), and neutrals — paper (background), ink (outlines
    and body text) and an optional muted gray. brandAccents() flattens the
-   roles into the ordered list charts and the restyle consumers use, so the
+   roles into the ordered list charts and swatches use, so the
    role order IS the mapping. Old single-array kits migrate automatically. */
 function brandHex(v){ return (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ? v.toLowerCase() : null; }
 /* the "basic elements" a brand carries beyond color+fonts: how lines, shapes,

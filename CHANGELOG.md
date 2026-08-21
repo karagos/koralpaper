@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.80.1
+
+**The Brand kit now says where it applies.** Its description still mentioned the removed restyle, and never listed what it actually governs. It now spells it out: charts use your colors in role order, every new element you draw starts in your line style, weight, corners, fill and arrowheads, new documents open on your paper, templates and headlines use your heading font, your colors appear as extra swatches, and Claude draws on brand through the MCP bridge.
+
 ## v3.80.0
 
 **"Make it mine" has been removed.** The one-step restyle never became reliable on real documents, so it is gone rather than left in the app half-working. Removed: the restyle engine and its color mapping, the dialog and all its options, the ☰ menu item, both right-click entries, the command palette entry, and the help sections describing it.
