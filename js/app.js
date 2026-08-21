@@ -676,7 +676,7 @@ function setStorageWarn(on){
   $('storageWarn').classList.toggle('hidden', !on);
 }
 // the one place the document is written to local storage. Returns true on success
-// so callers that MUST persist (a whole-document restyle) can react to a failure
+// so callers that MUST persist can react to a failure
 // instead of silently losing the work on the next reload.
 function writeAutosave(){
   try {
@@ -2148,7 +2148,6 @@ function openCtxMenu(ev){
       () => toggleLockSelection(!anyLocked));
     add('Delete', deleteSelection);
     hr();
-    add(sel.length > 1 ? 'Make these mine (restyle)' : 'Make it mine (restyle)', openRestyleDialog);
     if (sel.length >= 2) add('Group', () => { groupSelection(); syncPanel(); });
     if (sel.some(e => e.groupId)) add('Ungroup', () => { ungroupSelection(); syncPanel(); });
     if (sel.length >= 2 || sel.some(e => e.groupId)) hr();
@@ -2161,7 +2160,6 @@ function openCtxMenu(ev){
     add('Select all', () => { setSelection(new Set(state.elements.filter(e => !e.locked).map(e => e.id))); setTool('select'); });
     add('Zoom to fit', zoomToFit);
     add('Tidy the flow', tidyLayout);
-    if (state.elements.length) add('Make this page mine (restyle)', openRestyleDialog);
   }
   closeMenus();
   menu.classList.remove('hidden');
@@ -4486,317 +4484,6 @@ function setPanelTab(t){
   $('claudePane').classList.toggle('hidden', t !== 'claude');
   $('settingsPane').classList.toggle('hidden', t !== 'settings');
 }
-/* ── "Make it mine" restyle engine ──────────────────
-   Recast a page (or the selection) into the user's brand kit: colors mapped
-   to their accents, headings/body in their fonts, one consistent hand-drawn
-   character (re-seeded so nothing looks templated), and tidy line weights. */
-const RS_HOUSE = ['coral','periwinkle','sage','butter','terracotta','sky'];
-function rsHex(val){
-  if (!val || val === 'none') return null;
-  if (typeof val === 'string' && val[0] === '#') return val.toLowerCase();
-  const p = pal();
-  const h = resolveFill(p, val) || resolveStroke(p, val);
-  return h ? h.toLowerCase() : null;
-}
-function rsHsl(hex){
-  let x = hex.slice(1);
-  if (x.length === 3) x = x[0]+x[0]+x[1]+x[1]+x[2]+x[2];
-  const r = parseInt(x.slice(0,2),16)/255, g = parseInt(x.slice(2,4),16)/255, b = parseInt(x.slice(4,6),16)/255;
-  const mx = Math.max(r,g,b), mn = Math.min(r,g,b), l = (mx+mn)/2, d = mx-mn;
-  const s = d === 0 ? 0 : d / (1 - Math.abs(2*l-1));
-  return { s, l };
-}
-function rsColored(hex){                        // a real design color, as opposed to structure
-  if (!hex) return false;
-  const { s, l } = rsHsl(hex);
-  if (l >= 0.965 || l <= 0.10) return false;  // near-white/paper and near-black/ink are structure, left alone
-  // pale tints of gray (a #cbd5e0 divider rule) are structure, not brand color: as a color gets
-  // lighter it must be more saturated to count, or thin footer rules steal an accent
-  return l > 0.75 ? s >= 0.40 : s >= 0.13;
-}
-function rsAccents(){
-  const list = (brandActive() ? brandAccents() : RS_HOUSE.map(t => rsHex(t)).filter(Boolean)).filter(Boolean);
-  // For restyle, lead with the CHROMATIC brand colors. A near-neutral primary (e.g. black) would
-  // otherwise swallow every dominant shape, burying your real accent — text/structure already go to
-  // ink separately, so demote near-neutral brand colors to the end. Stable: chromatic order kept.
-  const chromatic = h => { const { s, l } = rsHsl(h); return (l > 0.10 && l < 0.965 && s >= 0.2) ? 1 : 0; };
-  return list.map((h, i) => [h, i]).sort((a, b) => (chromatic(b[0]) - chromatic(a[0])) || (a[1] - b[1])).map(e => e[0]);
-}
-/* Build the COMPLETE color translation table once, for everything being restyled.
-   Two problems this solves:
-   1. Per-page maps made the same source color land differently on each slide.
-   2. Flattening every light fill to Paper destroyed diagrams, which encode their
-      hierarchy as a tint ladder (dark node -> mid -> light -> near-white).
-   So: group the source's colors into hue families, give each family one of your
-   brand colors by how much of the document it covers, then reproduce that family's
-   own light-to-dark ladder in your brand color. Nothing is invented out of thin
-   air: every result is a kit color or a tint of one, and a source color always
-   translates to the same result everywhere. Add accents to your palette and the
-   families use them directly instead of needing tints. */
-function rsHue(hex){ return hexToHsl(hex).h; }
-function rsTint(baseHex, srcHex){
-  const b = hexToHsl(baseHex), c = hexToHsl(srcHex);
-  return hslToHex(b.h, Math.min(b.s, Math.max(c.s, 0.05)), c.l);   // brand hue, this rung's lightness
-}
-function rsBuildMap(arrays){
-  const accents = rsAccents();
-  const B = brandActive() ? brand : null;
-  const PAPER = B ? B.paper : 'cream', INK = B ? B.ink : 'ink';
-  const MUTED = (B && B.muted) ? B.muted : INK;
-  const paperHex = rsHex(PAPER), inkHex = rsHex(INK), mutedHex = rsHex(MUTED);
-  // 1. collect every source color with the weight of where it is used
-  const seen = new Map();                                  // hex -> weight
-  const bump = (val, w) => { const h = rsHex(val); if (h) seen.set(h, (seen.get(h) || 0) + w); };
-  for (const els of arrays) for (const el of els){
-    if (!el || el.type === 'image' || el.type === 'text') continue;
-    let b; try { b = boundsOf(el); } catch (e){ continue; }
-    if (!b) continue;
-    if (isLinear(el)){ bump(el.stroke, Math.max(b.w, b.h) * 8); continue; }
-    const area = Math.max(1, b.w * b.h);
-    if (el.fill && el.fill !== 'none') bump(el.fill, area); else bump(el.stroke, area * 0.5);
-  }
-  // 2. group into hue families; everything desaturated is one neutral family
-  const fams = [];                                         // {hue, neutral, weight, colors[]}
-  for (const [hex, w] of [...seen.entries()].sort((a, b2) => b2[1] - a[1])){
-    const { s, l } = rsHsl(hex);
-    const neutral = !rsColored(hex);
-    const hue = rsHue(hex);
-    let f = fams.find(x => x.neutral === neutral &&
-      (neutral || Math.min(Math.abs(x.hue - hue), 360 - Math.abs(x.hue - hue)) <= 30));
-    if (!f){ f = { hue, neutral, weight: 0, colors: [] }; fams.push(f); }
-    f.weight += w; f.colors.push(hex);
-  }
-  // 3. the biggest colored family gets your first accent, next gets the second, and so on
-  fams.sort((a, b2) => b2.weight - a.weight);
-  let ai = 0;
-  const map = new Map();
-  for (const f of fams){
-    const base = f.neutral ? MUTED : (accents.length ? accents[ai++ % accents.length] : null);
-    const baseHex = rsHex(base);
-    for (const hex of f.colors){
-      const { l } = rsHsl(hex);
-      if (l >= 0.93 && paperHex){ map.set(hex, PAPER); continue; }   // a white card stays a white card
-      if (l <= 0.10 && inkHex){ map.set(hex, INK); continue; }       // near-black stays structure
-      if (!baseHex){ map.set(hex, hex); continue; }
-      // one rung of the ladder: your brand color kept at THIS rung's own lightness,
-      // always, so a light node stays light and the hierarchy survives intact
-      map.set(hex, rsTint(baseHex, hex));
-    }
-  }
-  return map;
-}
-/* Recolor by consulting the table above. Application is a pure lookup, so what
-   you get can never drift from the plan the table describes. */
-function restyleColors(els, map, roles){
-  if (!map) map = rsBuildMap([els]);
-  const B = brandActive() ? brand : null;
-  const INK   = B ? B.ink : 'ink';
-  const PAPER = B ? B.paper : 'cream';
-  const MUTED = (B && B.muted) ? B.muted : INK;
-  const inkHex = rsHex(INK), paperHex = rsHex(PAPER);
-  const look = val => { const h = rsHex(val); return (h && map.has(h)) ? map.get(h) : val; };
-  // an edge or rule is structure: keep subtle ones subtle, but make them consistent
-  const edge = val => { const h = rsHex(val); return (h && rsHsl(h).l > 0.55) ? MUTED : INK; };
-  for (const el of els){
-    if (!el) continue;
-    try {
-      if (el.type === 'image'){ delete el._tintCv; continue; }
-      if (el.type === 'text'){
-        el.stroke = INK;                                    // all text reads as ink: one consistent, legible color
-        if (el.textColor && el.textColor !== 'auto') el.textColor = INK;
-      } else if (isLinear(el)){
-        if (el.stroke && el.stroke !== 'none')
-          el.stroke = rsColored(rsHex(el.stroke)) ? look(el.stroke) : edge(el.stroke);
-      } else {
-        const filled = el.fill && el.fill !== 'none';
-        if (filled) el.fill = look(el.fill);                // the ladder rung this fill belongs to
-        if (el.stroke && el.stroke !== 'none')
-          el.stroke = (!filled && rsColored(rsHex(el.stroke))) ? look(el.stroke) : edge(el.stroke);
-        // contrast safety: a label always lands on whichever of ink/paper reads on its own fill
-        if (el.text && String(el.text).trim()){
-          const bg = filled ? rsHex(el.fill) : paperHex;
-          el.textColor = (bg && inkHex && paperHex && contrastRatio(paperHex, bg) > contrastRatio(inkHex, bg)) ? PAPER : INK;
-        }
-      }
-      delete el._prims; delete el._pkey; delete el._tintCv;
-    } catch (e){ /* skip this element, keep restyling the rest */ }
-  }
-  if (roles) rsApplyRoles(els);
-}
-/* ── role rules: where Primary and Secondary actually go ──────────────
-   Rank-mapping alone only restates colors the source already had, so a
-   monochrome deck stays monochrome and your accent shows up nowhere. These
-   rules place the brand by MEANING instead, the same on every page:
-     Primary   → the page headline (the biggest display text)
-     Secondary → key figures: the big number/label inside a card
-     Ink       → all other text; Paper → backgrounds and light cards
-   Every assignment is contrast-checked, so a role can never make text unreadable. */
-function rsApplyRoles(els){
-  if (!brandActive()) return;
-  const P = brand.primary, S = brand.secondary, INK = brand.ink, PAPER = brand.paper;
-  const texts = els.filter(e => e && (e.type === 'text' || (e.text && String(e.text).trim())));
-  if (!texts.length) return;
-  const maxSize = Math.max(...texts.map(e => e.size || 21));
-  const reads = (fg, bg) => { const a = rsHex(fg), b = rsHex(bg); return !!(a && b && contrastRatio(a, b) >= 3); };
-  for (const el of texts){
-    try {
-      const size = el.size || 21;
-      if (el.type === 'text'){
-        // the headline: display-sized and the largest thing on the page
-        if (size >= 28 && size >= maxSize * 0.9 && reads(P, PAPER)) el.stroke = P;
-      } else {
-        // a figure sitting inside a card: the deck's secondary emphasis
-        const bg = (el.fill && el.fill !== 'none') ? el.fill : PAPER;
-        if (size >= 24 && size >= maxSize * 0.55 && reads(S, bg)) el.textColor = S;
-      }
-      delete el._prims; delete el._pkey;
-    } catch (e){}
-  }
-}
-function restyleFonts(els){
-  const head = brandActive() ? brand.headFont : 'serif';
-  const body = brandActive() ? brand.bodyFont : 'sans';
-  for (const f of [head, body]){ ensureCustomFont(f); if (f.startsWith('cg:')){ loadFontCssFor(f.slice(3).trim()); rememberGFont(f.slice(3).trim()); } }
-  const sizes = els.filter(e => e && e.text && String(e.text).trim()).map(e => e.size || 21).sort((a,b) => a-b);
-  const med = sizes.length ? sizes[sizes.length >> 1] : 21;
-  const thresh = Math.max(28, med * 1.35);
-  for (const el of els){
-    if (!el) continue;
-    if (!(el.text && String(el.text).trim()) && el.type !== 'text') continue;
-    el.font = (el.size || 21) >= thresh ? head : body;
-    try { if (el.type === 'text') autosizeText(el); } catch (e){}
-  }
-}
-// the house look when no brand kit is active
-function houseStyle(){ return { sketch: 1, dash: 'solid', weight: 'medium', round: 1, fillStyle: 'solid', startHead: 'none', endHead: 'arrow' }; }
-// apply the brand's style basics — line style, weight, corners, fill, arrowheads — uniformly
-function restyleStyle(els){
-  const st = (brandActive() && brand.style) ? brand.style : houseStyle();
-  const sw = swForWeight(st.weight);
-  for (const el of els){
-    if (!el || el.type === 'image' || el.type === 'text') continue;
-    el.sketch = st.sketch;
-    if (typeof el.sw === 'number') el.sw = sw;
-    if (st.sketch) el.seed = Math.floor(Math.random() * 2 ** 31);  // fresh wobble only when hand-drawn
-    if (isLinear(el)){
-      el.dash = st.dash;
-      if (el.endHead && el.endHead !== 'none') el.endHead = st.endHead;     // restyle existing arrowheads; never add heads to plain lines
-      if (el.startHead && el.startHead !== 'none') el.startHead = st.startHead;
-    } else {
-      el.round = st.round;
-      if (el.fill && el.fill !== 'none' && 'fillStyle' in el) el.fillStyle = st.fillStyle;
-    }
-    delete el._prims; delete el._pkey;
-  }
-}
-/* the document invariants a restyle must never break. Checked after the run:
-   if any of them fails we roll the whole document back rather than leave the
-   user with a canvas that looks like pages went missing. */
-function docIntact(expectPages){
-  if (!Array.isArray(state.pages) || state.pages.length !== expectPages) return false;
-  if (!(state.pageIndex >= 0 && state.pageIndex < state.pages.length)) return false;
-  for (const p of state.pages) if (!p || !Array.isArray(p.elements)) return false;
-  if (state.elements !== state.pages[state.pageIndex].elements) return false;
-  return true;
-}
-function makeItMine(opts){
-  syncPageRef();                                       // flush the live current-page array into state.pages
-  const sel = state.selection.size;
-  const allPages = !!opts.allPages && !sel && state.pages.length > 1;
-  const pageCount = state.pages.length;
-  // one or more element arrays to restyle
-  const targets = sel ? [selected()]
-    : allPages ? state.pages.map(p => p.elements)
-    : [state.elements];
-  const total = targets.reduce((n, a) => n + a.length, 0);
-  if (!total){ showHint('Nothing to restyle' + (allPages ? '' : ' on this page')); return; }
-  // ATOMIC: a restyle touches every page, so nothing may leave the document
-  // half-changed. Snapshot first; on any error put it back exactly as it was.
-  let before;
-  try { before = serialize(); }
-  catch (e){ console.error('restyle: could not snapshot the document', e);
-    showHint('Could not restyle: this document could not be safely copied first'); return; }
-  const rollback = why => {
-    try { restore(before); } catch (e){ console.error('rollback failed', e); }
-    console.error('Make it mine failed:', why);
-    showHint('Could not restyle: the document was put back unchanged');
-  };
-  try {
-    // ONE map for every page in this restyle, so a color maps identically everywhere
-    const cmap = opts.colors ? rsBuildMap(targets) : null;
-    for (const els of targets){
-      if (opts.colors) restyleColors(els, cmap, opts.roles !== false);
-      if (opts.fonts) restyleFonts(els);
-      if (opts.style) restyleStyle(els);
-    }
-    // making it yours includes the page itself, so backgrounds stop keeping the template's color
-    if (opts.colors && !sel && brandActive() && brand.paper){
-      if (allPages){ state.pages.forEach(p => p.bg = brand.paper); state.bgColor = brand.paper; }
-      else state.pages[state.pageIndex].bg = brand.paper;  // page-scoped: never repaint pages we did not restyle
-    }
-    for (const els of targets){ try { updateBoundArrows(els); } catch (e){ console.error('bound arrows', e); } }
-    try { preloadDocFonts(); } catch (e){ console.error('font preload', e); }
-  } catch (err){ rollback(err); return; }
-  // the restyle itself succeeded; verify we did not corrupt the document
-  if (!docIntact(pageCount)){ rollback('document invariants broken'); return; }
-  // PROVE IT DRAWS before we keep it. Every page is rendered once off-screen; if any
-  // page cannot be drawn we roll back, so a restyle can never blank out the canvas.
-  try {
-    const probe = document.createElement('canvas');
-    probe.width = 160; probe.height = 100;
-    const pctx = probe.getContext('2d');
-    for (const pg of state.pages){
-      renderScene(pctx, pg.elements, { width: 160, height: 100,
-        camera: { x: 0, y: 0, z: 0.05 }, pal: pal(), grid: false,
-        bg: pageBgOf(pg), hideBoardFrame: true });
-    }
-  } catch (e){ rollback('the restyled document could not be drawn: ' + e); return; }
-  // PERSIST FIRST, before any UI work: a later UI error must never cost the user
-  // the restyle itself (that is why a reload used to show the old, unstyled deck)
-  let saved = true;
-  try { commit(); } catch (e){ console.error('commit failed', e); }
-  try { saved = flushAutosave(); } catch (e){ console.error('autosave failed', e); saved = false; }
-  // every UI refresh is independently guarded: one failing repaint cannot stop the rest
-  const ui = [
-    ['page strip', () => buildPageStrip()],
-    ['canvas', () => requestRender()],
-    ['panel', () => syncPanel()],
-    ['paper', () => { if (typeof syncPaperUI === 'function') syncPaperUI(); }],
-  ];
-  for (const [what, fn] of ui){ try { fn(); } catch (e){ console.error('restyle: refreshing the ' + what + ' failed', e); } }
-  if (opts.tidy){ try { tidyLayout(); } catch (e){ console.error('tidy failed', e); } }
-  const scope = allPages ? 'all ' + pageCount + ' pages' : 'this page';
-  if (!saved){
-    showHint('Restyled ' + scope + ', but this browser could not save it: use Save sketch (.json) now');
-    return;
-  }
-  showHint(brandActive() ? 'Made ' + scope + ' yours: your colors, fonts and style ✳ (⌘Z to undo)'
-    : 'Restyled ' + scope + ' in the house look ✳ set a Brand kit in Settings to use your own (⌘Z to undo)');
-}
-function openRestyleDialog(){
-  closeMenus();
-  const on = brandActive();
-  $('restyleBrandNote').textContent = on
-    ? 'Recast this page in your brand kit: ' + (brand.name || 'your brand') + '.'
-    : 'No brand kit is active, so this uses a house style. Set your own in Settings → Brand kit.';
-  const sel = state.selection.size, multi = state.pages.length > 1;
-  // the "all pages" choice only makes sense for a whole-page restyle across a multi-page doc
-  $('rsAllPagesRow').style.display = (!sel && multi) ? '' : 'none';
-  if (sel || !multi) $('rsAllPages').checked = false;
-  $('restyleScopeNote').textContent = sel
-    ? 'Applies to your ' + sel + ' selected element' + (sel > 1 ? 's' : '') + '.'
-    : multi
-      ? 'Applies to this page. Tick “All pages” to restyle the whole document, or select elements first for just those.'
-      : 'Applies to the whole page. Select elements first to restyle only those.';
-  $('restyleDialog').classList.remove('hidden');
-}
-$('restyleApplyBtn').addEventListener('click', () => {
-  $('restyleDialog').classList.add('hidden');
-  makeItMine({ colors: $('rsColors').checked, fonts: $('rsFonts').checked,
-    roles: $('rsRoles').checked, style: $('rsStyle').checked, tidy: $('rsTidy').checked,
-    allPages: $('rsAllPages').checked });
-});
-$('restyleCancelBtn').addEventListener('click', () => $('restyleDialog').classList.add('hidden'));
 
 /* ── command palette (⌘K) ───────────────────────────
    Fuzzy search over every tool, action, page, template and font. */
@@ -4841,7 +4528,6 @@ function buildCommands(){
    ['pentagon','polygon',{sides:5}],['hexagon','polygon',{sides:6}],['octagon','polygon',{sides:8}],['label chip','chip'],['text box','text']]
     .forEach(([n,t,extra]) => add('Insert a ' + n, 'Insert', () => insertShapeAtCenter(t, extra || {}), 'add new ' + n + ' ' + t));
   add('Insert chart or table', 'Insert', () => chartOpen(null), 'graph bar line pie donut spider table data', 'B');
-  add('Make it mine (restyle to brand)', 'Edit', openRestyleDialog, 'rebrand recolor restyle brand kit fonts hand-drawn');
   // Pages
   add('Add page to the right', 'Page', () => insertPageAt(state.pageIndex + 1), 'new page after');
   add('Add page to the left', 'Page', () => insertPageAt(state.pageIndex), 'new page before');
@@ -5437,7 +5123,6 @@ function runFileAction(act){
   if (act === 'open') fileInput.click();
   if (act === 'save') saveJSON();
   if (act === 'snapshots') openSnapDialog();
-  if (act === 'restyle') openRestyleDialog();
   if (act === 'gif') openGifDialog();
   if (act === 'timelapse') tlToggleBar();
   if (act === 'image') $('imgInput').click();
@@ -7193,7 +6878,7 @@ const BRAND_KEY = 'koralpaper.brand';
    secondary (support, second series), an expandable palette (extra
    categorical variety), and neutrals — paper (background), ink (outlines
    and body text) and an optional muted gray. brandAccents() flattens the
-   roles into the ordered list charts and "Make it mine" consume, so the
+   roles into the ordered list charts and the restyle consumers use, so the
    role order IS the mapping. Old single-array kits migrate automatically. */
 function brandHex(v){ return (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ? v.toLowerCase() : null; }
 /* the "basic elements" a brand carries beyond color+fonts: how lines, shapes,
@@ -8633,7 +8318,6 @@ window.addEventListener('keydown', ev => {
     $('chartDialog').classList.add('hidden');
     $('snapDialog').classList.add('hidden');
     $('gifDialog').classList.add('hidden');
-    $('restyleDialog').classList.add('hidden');
     return; }
   if (ev.key === 'Enter'){
     const sel = selected();

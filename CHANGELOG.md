@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.80.0
+
+**"Make it mine" has been removed.** The one-step restyle never became reliable on real documents, so it is gone rather than left in the app half-working. Removed: the restyle engine and its color mapping, the dialog and all its options, the ☰ menu item, both right-click entries, the command palette entry, and the help sections describing it.
+
+**Nothing else was rolled back.** The Brand kit is untouched and still does everything it did: colors with roles (Primary, Secondary, an expandable accent palette, Paper, Ink, Muted), the one-color system generator, the contrast check, and the Style section for line style, weight, corners, fill and arrowheads. Charts, swatches, new documents, every new element you draw and Claude all still follow your kit.
+
+Two robustness fixes made during that work are also kept, because they protect the whole app and are unrelated to the removed feature: a page thumbnail that fails to draw can no longer truncate the page strip (which was the real cause of pages appearing to vanish), and saving to local storage now reports failure instead of failing silently.
+
 ## v3.79.0
 
 **Restyle keeps a design's structure instead of flattening it, and can no longer blank a page.**

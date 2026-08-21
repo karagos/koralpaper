@@ -970,7 +970,3 @@ body.dark #tooltip{box-shadow:0 4px 14px -4px rgba(0,0,0,.7);}
 .cmdfoot{display:flex; gap:16px; justify-content:center; padding:8px; border-top:1.5px solid var(--line-soft);
   font-size:11px; color:var(--ink-soft); opacity:.75;}
 
-/* make-it-mine restyle dialog */
-.restyledialog{width:380px;}
-.restyleopts{display:flex; flex-direction:column; gap:9px; margin:10px 0 2px;}
-.restyleopts .chartcheck{font-size:13px;}
