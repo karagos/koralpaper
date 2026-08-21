@@ -1,5 +1,24 @@
 # KoralPaper — Changelog
 
+## v3.78.0
+
+**Primary and Secondary now go where they belong, and a restyle can never lose your pages.**
+
+**Role rules.** Until now restyle only restated colors the original already used, so a near-monochrome deck stayed monochrome and your accent turned up in odd places like a footer rule. Colors are now placed by meaning, identically on every page:
+
+| Role | Where it goes |
+|---|---|
+| **Primary** | the page headline, the biggest display text |
+| **Secondary** | key figures: the big number or label inside a card |
+| **Accent palette** | any other colors the original used, ranked by how much of the page they cover |
+| **Ink** | all other text, and every outline |
+| **Paper** | the page background and light cards |
+| **Muted** | thin rules, dividers and grey connectors |
+
+Every placement is contrast-checked, so a role can never make text unreadable, and restyle still uses only colors that exist in your kit. A new **Roles** toggle in the restyle dialog turns this off if you would rather it simply restate the original's own colors.
+
+**Restyle is now atomic.** A single malformed element could throw partway through and leave the document half-changed (pages appearing to vanish until a reload). The whole operation is now snapshot-protected: if anything fails, the document is put back exactly as it was and you are told. Individual elements that cannot be restyled are skipped instead of stopping the run, and the page strip is rebuilt after an all-pages restyle.
+
 ## v3.77.1
 
 **"Make it mine" is now consistent across a whole document, and uses only your kit's colors.** Three real bugs, found restyling an 11-page deck:

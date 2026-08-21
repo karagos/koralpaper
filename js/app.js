@@ -4513,8 +4513,9 @@ function rsBuildMap(arrays){
   const weight = new Map();
   const bump = (val, area) => { const h = rsHex(val); if (h && rsColored(h)) weight.set(h, (weight.get(h) || 0) + area); };
   for (const els of arrays) for (const el of els){
-    if (el.type === 'image' || el.type === 'text') continue;      // text always goes to ink, never to an accent
-    const b = boundsOf(el);
+    if (!el || el.type === 'image' || el.type === 'text') continue; // text always goes to ink, never to an accent
+    let b; try { b = boundsOf(el); } catch (e){ continue; }         // a malformed element is skipped, never fatal
+    if (!b) continue;
     if (isLinear(el)){ bump(el.stroke, Math.max(b.w, b.h) * 8); continue; }
     const area = Math.max(1, b.w * b.h);
     const fh = rsHex(el.fill), filled = el.fill && el.fill !== 'none' && fh;
@@ -4529,7 +4530,7 @@ function rsBuildMap(arrays){
 }
 /* Recolor using ONLY colors that exist in the kit. Never invents a tint: every
    result is your primary, secondary, a palette accent, your paper, ink or muted. */
-function restyleColors(els, map){
+function restyleColors(els, map, roles){
   if (!map) map = rsBuildMap([els]);
   const B = brandActive() ? brand : null;
   const INK   = B ? B.ink : 'ink';
@@ -4541,6 +4542,8 @@ function restyleColors(els, map){
   // a neutral line/edge: keep subtle ones subtle (muted) but make everything consistent
   const neutral = val => { const h = rsHex(val); return (MUTED && h && rsHsl(h).l > 0.55) ? MUTED : INK; };
   for (const el of els){
+    if (!el) continue;
+    try {
     if (el.type === 'image'){ delete el._tintCv; continue; }
     if (el.type === 'text'){
       el.stroke = INK;                                            // all text reads as ink: one consistent, legible color
@@ -4565,19 +4568,52 @@ function restyleColors(els, map){
       }
     }
     delete el._prims; delete el._pkey; delete el._tintCv;
+    } catch (e){ /* skip this element, keep restyling the rest */ }
+  }
+  if (roles) rsApplyRoles(els);
+}
+/* ── role rules: where Primary and Secondary actually go ──────────────
+   Rank-mapping alone only restates colors the source already had, so a
+   monochrome deck stays monochrome and your accent shows up nowhere. These
+   rules place the brand by MEANING instead, the same on every page:
+     Primary   → the page headline (the biggest display text)
+     Secondary → key figures: the big number/label inside a card
+     Ink       → all other text; Paper → backgrounds and light cards
+   Every assignment is contrast-checked, so a role can never make text unreadable. */
+function rsApplyRoles(els){
+  if (!brandActive()) return;
+  const P = brand.primary, S = brand.secondary, INK = brand.ink, PAPER = brand.paper;
+  const texts = els.filter(e => e && (e.type === 'text' || (e.text && String(e.text).trim())));
+  if (!texts.length) return;
+  const maxSize = Math.max(...texts.map(e => e.size || 21));
+  const reads = (fg, bg) => { const a = rsHex(fg), b = rsHex(bg); return !!(a && b && contrastRatio(a, b) >= 3); };
+  for (const el of texts){
+    try {
+      const size = el.size || 21;
+      if (el.type === 'text'){
+        // the headline: display-sized and the largest thing on the page
+        if (size >= 28 && size >= maxSize * 0.9 && reads(P, PAPER)) el.stroke = P;
+      } else {
+        // a figure sitting inside a card: the deck's secondary emphasis
+        const bg = (el.fill && el.fill !== 'none') ? el.fill : PAPER;
+        if (size >= 24 && size >= maxSize * 0.55 && reads(S, bg)) el.textColor = S;
+      }
+      delete el._prims; delete el._pkey;
+    } catch (e){}
   }
 }
 function restyleFonts(els){
   const head = brandActive() ? brand.headFont : 'serif';
   const body = brandActive() ? brand.bodyFont : 'sans';
   for (const f of [head, body]){ ensureCustomFont(f); if (f.startsWith('cg:')){ loadFontCssFor(f.slice(3).trim()); rememberGFont(f.slice(3).trim()); } }
-  const sizes = els.filter(e => e.text && e.text.trim()).map(e => e.size || 21).sort((a,b) => a-b);
+  const sizes = els.filter(e => e && e.text && String(e.text).trim()).map(e => e.size || 21).sort((a,b) => a-b);
   const med = sizes.length ? sizes[sizes.length >> 1] : 21;
   const thresh = Math.max(28, med * 1.35);
   for (const el of els){
-    if (!(el.text && el.text.trim()) && el.type !== 'text') continue;
+    if (!el) continue;
+    if (!(el.text && String(el.text).trim()) && el.type !== 'text') continue;
     el.font = (el.size || 21) >= thresh ? head : body;
-    if (el.type === 'text') autosizeText(el);
+    try { if (el.type === 'text') autosizeText(el); } catch (e){}
   }
 }
 // the house look when no brand kit is active
@@ -4587,7 +4623,7 @@ function restyleStyle(els){
   const st = (brandActive() && brand.style) ? brand.style : houseStyle();
   const sw = swForWeight(st.weight);
   for (const el of els){
-    if (el.type === 'image' || el.type === 'text') continue;
+    if (!el || el.type === 'image' || el.type === 'text') continue;
     el.sketch = st.sketch;
     if (typeof el.sw === 'number') el.sw = sw;
     if (st.sketch) el.seed = Math.floor(Math.random() * 2 ** 31);  // fresh wobble only when hand-drawn
@@ -4612,21 +4648,33 @@ function makeItMine(opts){
     : [state.elements];
   const total = targets.reduce((n, a) => n + a.length, 0);
   if (!total){ showHint('Nothing to restyle' + (allPages ? '' : ' on this page')); return; }
-  // ONE map for every page in this restyle, so a color maps identically everywhere
-  const cmap = opts.colors ? rsBuildMap(targets) : null;
-  for (const els of targets){
-    if (opts.colors) restyleColors(els, cmap);
-    if (opts.fonts) restyleFonts(els);
-    if (opts.style) restyleStyle(els);
+  // ATOMIC: a restyle touches every page, so one bad element must never leave the
+  // document half-changed. Snapshot first; on any error put the document back exactly.
+  const before = serialize();
+  try {
+    // ONE map for every page in this restyle, so a color maps identically everywhere
+    const cmap = opts.colors ? rsBuildMap(targets) : null;
+    for (const els of targets){
+      if (opts.colors) restyleColors(els, cmap, opts.roles !== false);
+      if (opts.fonts) restyleFonts(els);
+      if (opts.style) restyleStyle(els);
+    }
+    // making it yours includes the page itself, so backgrounds stop keeping the template's color
+    if (opts.colors && !sel && brandActive() && brand.paper){
+      if (allPages){ state.pages.forEach(p => p.bg = brand.paper); state.bgColor = brand.paper; }
+      else state.pages[state.pageIndex].bg = brand.paper;  // page-scoped: never repaint pages we did not restyle
+    }
+    preloadDocFonts();
+    for (const els of targets) updateBoundArrows(els);
+  } catch (err){
+    restore(before);                                   // full rollback: nothing lost
+    console.error('Make it mine failed:', err);
+    showHint('Could not restyle: the document was put back unchanged');
+    return;
   }
-  // making it yours includes the page itself, so backgrounds stop keeping the template's color
-  if (opts.colors && !sel && brandActive() && brand.paper){
-    if (allPages){ state.pages.forEach(p => p.bg = brand.paper); state.bgColor = brand.paper; }
-    else state.pages[state.pageIndex].bg = brand.paper;   // page-scoped: never repaint pages we did not restyle
-  }
-  preloadDocFonts();
-  for (const els of targets) updateBoundArrows(els);
-  commit(); requestRender(); syncPanel(); if (typeof syncPaperUI === 'function') syncPaperUI();
+  commit();
+  buildPageStrip();                                    // an all-pages restyle changes every thumbnail
+  requestRender(); syncPanel(); if (typeof syncPaperUI === 'function') syncPaperUI();
   if (opts.tidy) tidyLayout();                          // its own undo step; only moves glued flows on this page
   const scope = allPages ? 'all ' + state.pages.length + ' pages' : 'this page';
   showHint(brandActive() ? 'Made ' + scope + ' yours: your colors, fonts and style ✳ (⌘Z to undo)'
@@ -4652,7 +4700,7 @@ function openRestyleDialog(){
 $('restyleApplyBtn').addEventListener('click', () => {
   $('restyleDialog').classList.add('hidden');
   makeItMine({ colors: $('rsColors').checked, fonts: $('rsFonts').checked,
-    style: $('rsStyle').checked, tidy: $('rsTidy').checked,
+    roles: $('rsRoles').checked, style: $('rsStyle').checked, tidy: $('rsTidy').checked,
     allPages: $('rsAllPages').checked });
 });
 $('restyleCancelBtn').addEventListener('click', () => $('restyleDialog').classList.add('hidden'));
