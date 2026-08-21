@@ -46,6 +46,7 @@
       <button data-act="image">Import image… &nbsp;<span class="menukey">I</span></button>
       <button data-act="templates">Templates…</button>
       <button data-act="snapshots">Snapshots…</button>
+      <button data-act="restyle">Make it mine (restyle)</button>
       <button data-act="timelapse">Time-lapse recorder</button>
       <hr>
       <button data-act="present">Present &nbsp;<span class="menukey">⇧⌘P</span></button>
@@ -668,6 +669,22 @@
   </div>
 
   <!-- ── Animated GIF dialog ──────────────────────── -->
+  <div class="island pdfdialog restyledialog hidden" id="restyleDialog">
+    <h3>Make it mine</h3>
+    <p id="restyleBrandNote">Recast this page in your look.</p>
+    <div class="restyleopts">
+      <label class="chartcheck"><input type="checkbox" id="rsColors" checked> Colors: recolor to your palette</label>
+      <label class="chartcheck"><input type="checkbox" id="rsFonts" checked> Fonts: headings &amp; body in your fonts</label>
+      <label class="chartcheck"><input type="checkbox" id="rsHand" checked> Hand-drawn: one fresh, consistent sketch style</label>
+      <label class="chartcheck"><input type="checkbox" id="rsWeights" checked> Line weights: snap to your presets</label>
+      <label class="chartcheck"><input type="checkbox" id="rsTidy"> Tidy layout: align connected flows</label>
+    </div>
+    <p class="setdesc" id="restyleScopeNote" style="margin:8px 0 0"></p>
+    <div class="tplfoot">
+      <button class="pill" id="restyleApplyBtn">Make it mine</button>
+      <button class="minipill" id="restyleCancelBtn">Cancel</button>
+    </div>
+  </div>
   <div class="island pdfdialog gifdialog hidden" id="gifDialog">
     <h3>Animated GIF</h3>
     <p>Every ticked page becomes one frame. Set how long each frame stays on screen.</p>
@@ -763,6 +780,7 @@
       <tr><td><b>⇧drag</b> moves in a straight line: locks the selection to the horizontal or vertical axis</td></tr>
       <tr><td><b>Double-click</b> a shape (or arrow) to type on it · <b>Enter</b> edits the selection</td></tr>
       <tr><td><b>Snap freehand to shapes:</b> with the pen (P), a rough box, circle, triangle, diamond or line becomes a clean shape. Toggle it with the wand button in the top bar; <b>⌘Z</b> keeps your raw stroke.</td></tr>
+      <tr><td><b>Make it mine (restyle):</b> ☰ menu or right-click → recast a page (or your selection) into your Brand kit: your colors, fonts, one fresh hand-drawn style and tidy line weights, in one step. Turns a template or an AI-drawn page into something that looks like you.</td></tr>
       <tr><td><b>Command palette (⌘K):</b> fuzzy-search every tool, action, page, template and font, then run it. Try "insert hexagon", "go to page 2", "export png", or a font name.</td></tr>
       <tr><td><b>Lock:</b> right-click an element or group → <b>Lock</b>. Locked elements ignore clicks and drags, so you cannot move or resize them by accident (a small padlock marks them). Right-click again → <b>Unlock</b>.</td></tr>
       <tr><td><b>Merge texts:</b> select several text elements (⇧click in the order you

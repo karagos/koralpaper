@@ -2139,6 +2139,7 @@ function openCtxMenu(ev){
       () => toggleLockSelection(!anyLocked));
     add('Delete', deleteSelection);
     hr();
+    add(sel.length > 1 ? 'Make these mine (restyle)' : 'Make it mine (restyle)', openRestyleDialog);
     if (sel.length >= 2) add('Group', () => { groupSelection(); syncPanel(); });
     if (sel.some(e => e.groupId)) add('Ungroup', () => { ungroupSelection(); syncPanel(); });
     if (sel.length >= 2 || sel.some(e => e.groupId)) hr();
@@ -2151,6 +2152,7 @@ function openCtxMenu(ev){
     add('Select all', () => { setSelection(new Set(state.elements.filter(e => !e.locked).map(e => e.id))); setTool('select'); });
     add('Zoom to fit', zoomToFit);
     add('Tidy the flow', tidyLayout);
+    if (state.elements.length) add('Make this page mine (restyle)', openRestyleDialog);
   }
   closeMenus();
   menu.classList.remove('hidden');
@@ -4364,6 +4366,133 @@ function setPanelTab(t){
   $('claudePane').classList.toggle('hidden', t !== 'claude');
   $('settingsPane').classList.toggle('hidden', t !== 'settings');
 }
+/* ── "Make it mine" restyle engine ──────────────────
+   Recast a page (or the selection) into the user's brand kit: colors mapped
+   to their accents, headings/body in their fonts, one consistent hand-drawn
+   character (re-seeded so nothing looks templated), and tidy line weights. */
+const RS_HOUSE = ['coral','periwinkle','sage','butter','terracotta','sky'];
+function rsHex(val){
+  if (!val || val === 'none') return null;
+  if (typeof val === 'string' && val[0] === '#') return val.toLowerCase();
+  const p = pal();
+  const h = resolveFill(p, val) || resolveStroke(p, val);
+  return h ? h.toLowerCase() : null;
+}
+function rsHsl(hex){
+  let x = hex.slice(1);
+  if (x.length === 3) x = x[0]+x[0]+x[1]+x[1]+x[2]+x[2];
+  const r = parseInt(x.slice(0,2),16)/255, g = parseInt(x.slice(2,4),16)/255, b = parseInt(x.slice(4,6),16)/255;
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b), l = (mx+mn)/2, d = mx-mn;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2*l-1));
+  return { s, l };
+}
+function rsColored(hex){                        // saturated, mid-luma → an accent color (not structure)
+  if (!hex) return false;
+  const { s, l } = rsHsl(hex);
+  return s >= 0.13 && l > 0.12 && l < 0.93;   // muted pastels count; true grays (s<0.13) do not
+}
+function rsAccents(){
+  const list = brandActive() ? brand.accents.slice() : RS_HOUSE.map(t => rsHex(t)).filter(Boolean);
+  return list.filter(Boolean);
+}
+function restyleColors(els){
+  const accents = rsAccents();
+  if (!accents.length) return;
+  const weight = new Map();
+  const bump = (val, area) => { const h = rsHex(val); if (h && rsColored(h)) weight.set(h, (weight.get(h)||0) + area); };
+  for (const el of els){
+    const b = boundsOf(el), area = Math.max(1, b.w * b.h);
+    bump(el.fill, area); bump(el.stroke, area * 0.35); bump(el.textColor, area * 0.2);
+  }
+  const ranked = [...weight.entries()].sort((a,b) => b[1]-a[1]).map(e => e[0]);
+  const map = new Map(); ranked.forEach((h,i) => map.set(h, accents[i % accents.length]));
+  const remap = val => { const h = rsHex(val); return (h && map.has(h)) ? map.get(h) : val; };
+  const colored = val => { const h = rsHex(val); return !!(h && rsColored(h)); };
+  for (const el of els){
+    if (isLinear(el)){
+      if (el.stroke && el.stroke !== 'none') el.stroke = remap(el.stroke);   // arrows/lines take the accent
+    } else if (el.type === 'text'){
+      if (el.stroke) el.stroke = remap(el.stroke);                            // text color = its stroke
+      if (el.textColor) el.textColor = remap(el.textColor);
+    } else {
+      const filled = el.fill && el.fill !== 'none';
+      if (filled){
+        el.fill = remap(el.fill);
+        // keep the outline readable so auto text (which follows the outline) stays visible
+        if (el.stroke && el.stroke !== 'none' && colored(el.stroke)) el.stroke = 'ink';
+      } else if (el.stroke && el.stroke !== 'none'){
+        el.stroke = remap(el.stroke);                                         // outline-only shape takes the accent
+      }
+      if (el.textColor) el.textColor = remap(el.textColor);
+    }
+    delete el._prims; delete el._pkey; delete el._tintCv;
+  }
+}
+function restyleFonts(els){
+  const head = brandActive() ? brand.headFont : 'serif';
+  const body = brandActive() ? brand.bodyFont : 'sans';
+  for (const f of [head, body]){ ensureCustomFont(f); if (f.startsWith('cg:')){ loadFontCssFor(f.slice(3).trim()); rememberGFont(f.slice(3).trim()); } }
+  const sizes = els.filter(e => e.text && e.text.trim()).map(e => e.size || 21).sort((a,b) => a-b);
+  const med = sizes.length ? sizes[sizes.length >> 1] : 21;
+  const thresh = Math.max(28, med * 1.35);
+  for (const el of els){
+    if (!(el.text && el.text.trim()) && el.type !== 'text') continue;
+    el.font = (el.size || 21) >= thresh ? head : body;
+    if (el.type === 'text') autosizeText(el);
+  }
+}
+function restyleHandDrawn(els){
+  for (const el of els){
+    if (el.type === 'image' || el.type === 'text') continue;
+    if (!isLinear(el)) el.sketch = 1;                 // uniform hand-drawn body
+    el.seed = Math.floor(Math.random() * 2 ** 31);    // fresh wobble: never looks stamped
+    delete el._prims; delete el._pkey;
+  }
+}
+function restyleWeights(els){
+  const stops = [widths.fine, widths.medium, widths.thick];
+  for (const el of els){
+    if (typeof el.sw !== 'number') continue;
+    let best = stops[0], bd = Infinity;
+    for (const s of stops){ const d = Math.abs(s - el.sw); if (d < bd){ bd = d; best = s; } }
+    el.sw = best; delete el._prims; delete el._pkey;
+  }
+}
+function makeItMine(opts){
+  const els = state.selection.size ? selected() : state.elements;
+  if (!els.length){ showHint('Nothing to restyle on this page'); return; }
+  if (opts.colors){
+    restyleColors(els);
+    if (!state.selection.size && brandActive() && brand.usePaper && brand.paper){ syncPageRef(); state.pages[state.pageIndex].bg = brand.paper; }
+  }
+  if (opts.fonts) restyleFonts(els);
+  if (opts.hand) restyleHandDrawn(els);
+  if (opts.weights) restyleWeights(els);
+  preloadDocFonts();
+  updateBoundArrows(state.elements);
+  commit(); requestRender(); syncPanel(); if (typeof syncPaperUI === 'function') syncPaperUI();
+  if (opts.tidy) tidyLayout();                        // its own undo step; only moves glued flows
+  showHint(brandActive() ? 'Made it yours: your colors, fonts and hand ✳ (⌘Z to undo)'
+    : 'Restyled in the house look ✳ set a Brand kit in Settings to use your own (⌘Z to undo)');
+}
+function openRestyleDialog(){
+  closeMenus();
+  const on = brandActive();
+  $('restyleBrandNote').textContent = on
+    ? 'Recast this page in your brand kit: ' + (brand.name || 'your brand') + '.'
+    : 'No brand kit is active, so this uses a house style. Set your own in Settings → Brand kit.';
+  $('restyleScopeNote').textContent = state.selection.size
+    ? 'Applies to your ' + state.selection.size + ' selected element' + (state.selection.size > 1 ? 's' : '') + '.'
+    : 'Applies to the whole page. Select elements first to restyle only those.';
+  $('restyleDialog').classList.remove('hidden');
+}
+$('restyleApplyBtn').addEventListener('click', () => {
+  $('restyleDialog').classList.add('hidden');
+  makeItMine({ colors: $('rsColors').checked, fonts: $('rsFonts').checked,
+    hand: $('rsHand').checked, weights: $('rsWeights').checked, tidy: $('rsTidy').checked });
+});
+$('restyleCancelBtn').addEventListener('click', () => $('restyleDialog').classList.add('hidden'));
+
 /* ── command palette (⌘K) ───────────────────────────
    Fuzzy search over every tool, action, page, template and font. */
 function paletteOpenPanel(tab){
@@ -4407,6 +4536,7 @@ function buildCommands(){
    ['pentagon','polygon',{sides:5}],['hexagon','polygon',{sides:6}],['octagon','polygon',{sides:8}],['label chip','chip'],['text box','text']]
     .forEach(([n,t,extra]) => add('Insert a ' + n, 'Insert', () => insertShapeAtCenter(t, extra || {}), 'add new ' + n + ' ' + t));
   add('Insert chart or table', 'Insert', () => chartOpen(null), 'graph bar line pie donut spider table data', 'B');
+  add('Make it mine (restyle to brand)', 'Edit', openRestyleDialog, 'rebrand recolor restyle brand kit fonts hand-drawn');
   // Pages
   add('Add page to the right', 'Page', () => insertPageAt(state.pageIndex + 1), 'new page after');
   add('Add page to the left', 'Page', () => insertPageAt(state.pageIndex), 'new page before');
@@ -5002,6 +5132,7 @@ function runFileAction(act){
   if (act === 'open') fileInput.click();
   if (act === 'save') saveJSON();
   if (act === 'snapshots') openSnapDialog();
+  if (act === 'restyle') openRestyleDialog();
   if (act === 'gif') openGifDialog();
   if (act === 'timelapse') tlToggleBar();
   if (act === 'image') $('imgInput').click();
@@ -8092,6 +8223,7 @@ window.addEventListener('keydown', ev => {
     $('chartDialog').classList.add('hidden');
     $('snapDialog').classList.add('hidden');
     $('gifDialog').classList.add('hidden');
+    $('restyleDialog').classList.add('hidden');
     return; }
   if (ev.key === 'Enter'){
     const sel = selected();

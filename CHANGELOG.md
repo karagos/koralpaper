@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.75.0
+
+**Make it mine (restyle engine).** One step recasts a page, or just your selection, into your look: colors remapped to your Brand kit accents, headings and body set in your brand fonts, one fresh and consistent hand-drawn character (the sketch wobble is re-seeded so nothing looks stamped from a template), and stray line weights snapped to your presets. An optional "tidy layout" pass lines up connected flows. It works on anything, a diagram Claude drew, an imported design, a template, and turns it into something that looks like you rather than AI-generated. Reach it from the ☰ menu, right-click, or the command palette (⌘K → "make it mine"). A dialog lets you pick exactly what to change. No Brand kit yet? It uses a house style so the button still works. One undo reverts everything.
+
 ## v3.74.1
 
 Command palette polish: long command and font names now wrap instead of being cut off at the edge, and the results list shows many more matches at once, so every font in the catalog is reachable when you search.
