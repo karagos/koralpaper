@@ -202,7 +202,7 @@ const ELEMENT_SCHEMA = {
   type: 'object',
   properties: {
     id: { type: 'string', description: 'Your own short id (e.g. "start", "step2") so arrows and later updates can reference this element.' },
-    type: { type: 'string', enum: ['rect', 'diamond', 'ellipse', 'chip', 'text', 'arrow', 'line'], description: 'rect = box/sticky, diamond = decision, ellipse = start/end, chip = small label pill, text = free text, arrow/line = connector.' },
+    type: { type: 'string', enum: ['rect', 'diamond', 'ellipse', 'polygon', 'chip', 'text', 'arrow', 'line'], description: 'rect = box/sticky, diamond = decision, ellipse = start/end, polygon = regular N-gon (set sides), chip = small label pill, text = free text, arrow/line = connector.' },
     x: { type: 'number' }, y: { type: 'number' },
     w: { type: 'number' }, h: { type: 'number' },
     text: { type: 'string', description: 'Text inside the shape, the free text, or the label riding an arrow.' },
@@ -219,6 +219,7 @@ const ELEMENT_SCHEMA = {
     sw: { type: 'number', description: 'Stroke (line/outline) width in px. Guide: 1.5 = thin/hairline, 3.3 = medium (default), 5 = thick, 8 to 14 = bold poster lines. Range 0.5 to 40. Thin outlines read as more precise; thick reads as emphasis.' },
     opacity: { type: 'number', description: 'Opacity of the WHOLE element (outline + fill + text) from 0 (invisible) to 100 (solid, default). Use for ghosted/faded elements.' },
     fillOpacity: { type: 'number', description: 'Transparency of the FILL ONLY, 0 (transparent fill) to 100 (opaque, default). The outline and text stay solid. Use for translucent highlight boxes, tints behind text, overlapping shapes that should show through each other, or Venn-style overlaps.' },
+    sides: { type: 'number', description: 'Polygon only: number of sides, 3 (triangle) to 12 (dodecagon). 5 = pentagon, 6 = hexagon, 8 = octagon.' },
     startHead: { type: 'string', enum: ['none','arrow','triangle','triangle-filled','diamond','diamond-filled','circle','circle-filled','bar'], description: 'Arrows/lines only: the marker at the START point. Default none.' },
     endHead: { type: 'string', enum: ['none','arrow','triangle','triangle-filled','diamond','diamond-filled','circle','circle-filled','bar'], description: 'Arrows/lines only: the marker at the END point. Default arrow for arrows, none for lines. "-filled" variants are solid; "bar" is a perpendicular stop.' },
     from: { type: 'string', description: 'Arrows only: id of the shape this arrow starts from (it glues to the border and follows).' },
@@ -354,7 +355,7 @@ function onMessage(msg){
     reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'koralpaper', version: '1.4.2' },
+      serverInfo: { name: 'koralpaper', version: '1.4.3' },
       instructions: 'These tools draw directly in the KoralPaper app (hand-drawn diagram studio) running in the user\'s browser. Workflow: koralpaper_status → koralpaper_read_document (if editing) → create/add/update → koralpaper_render_page to visually check the result, and iterate until the layout is clean.',
     });
     return;

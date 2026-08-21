@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.67.0
+
+New tools and shapes.
+- **Polygon tool (G).** A regular polygon with an adjustable number of sides, 3 (triangle) to 12, set with a "Sides" slider in the panel. Fill, style, text and everything else work like any other shape, and Claude can draw and adjust polygons too (`type:"polygon"`, `sides:6`).
+- **Eraser tool (E).** Click an element to delete it, or hold and drag across several to wipe them quickly. One undo brings back everything an eraser stroke removed.
+- **Import SVG files** through the image tool: SVGs now come in as true vectors (crisp at any size, vector in exports) instead of being flattened to pixels. Drag-and-drop and the toolbar image button both accept .svg.
+- **Clearer hand/pan icon** in the toolbar.
+
 ## v3.66.0
 
 Claude can now control line weight, transparency and arrowheads (it could not before), plus more arrowhead styles for everyone.

@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.66.0';
+const APP_VERSION = '3.67.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -261,24 +261,25 @@ function textColorOf(pal, el){
 }
 
 /* ── element model ─────────────────────────────────── */
-const SHAPE_TYPES = ['rect','diamond','ellipse','chip','icon','image'];
+const SHAPE_TYPES = ['rect','diamond','ellipse','chip','icon','image','polygon'];
 const LINEAR_TYPES = ['arrow','line','draw'];
 const isShape = el => SHAPE_TYPES.includes(el.type);
 const isLinear = el => LINEAR_TYPES.includes(el.type);
-const canHaveText = el => ['rect','diamond','ellipse','chip','text','arrow','line'].includes(el.type);
+const canHaveText = el => ['rect','diamond','ellipse','chip','text','arrow','line','polygon'].includes(el.type);
 
 function newElement(type, x, y, style){
   const el = {
     id: uid(), type, x, y, w: 0, h: 0, angle: 0,
     seed: Math.floor(Math.random() * 2 ** 31),
     stroke: 'ink', fill: 'none', fillStyle: 'solid', dash: 'solid',
-    sw: 3.3, sketch: 1, round: 1, opacity: 100,
+    sw: 3.3, sketch: 1, round: 1, opacity: 100, fillOpacity: 100,
     text: '', font: 'sans', size: 21, align: 'center',
     lh: 1.3, pgap: 0, lspace: 0, valign: 'middle',
     groupId: null,
   };
   if (type === 'chip'){ el.fill = 'periwinkle'; el.size = 16; }
   if (type === 'rect'){ el.fill = 'cream'; }
+  if (type === 'polygon'){ el.fill = 'cream'; el.sides = 6; }
   if (type === 'icon'){ el.kind = 'asterisk'; el.stroke = 'none'; el.fill = 'coral'; }
   if (type === 'image'){
     el._src = ''; el.imgId = null; el.artStyle = 'photo'; el.detail = 2;
@@ -496,6 +497,18 @@ function ellipseOutline(cx, cy, rx, ry, n){
 function diamondOutline(x, y, w, h){
   return [[x + w/2, y],[x + w, y + h/2],[x + w/2, y + h],[x, y + h/2]];
 }
+/* regular N-gon inscribed in the box, flat-ish top (first vertex at the top). */
+function polygonOutline(x, y, w, h, sides){
+  const n = Math.max(3, Math.min(12, Math.round(sides || 6)));
+  const cx = x + w/2, cy = y + h/2, rx = w/2, ry = h/2;
+  const start = -Math.PI / 2;                 // top vertex
+  const pts = [];
+  for (let i = 0; i < n; i++){
+    const a = start + (i / n) * TAU;
+    pts.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
+  }
+  return pts;
+}
 function shapeOutline(el){
   const { x, y, w, h } = el;
   switch (el.type){
@@ -505,6 +518,7 @@ function shapeOutline(el){
     case 'chip': return roundedRectOutline(x, y, w, h, h / 2);
     case 'ellipse': return ellipseOutline(x + w/2, y + h/2, w/2, h/2);
     case 'diamond': return diamondOutline(x, y, w, h);
+    case 'polygon': return polygonOutline(x, y, w, h, el.sides);
     case 'icon': return ellipseOutline(x + w/2, y + h/2, w/2, h/2, 24);
     default: { const b = boundsOf(el); return [[b.x,b.y],[b.x+b.w,b.y],[b.x+b.w,b.y+b.h],[b.x,b.y+b.h]]; }
   }
@@ -521,7 +535,7 @@ function boundaryPointToward(el, fromX, fromY, gap){
   const len = Math.hypot(dx, dy) || 1;
   const ux = dx / len, uy = dy / len;
   let t;
-  if (el.type === 'ellipse' || el.type === 'icon'){
+  if (el.type === 'ellipse' || el.type === 'icon' || el.type === 'polygon'){
     const rx = b.w/2 || 1, ry = b.h/2 || 1;
     t = 1 / Math.sqrt((ux*ux)/(rx*rx) + (uy*uy)/(ry*ry));
   } else if (el.type === 'diamond'){
@@ -547,6 +561,16 @@ function pointInShape(el, px, py, slack){
   switch (el.type){
     case 'ellipse': return nx*nx + ny*ny <= 1;
     case 'diamond': return Math.abs(nx) + Math.abs(ny) <= 1;
+    case 'polygon': {
+      // grow the outline by slack so edges/corners are easy to grab, then test
+      const pts = polygonOutline(b.x - slack, b.y - slack, b.w + slack*2, b.h + slack*2, el.sides);
+      let inside = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++){
+        const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+        if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
+      }
+      return inside;
+    }
     default: return Math.abs(nx) <= 1 && Math.abs(ny) <= 1;
   }
 }

@@ -55,7 +55,8 @@ const defaults = {
   curve:0, elbow:false, startHead:'none', endHead:'arrow',
   lh:typo.lh, pgap:typo.pgap, lspace:typo.lspace, valign:'middle',
   hlColor:'#F7E36B',
-  fillByType: { rect:'cream', diamond:'cream', ellipse:'cream', chip:'periwinkle', icon:'none' },
+  sides:6,
+  fillByType: { rect:'cream', diamond:'cream', ellipse:'cream', chip:'periwinkle', icon:'none', polygon:'cream' },
 };
 let iconKind = 'asterisk'; // last-picked stamp from the icon menu
 const HEAD_KINDS = ['none','arrow','triangle','triangle-filled','diamond','diamond-filled','circle','circle-filled','bar'];
@@ -884,6 +885,12 @@ function onPointerDown(ev){
   }
   if (ev.button !== 0) return;
 
+  if (state.tool === 'eraser'){
+    interaction = { kind: 'erase', erased: false };
+    eraseAt(sx, sy);
+    return;
+  }
+
   if (cropTarget){
     const el = byId(cropTarget);
     if (!el){ endCropMode(); return; }
@@ -1022,9 +1029,10 @@ function onPointerDown(ev){
     align: defaults.align,
     lh: defaults.lh, pgap: defaults.pgap, lspace: defaults.lspace, valign: defaults.valign,
   };
-  if (['rect','diamond','ellipse','chip','icon'].includes(state.tool)){
+  if (['rect','diamond','ellipse','chip','icon','polygon'].includes(state.tool)){
     style.fill = defaults.fillByType[state.tool] || defaults.fill;
   }
+  if (state.tool === 'polygon') style.sides = defaults.sides;
   if (state.tool === 'icon'){
     style.kind = iconKind;
     style.dash = defaults.dash;
@@ -1089,6 +1097,17 @@ function makeResize(sel, sb, handle, shiftKey){
   };
 }
 
+function eraseAt(sx, sy){
+  const hit = topElementAt(sx, sy);   // returns the element itself, not { el }
+  if (!hit) return;
+  const id = hit.id;
+  state.elements = state.elements.filter(e => e.id !== id);
+  state.pages[state.pageIndex].elements = state.elements;
+  state.selection.delete(id);
+  if (interaction) interaction.erased = true;
+  updateBoundArrows(state.elements);
+  requestRender();
+}
 function onPointerMove(ev){
   if (presenting){
     if (laserLive){
@@ -1132,6 +1151,7 @@ function onPointerMove(ev){
   }
   const it = interaction;
 
+  if (it.kind === 'erase'){ eraseAt(sx, sy); return; }
   if (it.kind === 'pan'){
     state.camera.x = it.camX + (ev.clientX - it.startX);
     state.camera.y = it.camY + (ev.clientY - it.startY);
@@ -1388,6 +1408,7 @@ function onPointerUp(ev){
   canvas.classList.remove('panning');
   if (!it){ requestRender(); return; }
 
+  if (it.kind === 'erase'){ if (it.erased){ commit(); syncPanel(); } requestRender(); return; }
   if (it.kind === 'pan'){ requestRender(); return; }
   if (it.kind === 'marquee'){ syncPanel(); requestRender(); return; }
 
@@ -1469,7 +1490,7 @@ function onPointerUp(ev){
     if (el.type === 'draw'){ requestRender(); return; } // pencil stays active
     setTool('select');
     setSelection(new Set([el.id]));
-    if (['rect','diamond','ellipse','chip'].includes(el.type)) openTextEditor(el, false);
+    if (['rect','diamond','ellipse','chip','polygon'].includes(el.type)) openTextEditor(el, false);
     requestRender();
   }
 }
@@ -2368,7 +2389,7 @@ function syncPanel(){
   const types = sel.length ? new Set(sel.map(e => e.type))
     : new Set([tool === 'text' ? 'text' : tool]);
   const has = (...ts) => ts.some(t => types.has(t));
-  const shapeish = has('rect','diamond','ellipse','chip','icon');
+  const shapeish = has('rect','diamond','ellipse','chip','icon','polygon');
   const linear = has('arrow','line','draw');
   const textish = has('rect','diamond','ellipse','chip','text','arrow','line');
 
@@ -2381,7 +2402,7 @@ function syncPanel(){
   show('rowArt', has('image'));
   const imgDuo = sel.some(e => e.type === 'image' && e.artStyle === 'duotone');
   show('rowFill', ((shapeish || has('draw')) && !has('image')) || imgDuo);
-  show('rowFillStyle', has('rect','diamond','ellipse','chip','icon'));
+  show('rowFillStyle', has('rect','diamond','ellipse','chip','icon','polygon'));
   show('rowWidth', shapeish || linear || has('image'));
   show('rowSketch', shapeish || linear || has('image'));
   show('rowFrame', has('image'));
@@ -2403,7 +2424,10 @@ function syncPanel(){
   show('rowAlign', textish);
   show('rowRich', textish);
   show('rowTypo', textish);
-  show('rowValign', has('rect','diamond','ellipse','chip'));
+  show('rowValign', has('rect','diamond','ellipse','chip','polygon'));
+  const polyOn = has('polygon');
+  show('rowSides', polyOn);
+  if (polyOn){ const sd = (sel.length ? sel[0].sides : defaults.sides) || 6; $('sidesRange').value = sd; $('sidesVal').textContent = sd; }
   show('rowOpacity', true);
   $('opacityVal').textContent = ((sel.length ? sel[0].opacity : defaults.opacity) ?? 100) + '%';
   const fillRowOn = !$('rowFill').classList.contains('hidden');
@@ -2551,6 +2575,12 @@ $('fillOpacityRange').addEventListener('input', ev => {
   $('fillOpacityVal').textContent = v + '%';
 });
 $('fillOpacityRange').addEventListener('change', () => { if (state.selection.size) commitCoalesced('fillOpacity', 1500); });
+$('sidesRange').addEventListener('input', ev => {
+  const v = clamp(Math.round(Number(ev.target.value) || 6), 3, 12);
+  applyStyle({ sides: v });
+  $('sidesVal').textContent = v;
+});
+$('sidesRange').addEventListener('change', () => { if (state.selection.size) commitCoalesced('sides', 800); });
 $('toFrontBtn').addEventListener('click', () => reorder('front'));
 $('toBackBtn').addEventListener('click', () => reorder('back'));
 $('forwardBtn').addEventListener('click', () => reorder('forward'));
@@ -3694,10 +3724,41 @@ function pasteImageIntoShape(file, shapeId){
   });
   reader.readAsDataURL(file);
 }
+function placeImageEl(dataURL, w, h, sx, sy, idx, svg){
+  let cx = sx, cy = sy;
+  if (cx == null){ [cx, cy] = toScene(canvas.clientWidth / 2, canvas.clientHeight / 2); }
+  const el = newElement('image', cx - w/2 + idx * 26, cy - h/2 + idx * 26, {});
+  el._src = dataURL; el.w = w; el.h = h;
+  if (svg) el.stroke = 'none';        // keep the SVG's own colors until a Tint is picked
+  internImage(el);
+  state.elements.push(el);
+  setTool('select');
+  setSelection(new Set([el.id]));
+  commit(); requestRender();
+  showHint(svg ? 'SVG added as a vector: it stays crisp at any size ✳'
+    : 'Image added: pick an Art style in the panel to vectorize it ✳');
+}
 function insertImageFiles(files, sx, sy){
-  const list = [...files].filter(f => f.type.startsWith('image/'));
+  const list = [...files].filter(f => f.type.startsWith('image/') || /\.svg$/i.test(f.name));
   if (!list.length) return;
   list.forEach((f, idx) => {
+    const isSvg = f.type === 'image/svg+xml' || /\.svg$/i.test(f.name);
+    if (isSvg){
+      const r = new FileReader();
+      r.onload = () => {
+        const src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(r.result)));
+        const probe = new Image();
+        probe.onload = () => {
+          const s = Math.min(1, 420 / Math.max(probe.naturalWidth || 300, probe.naturalHeight || 300));
+          placeImageEl(src, Math.max(24, Math.round((probe.naturalWidth||300)*s)),
+            Math.max(24, Math.round((probe.naturalHeight||300)*s)), sx, sy, idx, true);
+        };
+        probe.onerror = () => alert('Could not read that SVG file.');
+        probe.src = src;
+      };
+      r.readAsText(f);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => downscaleDataURL(reader.result, f.type, dataURL => {
       const probe = new Image();
@@ -3744,7 +3805,7 @@ document.addEventListener('paste', ev => {
     const f = imgItem.getAsFile();
     if (f){
       const sel = selected();
-      const target = (sel.length === 1 && ['rect', 'diamond', 'ellipse', 'chip'].includes(sel[0].type))
+      const target = (sel.length === 1 && ['rect', 'diamond', 'ellipse', 'chip', 'polygon'].includes(sel[0].type))
         ? sel[0] : null;
       if (target){ pasteImageIntoShape(f, target.id); return; }
       insertImageFiles([f], null, null); return;
@@ -7331,8 +7392,8 @@ function exportSVG(transparent){
 }
 
 /* ── keyboard ──────────────────────────────────────── */
-const TOOL_KEYS = { v:'select', h:'hand', r:'rect', d:'diamond', o:'ellipse',
-  c:'chip', s:'icon', a:'arrow', l:'line', p:'draw', t:'text' };
+const TOOL_KEYS = { v:'select', h:'hand', e:'eraser', r:'rect', d:'diamond', o:'ellipse',
+  g:'polygon', c:'chip', s:'icon', a:'arrow', l:'line', p:'draw', t:'text' };
 
 window.addEventListener('keydown', ev => {
   if (replaying){ ev.preventDefault(); stopReplay(); return; }
@@ -7694,7 +7755,7 @@ function claudeColor(v, keys, fallback){
   return keys.includes(k) ? k : fallback;
 }
 function claudeBuildElement(spec, idMap){
-  const kind = ['rect', 'diamond', 'ellipse', 'chip', 'text', 'arrow', 'line'].includes(spec.type)
+  const kind = ['rect', 'diamond', 'ellipse', 'polygon', 'chip', 'text', 'arrow', 'line'].includes(spec.type)
     ? spec.type : 'rect';
   const style = {
     stroke: claudeColor(spec.stroke, STROKE_KEYS, 'ink'),
@@ -7716,6 +7777,7 @@ function claudeBuildElement(spec, idMap){
     lh: typo.lh, pgap: typo.pgap, lspace: typo.lspace, valign: 'middle',
   };
   if (spec.textColor) style.textColor = claudeColor(spec.textColor, STROKE_KEYS, null);
+  if (kind === 'polygon') style.sides = clamp(Math.round(Number(spec.sides) || 6), 3, 12);
   const x = Number(spec.x) || 0, y = Number(spec.y) || 0;
   const el = newElement(kind, x, y, style);
   el.x = x; el.y = y;
@@ -7773,6 +7835,7 @@ function claudeCompact(el){
     if (el.endHead) c.endHead = el.endHead;
   }
   if (el.type === 'icon') c.icon = el.kind;
+  if (el.type === 'polygon') c.sides = el.sides || 6;
   if (el.textColor) c.textColor = el.textColor;
   if (el.mindRoot) c.mindRoot = true;
   if (el.folded) c.folded = true;
@@ -7869,6 +7932,7 @@ async function claudeExecute(action, args){
       if (u.sw !== undefined && Number(u.sw) > 0) el.sw = clamp(Number(u.sw), 0.5, 40);
       if (u.opacity !== undefined && Number(u.opacity) >= 0) el.opacity = clamp(Number(u.opacity), 0, 100);
       if (u.fillOpacity !== undefined && Number(u.fillOpacity) >= 0) el.fillOpacity = clamp(Number(u.fillOpacity), 0, 100);
+      if (u.sides !== undefined && el.type === 'polygon') el.sides = clamp(Math.round(Number(u.sides) || 6), 3, 12);
       if (u.startHead !== undefined && HEAD_KINDS.includes(u.startHead)) el.startHead = u.startHead;
       if (u.endHead !== undefined && HEAD_KINDS.includes(u.endHead)) el.endHead = u.endHead;
       if (el.type === 'text') autosizeText(el);
