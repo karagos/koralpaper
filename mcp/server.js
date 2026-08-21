@@ -76,6 +76,23 @@ function corsHeaders(origin, extra){
   }
   return Object.assign(h, extra || {});
 }
+/* Read a request body with a hard cap. Without one, any local process could
+   POST an endless stream at the bridge and exhaust this process's memory. */
+const MAX_BODY = 8 * 1024 * 1024;                 // 8 MB: far above any real tool call
+function readBody(req, res, origin, onDone){
+  let body = '', over = false;
+  req.on('data', d => {
+    if (over) return;
+    body += d;
+    if (body.length > MAX_BODY){
+      over = true; body = '';
+      try { res.writeHead(413, corsHeaders(origin)); res.end(); } catch (e){}
+      req.destroy();
+    }
+  });
+  req.on('end', () => { if (!over) onDone(body); });
+  req.on('error', () => { over = true; });
+}
 const server = http.createServer((req, res) => {
   if (!hostAllowed(req.headers.host)){
     res.writeHead(403, { 'Cache-Control': 'no-store' }); res.end(); return;
@@ -104,9 +121,7 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (req.method === 'POST' && req.url.startsWith('/result')){
-    let body = '';
-    req.on('data', d => { body += d; });
-    req.on('end', () => {
+    readBody(req, res, origin, body => {
       try {
         const { id, result } = JSON.parse(body);
         const p = pending.get(id);
@@ -124,9 +139,7 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === 'POST' && req.url.startsWith('/dispatch')){
     // a proxy instance (another Claude app) forwards a tool call to us
-    let body = '';
-    req.on('data', d => { body += d; });
-    req.on('end', async () => {
+    readBody(req, res, origin, async body => {
       let out;
       try {
         const { action, args } = JSON.parse(body);

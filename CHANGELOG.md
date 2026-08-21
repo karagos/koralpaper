@@ -1,5 +1,16 @@
 # KoralPaper — Changelog
 
+## v3.82.0
+
+**Security and robustness pass.** A full audit of the app and the MCP bridge. Four real issues found and fixed; everything else came back clean.
+
+- **Prototype pollution through imported files.** An environment saved inside a settings file could carry a crafted `__proto__` key, and merging it replaced the drawing defaults' prototype. Imported data is now merged through checks that refuse `__proto__`, `constructor` and `prototype`, and environments are sanitized on import.
+- **Unbounded geometry over the bridge.** Coordinates and sizes were used as given, so `Infinity` or `1e308` could reach the canvas, poison the page bounds and make an export try to allocate an impossible image. Positions, sizes and arrow endpoints are now clamped to a finite range, and a missing or non-positive size falls back to the normal default instead of collapsing to a single pixel.
+- **Unbounded text over the bridge.** Element text had no length limit; it is now capped.
+- **Unbounded request bodies on the local bridge.** The two POST endpoints read the body with no cap, so any local process could stream endlessly at it and exhaust memory. Bodies are now capped at 8 MB and oversized ones are rejected.
+
+Confirmed safe during the audit: no `innerHTML`, `eval`, `new Function` or `document.write` anywhere in the app; a strict Content-Security-Policy with `object-src 'none'` and `base-uri 'none'`; text escaped in SVG and HTML export; font names restricted to letters, digits and spaces before they reach a stylesheet or a Google Fonts URL; imported SVGs handled as images, where scripts cannot run; and the bridge bound to 127.0.0.1 with host, origin and custom-header checks.
+
 ## v3.81.0
 
 **Everything Claude draws now follows your Brand kit.** It did not before. Elements arriving over the MCP bridge were built from hardcoded house values: line style was pinned to sketchy, the font to Sans, and weight, corners, fill style, outline color and arrowheads all ignored the kit. So a kit set to Neat lines still produced sketchy shapes, and text came out in a different font from the rest of the document.

@@ -3176,6 +3176,23 @@ function captureEnv(){
     },
   };
 }
+/* Imported files (settings, environments, kits) are untrusted input. Copying them
+   with Object.assign lets a crafted "__proto__" key replace the target's prototype,
+   so every merge of imported data goes through these instead. */
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+function safeAssign(target, src){
+  if (!src || typeof src !== 'object') return target;
+  for (const k of Object.keys(src)) if (!UNSAFE_KEYS.has(k)) target[k] = src[k];
+  return target;
+}
+function safeClone(src, depth = 0){
+  if (depth > 8) return Array.isArray(src) ? [] : (src && typeof src === 'object' ? {} : src);
+  if (Array.isArray(src)) return src.map(v => safeClone(v, depth + 1));
+  if (!src || typeof src !== 'object') return src;
+  const clean = {};
+  for (const k of Object.keys(src)) if (!UNSAFE_KEYS.has(k)) clean[k] = safeClone(src[k], depth + 1);
+  return clean;
+}
 function applyEnv(env, silent){
   if (!env) return;
   state.board = (env.board && env.board.w > 0 && env.board.h > 0)
@@ -3184,7 +3201,7 @@ function applyEnv(env, silent){
   if (typeof env.grid === 'string') state.grid = env.grid;
   if (Number(env.gridSize) > 0) state.gridSize = clamp(Number(env.gridSize), 6, 120);
   if (env.theme){ state.theme = env.theme === 'dark' ? 'dark' : 'light'; document.body.classList.toggle('dark', state.theme === 'dark'); }
-  if (env.defaults){ Object.assign(defaults, env.defaults); if (env.defaults.fillByType) defaults.fillByType = { ...env.defaults.fillByType }; }
+  if (env.defaults){ safeAssign(defaults, env.defaults); if (env.defaults.fillByType) defaults.fillByType = safeAssign({}, env.defaults.fillByType); }
   syncPaperUI(); syncToggles(); syncGridMenu(); paintSwatches(); syncBoardBtn(); buildBoardMenuSel();
   commit(); syncPanel(); requestRender(); scheduleAutosave();
 }
@@ -4852,7 +4869,8 @@ function importSettingsData(data){
     } catch (e){}
   }
   if (Array.isArray(data.environments)){
-    try { localStorage.setItem(ENV_KEY, JSON.stringify(data.environments)); } catch (e){}
+    const safeEnvs = safeClone(data.environments).slice(0, 60);   // untrusted file: strip prototype keys
+    try { localStorage.setItem(ENV_KEY, JSON.stringify(safeEnvs)); } catch (e){}
     if (typeof data.defaultEnvId === 'string'){ try { localStorage.setItem(ENVDEF_KEY, data.defaultEnvId); } catch (e){} }
     buildEnvList();
   }
@@ -8621,6 +8639,18 @@ function claudeColor(v, keys, fallback){
   const k = v.toLowerCase().replace('black', 'ink');
   return keys.includes(k) ? k : fallback;
 }
+/* Values arriving over the bridge are untrusted: NaN, Infinity and 1e308 all used
+   to pass straight through into geometry, where they poison sceneBounds and make an
+   export try to allocate an impossible canvas. Everything is clamped to a finite,
+   sane canvas range instead. */
+const CLAUDE_COORD = 1e6, CLAUDE_SIZE = 1e5, CLAUDE_TEXT_MAX = 20000;
+function claudeNum(v, fallback, lo, hi){
+  const n = Number(v);
+  return Number.isFinite(n) ? clamp(n, lo, hi) : fallback;
+}
+function claudeText(v){
+  return typeof v === 'string' ? v.slice(0, CLAUDE_TEXT_MAX) : '';
+}
 function claudeBuildElement(spec, idMap){
   const kind = ['rect', 'diamond', 'ellipse', 'polygon', 'chip', 'text', 'arrow', 'line'].includes(spec.type)
     ? spec.type : 'rect';
@@ -8652,7 +8682,7 @@ function claudeBuildElement(spec, idMap){
   };
   if (spec.textColor) style.textColor = claudeColor(spec.textColor, STROKE_KEYS, null);
   if (kind === 'polygon') style.sides = clamp(Math.round(Number(spec.sides) || 6), 3, 12);
-  const x = Number(spec.x) || 0, y = Number(spec.y) || 0;
+  const x = claudeNum(spec.x, 0, -CLAUDE_COORD, CLAUDE_COORD), y = claudeNum(spec.y, 0, -CLAUDE_COORD, CLAUDE_COORD);
   const el = newElement(kind, x, y, style);
   el.x = x; el.y = y;
   if (spec.bold && typeof spec.text === 'string' && spec.text.length)
@@ -8678,15 +8708,18 @@ function claudeBuildElement(spec, idMap){
       el.startBind = fromId; el.endBind = toId;
       el.points = [[0, 0], [10, 0]];
     } else {
-      const x2 = Number(spec.x2), y2 = Number(spec.y2);
+      const x2 = claudeNum(spec.x2, NaN, -CLAUDE_COORD, CLAUDE_COORD);
+      const y2 = claudeNum(spec.y2, NaN, -CLAUDE_COORD, CLAUDE_COORD);
       el.points = [[0, 0], [isNaN(x2) ? 160 : x2 - x, isNaN(y2) ? 0 : y2 - y]];
     }
-    el.text = typeof spec.text === 'string' ? spec.text : '';
+    el.text = claudeText(spec.text);
   } else {
     const defSize = { rect: [190, 92], diamond: [170, 120], ellipse: [160, 110], chip: [140, 40] }[kind];
-    el.w = Number(spec.w) > 0 ? Number(spec.w) : (defSize ? defSize[0] : 120);
-    el.h = Number(spec.h) > 0 ? Number(spec.h) : (defSize ? defSize[1] : 60);
-    el.text = typeof spec.text === 'string' ? spec.text : '';
+    // a missing OR non-positive size means "use the default", not "make it 1px wide"
+    const wPos = Number(spec.w) > 0 ? spec.w : undefined, hPos = Number(spec.h) > 0 ? spec.h : undefined;
+    el.w = claudeNum(wPos, defSize ? defSize[0] : 120, 1, CLAUDE_SIZE);
+    el.h = claudeNum(hPos, defSize ? defSize[1] : 60, 1, CLAUDE_SIZE);
+    el.text = claudeText(spec.text);
     if (kind === 'text') autosizeText(el);
   }
   if (spec.id) idMap.set(String(spec.id), el.id);
