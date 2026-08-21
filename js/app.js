@@ -4488,9 +4488,9 @@ function cmdScore(q, c){
 function renderCmdList(){
   const q = $('cmdInput').value.trim().toLowerCase();
   let list;
-  if (!q) list = cmdAll.slice(0, 60);
+  if (!q) list = cmdAll.slice(0, 80);
   else list = cmdAll.map(c => ({ c, s: cmdScore(q, c) })).filter(x => x.s > -Infinity)
-    .sort((a,b) => b.s - a.s).slice(0, 50).map(x => x.c);
+    .sort((a,b) => b.s - a.s).slice(0, 200).map(x => x.c);
   cmdShown = list; cmdSel = 0;
   const wrap = $('cmdList');
   wrap.replaceChildren();

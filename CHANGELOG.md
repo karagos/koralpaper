@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.74.1
+
+Command palette polish: long command and font names now wrap instead of being cut off at the edge, and the results list shows many more matches at once, so every font in the catalog is reachable when you search.
+
 ## v3.74.0
 
 **Command palette (⌘K).** Press ⌘K (Ctrl+K on Windows/Linux) to open a fuzzy search over everything the app can do: switch tools, insert a shape ("insert a hexagon"), jump to a page ("go to page 3"), run any file or export action, apply a font by name, drop in a template, toggle the grid or theme, and more. Type a few letters, use the arrow keys, and press Enter. Over 200 commands, and the list grows automatically with your pages, fonts and templates.

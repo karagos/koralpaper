@@ -940,12 +940,12 @@ body.dark #tooltip{box-shadow:0 4px 14px -4px rgba(0,0,0,.7);}
 #cmdInput{border:none; outline:none; background:transparent; color:var(--ink);
   font:16px/1.4 var(--sans); padding:16px 18px; border-bottom:1.5px solid var(--line-soft);}
 .cmdlist{max-height:min(52vh,460px); overflow-y:auto; padding:6px;}
-.cmditem{display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:9px;
+.cmditem{display:flex; align-items:flex-start; gap:10px; padding:9px 12px; border-radius:9px;
   cursor:pointer; font-size:13.5px;}
 .cmditem.sel{background:var(--coral-soft);}
-.cmditem .cmdcat{font-size:10.5px; font-weight:700; color:#fff; background:var(--ink-soft);
+.cmditem .cmdcat{font-size:10.5px; font-weight:700; color:#fff; background:var(--ink-soft); margin-top:1px;
   border-radius:5px; padding:2px 6px; flex:0 0 auto; opacity:.85;}
-.cmditem .cmdtitle{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink);}
+.cmditem .cmdtitle{flex:1; min-width:0; color:var(--ink); white-space:normal; overflow-wrap:anywhere; line-height:1.35;}
 .cmditem .cmdhint{flex:0 0 auto; font-size:11px; color:var(--ink-soft);
   font-variant-numeric:tabular-nums; opacity:.7;}
 .cmdempty{padding:18px 14px; color:var(--ink-soft); font-size:13px; text-align:center;}
