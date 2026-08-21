@@ -2391,7 +2391,7 @@ function syncPanel(){
   const has = (...ts) => ts.some(t => types.has(t));
   const shapeish = has('rect','diamond','ellipse','chip','icon','polygon');
   const linear = has('arrow','line','draw');
-  const textish = has('rect','diamond','ellipse','chip','text','arrow','line');
+  const textish = has('rect','diamond','ellipse','chip','text','arrow','line','polygon');
 
   const onlyText = sel.length > 0 && sel.every(e => e.type === 'text');
   const onlyLinear = sel.length > 0 && sel.every(e => isLinear(e));

@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.69.1
+
+Polygon fixes.
+- Selecting a polygon now shows the text controls (font, size, text color, alignment), so its label is as editable as any other shape's.
+- Arrows and lines glued to a polygon now touch its actual edge, with the same small gap as a rectangle, instead of stopping short at the wider circumscribed circle.
+
 ## v3.69.0
 
 Environments: save and switch your whole working setup. In Settings, the new Environments section saves your canvas size, paper color, grid, theme, line and shape style, fonts, and arrowhead defaults as a named environment. Apply one anytime, keep as many as you like, and mark one as the default that every new document starts from. Perfect for jumping between, say, a "LinkedIn carousel" setup and a "clean flowchart" one without re-configuring each time.

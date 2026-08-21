@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.69.0';
+const APP_VERSION = '3.69.1';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -535,9 +535,25 @@ function boundaryPointToward(el, fromX, fromY, gap){
   const len = Math.hypot(dx, dy) || 1;
   const ux = dx / len, uy = dy / len;
   let t;
-  if (el.type === 'ellipse' || el.type === 'icon' || el.type === 'polygon'){
+  if (el.type === 'ellipse' || el.type === 'icon'){
     const rx = b.w/2 || 1, ry = b.h/2 || 1;
     t = 1 / Math.sqrt((ux*ux)/(rx*rx) + (uy*uy)/(ry*ry));
+  } else if (el.type === 'polygon'){
+    // cast the ray from the centre against the real polygon edges so the
+    // endpoint lands on the flat side, not on the wider circumscribed ellipse
+    const pts = polygonOutline(b.x, b.y, b.w, b.h, el.sides);
+    let best = Infinity;
+    for (let i = 0; i < pts.length; i++){
+      const a = pts[i], c = pts[(i + 1) % pts.length];
+      const ex = c[0] - a[0], ey = c[1] - a[1];
+      const den = ux * ey - uy * ex;
+      if (Math.abs(den) < 1e-9) continue;
+      const wx = a[0] - cx, wy = a[1] - cy;
+      const tt = (wx * ey - wy * ex) / den;      // distance along the unit ray
+      const s = (wx * uy - wy * ux) / den;       // position along the edge
+      if (tt > 0 && s >= -1e-6 && s <= 1 + 1e-6 && tt < best) best = tt;
+    }
+    t = isFinite(best) ? best : (Math.min(b.w, b.h) / 2 || 1);
   } else if (el.type === 'diamond'){
     const rx = b.w/2 || 1, ry = b.h/2 || 1;
     t = 1 / (Math.abs(ux)/rx + Math.abs(uy)/ry);
