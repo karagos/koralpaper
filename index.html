@@ -718,53 +718,48 @@
         the page and look at a picture of it, so "make the third box green" or
         "clean up this layout" work on whatever is on the paper, even things you
         drew by hand.</p>
-      <table>
-        <tr><td class="sect">Set up once (about a minute)</td></tr>
-        <tr><td><b>1.</b> Install the free <a href="https://claude.ai/download" target="_blank" rel="noopener">Claude Desktop</a> app and sign in.</td></tr>
+      
+      <details class="setsec"><summary>Set up once (about a minute)</summary><div class="setsecbody"><table><tr><td><b>1.</b> Install the free <a href="https://claude.ai/download" target="_blank" rel="noopener">Claude Desktop</a> app and sign in.</td></tr>
         <tr><td><b>2.</b> Double-click <b>koralpaper.mcpb</b> (it ships in the <code>mcp</code> folder of this app, or grab it from the
           <a href="https://github.com/karagos/koralpaper" target="_blank" rel="noopener">GitHub page</a>) and confirm the install inside Claude Desktop.</td></tr>
-        <tr><td><b>3.</b> Keep KoralPaper open in your browser. The ✳ appears in the top bar when the link is alive.</td></tr>
-        <tr><td class="sect">Prompt recipes (click to copy, paste into Claude Desktop)</td></tr>
-        <tr><td><div class="reciperow">
+        <tr><td><b>3.</b> Keep KoralPaper open in your browser. The ✳ appears in the top bar when the link is alive.</td></tr></table></div></details>
+      <details class="setsec"><summary>Prompt recipes (click to copy, paste into Claude Desktop)</summary><div class="setsecbody"><table><tr><td><div class="reciperow">
           <button class="minipill" data-recipe="tidy">Tidy this page</button>
           <button class="minipill" data-recipe="clean">Rebuild it clean</button>
           <button class="minipill" data-recipe="mindmap">Turn into a mind map</button>
           <button class="minipill" data-recipe="carousel">Make a carousel of it</button>
           <button class="minipill" data-recipe="summary">Summarize the document</button>
-        </div></td></tr>
-        <tr><td class="sect">Then just talk to Claude</td></tr>
-        <tr><td>"Draw a customer onboarding flowchart with five steps on a 1920×1080 board."</td></tr>
+        </div></td></tr></table></div></details>
+      <details class="setsec"><summary>Then just talk to Claude</summary><div class="setsecbody"><table><tr><td>"Draw a customer onboarding flowchart with five steps on a 1920×1080 board."</td></tr>
         <tr><td>"Read my KoralPaper page and tidy the layout, keep my colors."</td></tr>
-        <tr><td>"Turn these meeting notes into a decision tree on a LinkedIn carousel board."</td></tr>
-        <tr><td class="sect">Recreate a design from an image</td></tr>
-        <tr><td>Give Claude Desktop a poster, slide or PDF page and it rebuilds it here as an
+        <tr><td>"Turn these meeting notes into a decision tree on a LinkedIn carousel board."</td></tr></table></div></details>
+      <details class="setsec"><summary>Recreate a design from an image</summary><div class="setsecbody"><table><tr><td>Give Claude Desktop a poster, slide or PDF page and it rebuilds it here as an
           editable KoralPaper page: exact texts, colors and layout, one page per image.
           Copy the replica prompt, paste it into Claude Desktop, attach the image(s), send.</td></tr>
-        <tr><td><button class="minipill" id="copyReplicaBtn">Copy the replica prompt</button></td></tr>
-        <tr><td class="sect">No Claude Desktop?</td></tr>
-        <tr><td>Copy the design prompt below, paste it into any Claude (claude.ai works fine)
+        <tr><td><button class="minipill" id="copyReplicaBtn">Copy the replica prompt</button></td></tr></table></div></details>
+      <details class="setsec"><summary>No Claude Desktop?</summary><div class="setsecbody"><table><tr><td>Copy the design prompt below, paste it into any Claude (claude.ai works fine)
           together with what you want, then save Claude's .json answer as a file and open it
-          here with ☰ → Open sketch.</td></tr>
-      </table>
+          here with ☰ → Open sketch.</td></tr></table></div></details>
+    
       <div class="setactions">
         <button class="minipill" id="copyPromptBtn">Copy the design prompt</button>
       </div>
     </div>
     <div id="helpPane">
     <h3>Shortcuts &amp; tips</h3>
-    <table>
-      <tr><td class="sect">Tools</td></tr>
-      <tr><td><b>V</b> select · <b>H</b> hand · <b>E</b> eraser · <b>R</b> sticky · <b>D</b> diamond · <b>O</b> ellipse · <b>C</b> chip</td></tr>
+    <p class="setdesc setintro">Click a heading to open it.</p>
+    
+      <details class="setsec"><summary>Tools</summary><div class="setsecbody"><table><tr><td><b>V</b> select · <b>H</b> hand · <b>E</b> eraser · <b>R</b> sticky · <b>D</b> diamond · <b>O</b> ellipse · <b>C</b> chip</td></tr>
       <tr><td><b>S</b> icon stamps · <b>A</b> arrow · <b>L</b> line · <b>P</b> draw · <b>T</b> text · <b>I</b> import image · <b>polygon</b> (toolbar)</td></tr>
       <tr><td><b>Eraser (E):</b> click an element to delete it, or hold and drag across several to wipe them. One undo brings the whole stroke back.</td></tr>
-      <tr><td><b>Polygon:</b> a regular shape from 3 to 12 sides, set with the <b>Sides</b> slider in the panel. Fill, text and everything else work like any shape.</td></tr>
-      <tr><td class="sect">Editing</td></tr>
-      <tr><td><b>⌘Z</b> undo · <b>⇧⌘Z</b> redo · <b>⌘A</b> select all · <b>⌘D</b> duplicate · <b>⌥drag</b> duplicate</td></tr>
+      <tr><td><b>Polygon:</b> a regular shape from 3 to 12 sides, set with the <b>Sides</b> slider in the panel. Fill, text and everything else work like any shape.</td></tr></table></div></details>
+      <details class="setsec"><summary>Editing</summary><div class="setsecbody"><table><tr><td><b>⌘Z</b> undo · <b>⇧⌘Z</b> redo · <b>⌘A</b> select all · <b>⌘D</b> duplicate · <b>⌥drag</b> duplicate</td></tr>
       <tr><td><b>⌘C / ⌘X / ⌘V</b> copy, cut &amp; paste · <b>⌥⌘C / ⌥⌘V</b> copy &amp; paste style</td></tr>
       <tr><td><b>⇧⌘C</b> copy the selection (or page) to the clipboard as a PNG image</td></tr>
       <tr><td><b>⌘G</b> group · <b>⇧⌘G</b> ungroup · <b>Delete</b> removes · <b>arrow keys</b> nudge (⇧ = ×5)</td></tr>
       <tr><td><b>⇧drag</b> moves in a straight line: locks the selection to the horizontal or vertical axis</td></tr>
       <tr><td><b>Double-click</b> a shape (or arrow) to type on it · <b>Enter</b> edits the selection</td></tr>
+      <tr><td><b>Lock:</b> right-click an element or group → <b>Lock</b>. Locked elements ignore clicks and drags, so you cannot move or resize them by accident (a small padlock marks them). Right-click again → <b>Unlock</b>.</td></tr>
       <tr><td><b>Merge texts:</b> select several text elements (⇧click in the order you
         want the lines), right-click → <b>Merge texts into one</b>. Add a shape to the
         selection and the menu offers <b>Merge text into the shape</b> instead: the text
@@ -799,33 +794,28 @@
         editor open: works mid-typing too. Right-click the canvas → <b>Tidy the flow</b> lines it all up</td></tr>
       <tr><td><b>Mind map:</b> right-click a shape → <b>Mark as mind-map root</b>, then click the
         <b>−</b>/<b>+</b> badges to fold and unfold branches: also mid-presentation. Exports show
-        exactly what you see; unmark the root to reveal everything again</td></tr>
-      <tr><td class="sect">Shapes &amp; style</td></tr>
-      <tr><td><b>Fill opacity:</b> a slider in the panel fades only the fill, leaving the outline and text solid: translucent highlights, tints behind text, Venn overlaps.</td></tr>
+        exactly what you see; unmark the root to reveal everything again</td></tr></table></div></details>
+      <details class="setsec"><summary>Shapes &amp; style</summary><div class="setsecbody"><table><tr><td><b>Fill opacity:</b> a slider in the panel fades only the fill, leaving the outline and text solid: translucent highlights, tints behind text, Venn overlaps.</td></tr>
       <tr><td><b>Arrowheads:</b> pick a head for each end of a line: open arrow, hollow or solid triangle, hollow or solid diamond, hollow or solid circle, or a bar stop.</td></tr>
-      <tr><td><b>Import SVG:</b> drag in or press <b>I</b> with an .svg file and it comes in as a true vector, crisp at any size and vector in exports.</td></tr>
-      <tr><td class="sect">Files &amp; view</td></tr>
-      <tr><td><b>⌘S</b> save .json · <b>⌘O</b> open · <b>⌥⌘N</b> new document · <b>Esc</b> closes anything</td></tr>
+      <tr><td><b>Import SVG:</b> drag in or press <b>I</b> with an .svg file and it comes in as a true vector, crisp at any size and vector in exports.</td></tr></table></div></details>
+      <details class="setsec"><summary>Files &amp; view</summary><div class="setsecbody"><table><tr><td><b>⌘S</b> save .json · <b>⌘O</b> open · <b>⌥⌘N</b> new document · <b>Esc</b> closes anything</td></tr>
       <tr><td><b>Space-drag</b> or middle mouse pans · <b>⌘ + scroll</b> zooms · <b>⇧1</b> zoom to fit</td></tr>
-      <tr><td><b>G</b> cycles grid (lines / dots / off) · <b>⇧G</b> alignment-guide snapping</td></tr>
-      <tr><td class="sect">Arrows</td></tr>
-      <tr><td>Draw between shapes: the arrow <b>glues to both</b>; aim for the <b>side dots</b> to pin a side.</td></tr>
+      <tr><td><b>G</b> cycles grid (lines / dots / off) · <b>⇧G</b> alignment-guide snapping</td></tr></table></div></details>
+      <details class="setsec"><summary>Arrows</summary><div class="setsecbody"><table><tr><td>Draw between shapes: the arrow <b>glues to both</b>; aim for the <b>side dots</b> to pin a side.</td></tr>
       <tr><td>Drag the <b>middle handle</b> to bend. The <b>elbow</b> bend style routes at right angles
-        around other shapes: every segment gets its own handle; right-click → re-route.</td></tr>
-      <tr><td class="sect">Images &amp; art styles</td></tr>
-      <tr><td><b>Drag &amp; drop</b>, paste, or press <b>I</b>: then pick an <b>Art style</b> in the panel:
+        around other shapes: every segment gets its own handle; right-click → re-route.</td></tr></table></div></details>
+      <details class="setsec"><summary>Images &amp; art styles</summary><div class="setsecbody"><table><tr><td><b>Drag &amp; drop</b>, paste, or press <b>I</b>: then pick an <b>Art style</b> in the panel:
         dots, lines, stipple, hatch, cubist, flow, scribble, one line, string, typewriter, duotone.</td></tr>
       <tr><td>Tune with the <b>Brightness / Contrast / Gamma / Sharpen</b> sliders · <b>Crop</b> from the
         panel or right-click · everything stays non-destructive.</td></tr>
       <tr><td>The icon menu also holds <b>Google Material icons</b>: search 3,000 symbols;
         <b>right-click an icon to pin it</b>. Pinned ★ and recently-used icons lead the grid
-        (internet needed once per new icon).</td></tr>
-      <tr><td class="sect">More</td></tr>
-      <tr><td><b>Right-click</b> anything for the context menu · ☰ → <b>Templates</b> for ready-made pages · the <b>∞ / size button</b>
+        (internet needed once per new icon).</td></tr></table></div></details>
+      <details class="setsec"><summary>More</summary><div class="setsecbody"><table><tr><td><b>Right-click</b> anything for the context menu · ☰ → <b>Templates</b> for ready-made pages · the <b>∞ / size button</b>
         (bottom left) sets exact canvas sizes for social formats.</td></tr>
       <tr><td><b>Pages:</b> the strip at the bottom holds multi-page documents. <b>Shift-click</b> a range or <b>⌘/Ctrl-click</b> to select several, then right-click to move, duplicate or delete them together.</td></tr>
-      <tr><td><b>Environments (? → Settings):</b> save your canvas size, colors, grid, style and fonts as a named setup. Apply one anytime, or set a default that new documents start from.</td></tr>
-    </table>
+      <tr><td><b>Environments (? → Settings):</b> save your canvas size, colors, grid, style and fonts as a named setup. Apply one anytime, or set a default that new documents start from.</td></tr></table></div></details>
+    
     </div>
     <div id="settingsPane" class="hidden">
       <h3>Settings</h3>

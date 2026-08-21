@@ -335,6 +335,27 @@ function drawOverlay(){
     }
   }
 
+  // lock badges: a small padlock at the top-right of each locked element
+  if (state.tool === 'select' && !presenting){
+    for (const el of visibleEls(state.elements)){
+      if (!el.locked) continue;
+      const b = boundsOf(el);
+      const s = 12 / z;
+      const bx = b.x + b.w - s * 1.15, by = b.y + s * 0.15;
+      ctx.save();
+      ctx.fillStyle = state.theme === 'light' ? 'rgba(32,29,24,.5)' : 'rgba(236,231,218,.55)';
+      ctx.strokeStyle = ctx.fillStyle;
+      ctx.lineWidth = s * 0.15;
+      ctx.beginPath();                                  // shackle
+      ctx.arc(bx + s / 2, by + s * 0.52, s * 0.26, Math.PI, 0);
+      ctx.stroke();
+      const bodyY = by + s * 0.5, bodyH = s * 0.62, bodyW = s * 0.78, bodyX = bx + (s - bodyW) / 2;
+      if (ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bodyX, bodyY, bodyW, bodyH, s * 0.16); ctx.fill(); }
+      else ctx.fillRect(bodyX, bodyY, bodyW, bodyH);
+      ctx.restore();
+    }
+  }
+
   // per-element selection outlines
   const sel = selected();
   for (const el of sel){
@@ -762,9 +783,10 @@ function setSelection(ids){
   state.selection = expandGroups(ids);
   syncPanel(); requestRender();
 }
-function topElementAt(sx, sy){
+function topElementAt(sx, sy, includeLocked){
   const els = visibleEls(state.elements);
   for (let i = els.length - 1; i >= 0; i--){
+    if (!includeLocked && els[i].locked) continue;   // locked elements ignore clicks
     if (hitTest(els[i], sx, sy, state.camera.z)) return els[i];
   }
   return null;
@@ -902,7 +924,8 @@ function onPointerDown(ev){
     const badge = mindBadgeAt(sx, sy);
     if (badge){ mindToggle(badge.id); return; }
     const sel = selected();
-    if (sel.length){
+    const allLocked = sel.length > 0 && sel.every(e => e.locked);
+    if (sel.length && !allLocked){
       const sb = selectionBounds();
       const z = state.camera.z;
       const single = sel.length === 1 ? sel[0] : null;
@@ -983,7 +1006,8 @@ function onPointerDown(ev){
         }
       }
       if (!state.selection.has(hit.id)) setSelection(new Set([hit.id]));
-      let movingEls = selected();
+      let movingEls = selected().filter(e => !e.locked);
+      if (!movingEls.length) movingEls = selected();  // (locked-only: nothing will actually move)
       if (ev.altKey){
         movingEls = duplicateElements(movingEls, 0, 0);
         setSelection(new Set(movingEls.map(e => e.id)));
@@ -1165,6 +1189,7 @@ function onPointerMove(ev){
     const rw = Math.abs(it.x1 - it.x0), rh = Math.abs(it.y1 - it.y0);
     const ids = new Set(it.keep);
     for (const el of visibleEls(state.elements)){
+      if (el.locked) continue;                       // locked elements skip marquee selection
       const b = boundsWithRotation(el);
       if (b.x < rx + rw && b.x + b.w > rx && b.y < ry + rh && b.y + b.h > ry) ids.add(el.id);
     }
@@ -1738,10 +1763,20 @@ function duplicateSelection(){
   setSelection(new Set(clones.map(e => e.id)));
   commit();
 }
+function toggleLockSelection(lock){
+  const sel = selected();
+  if (!sel.length) return;
+  for (const el of sel) el.locked = !!lock;
+  if (lock) state.selection = new Set();             // deselect so they can't be dragged
+  commit(); syncPanel(); requestRender();
+  showHint(lock ? 'Locked: right-click to unlock. Locked elements ignore clicks and drags'
+    : 'Unlocked');
+}
 function deleteSelection(){
   if (!state.selection.size) return;
-  state.elements = state.elements.filter(e => !state.selection.has(e.id));
-  state.selection = new Set();
+  const lockedInSel = state.elements.filter(e => state.selection.has(e.id) && e.locked);
+  state.elements = state.elements.filter(e => !state.selection.has(e.id) || e.locked);  // keep locked
+  state.selection = new Set(lockedInSel.map(e => e.id));
   updateBoundArrows(state.elements);
   commit(); syncPanel(); requestRender();
 }
@@ -1999,7 +2034,7 @@ function mergeTextIntoShape(){
 }
 function openCtxMenu(ev){
   const [sx, sy] = toScene(ev.clientX, ev.clientY);
-  const hit = topElementAt(sx, sy);
+  const hit = topElementAt(sx, sy, true);            // right-click can target locked elements too
   if (hit && !state.selection.has(hit.id)) setSelection(new Set([hit.id]));
   if (!hit && state.tool === 'select') setSelection(new Set());
   const sel = selected();
@@ -2081,6 +2116,9 @@ function openCtxMenu(ev){
         }
         commit(); syncPanel(); requestRender();
       });
+    const anyLocked = sel.some(e => e.locked);
+    add(anyLocked ? (sel.length > 1 ? 'Unlock these' : 'Unlock') : (sel.length > 1 ? 'Lock these' : 'Lock'),
+      () => toggleLockSelection(!anyLocked));
     add('Delete', deleteSelection);
     hr();
     if (sel.length >= 2) add('Group', () => { groupSelection(); syncPanel(); });
@@ -2092,7 +2130,7 @@ function openCtxMenu(ev){
     add('Send to back', () => reorder('back'));
   } else {
     add('Paste', paste, !clipboard);
-    add('Select all', () => { setSelection(new Set(state.elements.map(e => e.id))); setTool('select'); });
+    add('Select all', () => { setSelection(new Set(state.elements.filter(e => !e.locked).map(e => e.id))); setTool('select'); });
     add('Zoom to fit', zoomToFit);
     add('Tidy the flow', tidyLayout);
   }

@@ -1,5 +1,10 @@
 # KoralPaper — Changelog
 
+## v3.71.0
+
+- **Lock elements.** Right-click an element or group and choose **Lock**: it then ignores clicks, drags and marquee selection, so you cannot move or resize it by accident, which is a lifesaver on busy pages. A small padlock marks locked elements; right-click one and choose **Unlock** to release it. Locking also saves with the document.
+- **The Help and Design-with-Claude tabs are now collapsible sections too**, matching Settings. Every section starts collapsed; click a heading to open just what you need.
+
 ## v3.70.0
 
 Settings and Help tidy-up.
