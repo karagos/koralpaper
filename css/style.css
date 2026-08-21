@@ -611,6 +611,24 @@ body.dark .minipill.danger{color:#F09070; border-color:rgba(240,144,112,.4);}
   padding:6px 8px; border:1.5px solid var(--line-soft); border-radius:8px;
   background:var(--card); color:var(--ink); min-width:0; cursor:pointer;
 }
+/* brand kit v2: grouped roles, expandable accent palette */
+.brandgroup{margin:9px 0 4px; padding:8px 9px; border:1.5px solid var(--line-soft); border-radius:10px; background:var(--card);}
+.brandgrouphd{font-family:var(--sans); font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:6px;}
+.brandgrouphint{font-weight:500; text-transform:none; letter-spacing:0; opacity:.75;}
+.brandpalette{display:flex; gap:9px; flex-wrap:wrap; margin-bottom:7px;}
+.brandpalcell{position:relative;}
+.brandpaltools{display:flex; gap:2px; margin-top:2px;}
+.brandpalbtn{
+  width:15px; height:15px; padding:0; line-height:1; font-size:10px;
+  border:1px solid var(--line-soft); border-radius:4px; background:var(--paper);
+  color:var(--ink-soft); cursor:pointer;
+}
+.brandpalbtn:hover:not(:disabled){border-color:var(--coral); color:var(--coral);}
+.brandpalbtn:disabled{opacity:.3; cursor:default;}
+.brandcontrast{margin:6px 0 0; font-size:11px; opacity:.85;}
+.brandcontrast.warn{color:var(--coral); opacity:1; font-weight:600;}
+.brandgenrow{align-items:flex-start; gap:8px; flex-wrap:wrap; margin-top:6px;}
+.brandgentext{flex:1; min-width:120px; font-size:12px; color:var(--ink-soft); line-height:1.35;}
 .swatch.brandsw{outline:2px solid var(--coral-soft); outline-offset:-2px;}
 .swatch.libsw{border-radius:50%;}
 #imgRadiusRange{width:100%; accent-color:var(--coral); height:18px;}

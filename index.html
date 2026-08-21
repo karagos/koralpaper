@@ -781,6 +781,7 @@
       <tr><td><b>Double-click</b> a shape (or arrow) to type on it · <b>Enter</b> edits the selection</td></tr>
       <tr><td><b>Snap freehand to shapes:</b> with the pen (P), a rough box, circle, triangle, diamond or line becomes a clean shape. Toggle it with the wand button in the top bar; <b>⌘Z</b> keeps your raw stroke.</td></tr>
       <tr><td><b>Make it mine (restyle):</b> ☰ menu or right-click → recast a page (or your selection) into your Brand kit: your colors, fonts, one fresh hand-drawn style and tidy line weights, in one step. Turns a template or an AI-drawn page into something that looks like you.</td></tr>
+      <tr><td><b>Brand kit (design system):</b> Settings → Brand kit. Colors carry roles, so the whole app knows which goes where: <b>Primary</b> (hero, first chart series, headline accent, the ✳), <b>Secondary</b> (support, second series), an expandable <b>Accent palette</b> (add, remove and reorder for extra variety), and neutrals <b>Paper</b>, <b>Ink</b> and an optional <b>Muted</b> gray. Paste one Primary color and <b>Generate system</b> builds a harmonious rest around it. Charts, headlines, new documents, "Make it mine" and Claude all follow the roles.</td></tr>
       <tr><td><b>Command palette (⌘K):</b> fuzzy-search every tool, action, page, template and font, then run it. Try "insert hexagon", "go to page 2", "export png", or a font name.</td></tr>
       <tr><td><b>Lock:</b> right-click an element or group → <b>Lock</b>. Locked elements ignore clicks and drags, so you cannot move or resize them by accident (a small padlock marks them). Right-click again → <b>Unlock</b>.</td></tr>
       <tr><td><b>Merge texts:</b> select several text elements (⇧click in the order you
@@ -861,25 +862,49 @@
       <details class="setsec">
         <summary>Brand kit</summary>
         <div class="setsecbody">
-          <p class="setdesc">Your identity in one place: when active, charts use the accent colors,
-            chart and template headlines use the heading font, new documents start on the brand
-            paper, and the accents appear as extra color swatches. Claude reads the kit too and
-            designs on brand. Export the kit as a file to give your whole team the same look.</p>
+          <p class="setdesc">A small design system, not just a color list. Every color has a role, so
+            charts, headlines, new documents and “Make it mine” all know which color goes where. Claude
+            reads the roles too and designs on brand. Export the kit to give your whole team one look.</p>
           <div class="setrow"><label>Active</label><input type="checkbox" id="brandActiveChk" class="brandchk"></div>
           <div class="setrow"><label>Name</label><input type="text" id="brandName" class="brandtextinput" placeholder="e.g. CAIO" autocomplete="off"></div>
-          <div class="setrow brandrow"><label>Accents</label><div class="brandaccents" id="brandAccents">
-            <span class="brandacc"><input type="color" id="brandC1"><span class="brandhex" id="brandC1Hex"></span></span>
-            <span class="brandacc"><input type="color" id="brandC2"><span class="brandhex" id="brandC2Hex"></span></span>
-            <span class="brandacc"><input type="color" id="brandC3"><span class="brandhex" id="brandC3Hex"></span></span>
-            <span class="brandacc"><input type="color" id="brandC4"><span class="brandhex" id="brandC4Hex"></span></span>
-            <span class="brandacc"><input type="color" id="brandC5"><span class="brandhex" id="brandC5Hex"></span></span>
-            <span class="brandacc"><input type="color" id="brandC6"><span class="brandhex" id="brandC6Hex"></span></span>
-          </div></div>
-          <div class="setrow brandrow"><label>Paper</label>
-            <span class="brandacc"><input type="color" id="brandPaper"><span class="brandhex" id="brandPaperHex"></span></span>
-            <label class="chartcheck" title="New documents start with this paper color"><input type="checkbox" id="brandPaperOn"> new documents</label></div>
-          <div class="setrow"><label>Headings</label><select id="brandHeadFont" class="brandselect"></select></div>
-          <div class="setrow"><label>Body</label><select id="brandBodyFont" class="brandselect"></select></div>
+
+          <div class="brandgroup">
+            <div class="brandgrouphd">Core</div>
+            <div class="setrow brandrow"><label title="Hero color: first chart series, headline accent, the ✳">Primary</label>
+              <span class="brandacc"><input type="color" id="brandPrimary"><span class="brandhex" id="brandPrimaryHex"></span></span></div>
+            <div class="setrow brandrow"><label title="Support color: second chart series, secondary emphasis">Secondary</label>
+              <span class="brandacc"><input type="color" id="brandSecondary"><span class="brandhex" id="brandSecondaryHex"></span></span></div>
+          </div>
+
+          <div class="brandgroup">
+            <div class="brandgrouphd">Accent palette <span class="brandgrouphint">extra categorical colors, after primary + secondary</span></div>
+            <div class="brandpalette" id="brandPalette"></div>
+            <button class="minipill" id="brandAddAccent">+ Add accent</button>
+          </div>
+
+          <div class="brandgroup">
+            <div class="brandgrouphd">Neutrals</div>
+            <div class="setrow brandrow"><label title="Background color for new documents and Make-it-mine">Paper</label>
+              <span class="brandacc"><input type="color" id="brandPaper"><span class="brandhex" id="brandPaperHex"></span></span>
+              <label class="chartcheck" title="New documents start with this paper color"><input type="checkbox" id="brandPaperOn"> new docs</label></div>
+            <div class="setrow brandrow"><label title="Outlines and body text">Ink</label>
+              <span class="brandacc"><input type="color" id="brandInk"><span class="brandhex" id="brandInkHex"></span></span></div>
+            <div class="setrow brandrow"><label title="Optional soft gray for subtle text and fills">Muted</label>
+              <span class="brandacc"><input type="color" id="brandMuted"><span class="brandhex" id="brandMutedHex"></span></span>
+              <label class="chartcheck" title="Include an optional muted gray in the kit"><input type="checkbox" id="brandMutedOn"> use</label></div>
+            <p class="setdesc brandcontrast" id="brandContrast"></p>
+          </div>
+
+          <div class="brandgroup">
+            <div class="brandgrouphd">Fonts</div>
+            <div class="setrow"><label>Headings</label><select id="brandHeadFont" class="brandselect"></select></div>
+            <div class="setrow"><label>Body</label><select id="brandBodyFont" class="brandselect"></select></div>
+          </div>
+
+          <div class="setrow brandgenrow"><label title="Paste one brand color and build a harmonious system around it">Auto-build</label>
+            <span class="brandgentext">From your <b>Primary</b>, generate a matching secondary, accent palette and neutrals.</span>
+            <button class="minipill" id="brandGenBtn">Generate system ✳</button></div>
+
           <div class="setactions">
             <button class="minipill" id="brandExportBtn">Export kit (.json)</button>
             <button class="minipill" id="brandImportBtn">Import kit…</button>

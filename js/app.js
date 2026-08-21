@@ -2217,12 +2217,14 @@ function libSwatchesInto(container, prop){
 }
 function brandSwatchesInto(container, prop){
   if (!brandActive()) return;
-  brand.accents.forEach((hx, i) => {
+  const nm = brand.name || 'Brand';
+  const role = i => i === 0 ? 'Primary' : i === 1 ? 'Secondary' : 'Accent ' + (i - 1);
+  brandAccents().forEach((hx, i) => {
     const b = document.createElement('button');
     b.className = 'swatch brandsw';
     b.dataset[prop] = hx;
     b.style.background = hx;
-    b.title = (brand.name || 'Brand') + ' accent ' + (i + 1);
+    b.title = nm + ' · ' + role(i);
     container.appendChild(b);
   });
 }
@@ -3000,10 +3002,11 @@ function openFontMenu(){
 }
 function closeFontMenu(){ $('fontMenu').classList.add('hidden'); }
 /* ── brand kit UI (Settings tab) ── */
-const BRAND_COLOR_IDS = ['brandC1', 'brandC2', 'brandC3', 'brandC4', 'brandC5', 'brandC6'];
 function brandDefaults(){
-  return normalizeBrand({ active: false, name: '', paper: '#f6ece1', usePaper: false,
-    accents: ['#d97757', '#5b72c9', '#6e9e63', '#7c5aa0', '#c9a227', '#1f1e1b'],
+  return normalizeBrand({ active: false, name: '',
+    primary: '#d97757', secondary: '#5b72c9',
+    palette: ['#6e9e63', '#7c5aa0', '#c9a227', '#4d9891'],
+    ink: '#26221c', muted: '#8a8378', paper: '#f6ece1', usePaper: false,
     headFont: 'serif', bodyFont: 'sans' });
 }
 function brandFontOptions(sel, current){
@@ -3017,35 +3020,100 @@ function brandFontOptions(sel, current){
   for (const fam of savedGFonts()) add('cg:' + fam, fam + ' (Google)');
   sel.value = (current && [...sel.options].some(o => o.value === current)) ? current : 'sans';
 }
-function brandSyncUI(){
-  const b = brand || brandDefaults();
-  $('brandActiveChk').checked = !!b.active;
-  $('brandName').value = b.name || '';
-  const seed = ['#d97757', '#5b72c9', '#6e9e63', '#7c5aa0', '#c9a227', '#1f1e1b'];
-  BRAND_COLOR_IDS.forEach((id, i) => {
-    $(id).value = b.accents[i] || seed[i];
-    $(id + 'Hex').textContent = $(id).value;
-  });
-  $('brandPaper').value = b.paper || '#f6ece1';
-  $('brandPaperHex').textContent = $('brandPaper').value;
-  $('brandPaperOn').checked = !!b.usePaper;
-  brandFontOptions($('brandHeadFont'), b.headFont);
-  brandFontOptions($('brandBodyFont'), b.bodyFont);
-}
-function brandFromUI(){
+// DOM → brand (authoritative + normalized). Palette is read from its live inputs.
+function brandCollect(){
   brand = normalizeBrand({
     active: $('brandActiveChk').checked,
     name: $('brandName').value.trim(),
+    primary: $('brandPrimary').value,
+    secondary: $('brandSecondary').value,
+    palette: [...document.querySelectorAll('#brandPalette .brandpalinput')].map(el => el.value),
+    ink: $('brandInk').value,
+    muted: $('brandMutedOn').checked ? $('brandMuted').value : null,
     paper: $('brandPaper').value,
     usePaper: $('brandPaperOn').checked,
-    accents: BRAND_COLOR_IDS.map(id => $(id).value),
     headFont: $('brandHeadFont').value,
     bodyFont: $('brandBodyFont').value,
   });
-  saveBrand();
-  brandEnsureFonts();
-  buildSwatches();
-  syncPanel();
+}
+// full brand → UI (used on load, generate, import, reset)
+function brandSyncUI(){
+  if (!brand) brand = brandDefaults();
+  const b = brand;
+  $('brandActiveChk').checked = !!b.active;
+  $('brandName').value = b.name || '';
+  $('brandPrimary').value = b.primary;
+  $('brandSecondary').value = b.secondary;
+  $('brandInk').value = b.ink;
+  $('brandMutedOn').checked = !!b.muted;
+  $('brandMuted').value = b.muted || '#8a8378';
+  $('brandPaper').value = b.paper;
+  $('brandPaperOn').checked = !!b.usePaper;
+  brandFontOptions($('brandHeadFont'), b.headFont);
+  brandFontOptions($('brandBodyFont'), b.bodyFont);
+  renderBrandPalette();
+  brandUpdateReadouts();
+}
+// keep hex labels, the muted enable state and the contrast check in sync
+function brandUpdateReadouts(){
+  const set = (id, val) => { const el = $(id + 'Hex'); if (el) el.textContent = val; };
+  set('brandPrimary', $('brandPrimary').value);
+  set('brandSecondary', $('brandSecondary').value);
+  set('brandInk', $('brandInk').value);
+  set('brandMuted', $('brandMuted').value);
+  set('brandPaper', $('brandPaper').value);
+  $('brandMuted').disabled = !$('brandMutedOn').checked;
+  document.querySelectorAll('#brandPalette .brandpalinput').forEach(inp => {
+    const lab = inp.parentElement.querySelector('.brandhex'); if (lab) lab.textContent = inp.value;
+  });
+  const note = $('brandContrast');
+  if (note){
+    const cr = contrastRatio($('brandInk').value, $('brandPaper').value);
+    const ok = cr >= 4.5;
+    note.textContent = ok
+      ? 'Ink on paper: ' + cr.toFixed(1) + ':1 — easy to read ✓'
+      : 'Ink on paper: ' + cr.toFixed(1) + ':1 — low contrast, text may be hard to read ⚠';
+    note.classList.toggle('warn', !ok);
+  }
+}
+// draw the expandable accent palette (add / remove / reorder)
+function renderBrandPalette(){
+  const wrap = $('brandPalette'); if (!wrap) return;
+  wrap.replaceChildren();
+  brand.palette.forEach((hx, i) => {
+    const cell = document.createElement('span'); cell.className = 'brandacc brandpalcell';
+    const inp = document.createElement('input');
+    inp.type = 'color'; inp.className = 'brandpalinput'; inp.value = hx; inp.title = 'Accent ' + (i + 1);
+    inp.addEventListener('input', brandUpdateReadouts);
+    inp.addEventListener('change', brandApply);
+    const hex = document.createElement('span'); hex.className = 'brandhex'; hex.textContent = hx;
+    const tools = document.createElement('span'); tools.className = 'brandpaltools';
+    const mk = (txt, title, fn, dis) => { const btn = document.createElement('button'); btn.className = 'brandpalbtn'; btn.textContent = txt; btn.title = title; if (dis) btn.disabled = true; btn.addEventListener('click', fn); return btn; };
+    tools.append(
+      mk('◀', 'Move left', () => accentMove(i, -1), i === 0),
+      mk('▶', 'Move right', () => accentMove(i, 1), i === brand.palette.length - 1),
+      mk('×', 'Remove this accent', () => accentRemove(i)),
+    );
+    cell.append(inp, hex, tools);
+    wrap.appendChild(cell);
+  });
+  const addBtn = $('brandAddAccent');
+  if (addBtn) addBtn.disabled = brand.palette.length >= 10;
+}
+// persist current fields + a mutated palette, then refresh everything downstream
+function brandPersist(){ saveBrand(); brandEnsureFonts(); buildSwatches(); syncPanel(); brandUpdateReadouts(); }
+function brandApply(){ brandCollect(); brandPersist(); }
+function accentAdd(){ brandCollect(); if (brand.palette.length >= 10) return; brand.palette.push(brandFromSeed(brand.primary).palette[brand.palette.length % 4]); saveBrand(); renderBrandPalette(); brandPersist(); }
+function accentRemove(i){ brandCollect(); brand.palette.splice(i, 1); saveBrand(); renderBrandPalette(); brandPersist(); }
+function accentMove(i, d){ brandCollect(); const j = i + d; if (j < 0 || j >= brand.palette.length) return; const t = brand.palette[i]; brand.palette[i] = brand.palette[j]; brand.palette[j] = t; saveBrand(); renderBrandPalette(); brandPersist(); }
+// one seed color → a full harmonious system
+function brandGenerate(){
+  brandCollect();
+  const g = brandFromSeed($('brandPrimary').value);
+  Object.assign(brand, { secondary: g.secondary, palette: g.palette, paper: g.paper, ink: g.ink, muted: g.muted });
+  brand = normalizeBrand(brand);
+  saveBrand(); brandSyncUI(); brandEnsureFonts(); buildSwatches(); syncPanel();
+  showHint('Built a full brand system from your primary color ✳');
 }
 /* ── environment presets ────────────────────────────
    A saved snapshot of the working setup: canvas size, paper color, grid,
@@ -3121,13 +3189,17 @@ $('envSaveBtn').addEventListener('click', saveEnvironment);
 $('envName').addEventListener('keydown', ev => { if (ev.key === 'Enter'){ ev.preventDefault(); saveEnvironment(); } });
 
 function initBrandUI(){
+  if (!brand) brand = brandDefaults();
   brandSyncUI();
-  ['brandActiveChk', 'brandName', 'brandPaper', 'brandPaperOn',
-   ...BRAND_COLOR_IDS, 'brandHeadFont', 'brandBodyFont']
-    .forEach(id => $(id).addEventListener('change', brandFromUI));
-  // live hex readout while the native picker is open
-  for (const id of [...BRAND_COLOR_IDS, 'brandPaper'])
-    $(id).addEventListener('input', () => { $(id + 'Hex').textContent = $(id).value; });
+  const SCALARS = ['brandActiveChk', 'brandName', 'brandPrimary', 'brandSecondary',
+    'brandInk', 'brandMuted', 'brandMutedOn', 'brandPaper', 'brandPaperOn', 'brandHeadFont', 'brandBodyFont'];
+  SCALARS.forEach(id => $(id).addEventListener('change', brandApply));
+  // live hex readout + contrast while the native picker is open
+  for (const id of ['brandPrimary', 'brandSecondary', 'brandInk', 'brandMuted', 'brandPaper'])
+    $(id).addEventListener('input', brandUpdateReadouts);
+  $('brandMutedOn').addEventListener('change', brandUpdateReadouts);
+  $('brandAddAccent').addEventListener('click', accentAdd);
+  $('brandGenBtn').addEventListener('click', brandGenerate);
   $('brandActiveChk').addEventListener('change', () => {
     if ($('brandActiveChk').checked){
       defaults.font = $('brandBodyFont').value;
@@ -3135,8 +3207,8 @@ function initBrandUI(){
     }
   });
   $('brandExportBtn').addEventListener('click', () => {
-    brandFromUI();
-    const blob = new Blob([JSON.stringify({ app: 'koralpaper-brand', v: 1, ...brand }, null, 2)],
+    brandCollect();
+    const blob = new Blob([JSON.stringify({ app: 'koralpaper-brand', v: 2, ...brand }, null, 2)],
       { type: 'application/json' });
     download((brand.name ? brand.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'brand') + '-kit.json',
       URL.createObjectURL(blob));
@@ -4392,7 +4464,7 @@ function rsColored(hex){                        // saturated, mid-luma → an ac
   return s >= 0.13 && l > 0.12 && l < 0.93;   // muted pastels count; true grays (s<0.13) do not
 }
 function rsAccents(){
-  const list = brandActive() ? brand.accents.slice() : RS_HOUSE.map(t => rsHex(t)).filter(Boolean);
+  const list = brandActive() ? brandAccents() : RS_HOUSE.map(t => rsHex(t)).filter(Boolean);
   return list.filter(Boolean);
 }
 function restyleColors(els){
@@ -4419,7 +4491,7 @@ function restyleColors(els){
       if (filled){
         el.fill = remap(el.fill);
         // keep the outline readable so auto text (which follows the outline) stays visible
-        if (el.stroke && el.stroke !== 'none' && colored(el.stroke)) el.stroke = 'ink';
+        if (el.stroke && el.stroke !== 'none' && colored(el.stroke)) el.stroke = brandActive() ? brand.ink : 'ink';
       } else if (el.stroke && el.stroke !== 'none'){
         el.stroke = remap(el.stroke);                                         // outline-only shape takes the accent
       }
@@ -6882,17 +6954,36 @@ $('tplCloseBtn').addEventListener('click', () => $('tplDialog').classList.add('h
    One small identity object that recolors charts, seeds swatches and
    paper, and is exposed to Claude so designs come back on brand. */
 const BRAND_KEY = 'koralpaper.brand';
+/* ── Brand kit v2: a small design system, not a bag of colors ──────────
+   Colors have roles, mirroring how a real system assigns "which color goes
+   where": primary (hero, first chart series, headline accent, the ✳),
+   secondary (support, second series), an expandable palette (extra
+   categorical variety), and neutrals — paper (background), ink (outlines
+   and body text) and an optional muted gray. brandAccents() flattens the
+   roles into the ordered list charts and "Make it mine" consume, so the
+   role order IS the mapping. Old single-array kits migrate automatically. */
+function brandHex(v){ return (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ? v.toLowerCase() : null; }
 function normalizeBrand(b){
   if (!b || typeof b !== 'object') return null;
-  const hex = v => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ? v.toLowerCase() : null;
-  const accents = (Array.isArray(b.accents) ? b.accents : []).map(hex).filter(Boolean).slice(0, 6);
+  const hex = brandHex;
   const fontKey = (k, fb) => (typeof k === 'string' && (FONTS[k] || ensureCustomFont(k))) ? k : fb;
+  let primary = hex(b.primary), secondary = hex(b.secondary);
+  let palette = (Array.isArray(b.palette) ? b.palette : []).map(hex).filter(Boolean);
+  if (!primary && Array.isArray(b.accents)){        // migrate a v1 kit (one flat accents[] array)
+    const a = b.accents.map(hex).filter(Boolean);
+    primary = a[0] || null; secondary = a[1] || null;
+    if (!palette.length) palette = a.slice(2);
+  }
   return {
     active: !!b.active,
     name: typeof b.name === 'string' ? b.name.slice(0, 40) : '',
-    paper: hex(b.paper),
+    primary: primary || '#d97757',
+    secondary: secondary || '#5b72c9',
+    palette: palette.slice(0, 10),
+    ink: hex(b.ink) || '#26221c',
+    muted: hex(b.muted),                            // optional: null when off
+    paper: hex(b.paper) || '#f6ece1',
     usePaper: !!b.usePaper,
-    accents: accents.length ? accents : ['#d97757', '#5b72c9', '#6e9e63', '#7c5aa0', '#c9a227', '#1f1e1b'],
     headFont: fontKey(b.headFont, 'serif'),
     bodyFont: fontKey(b.bodyFont, 'sans'),
   };
@@ -6901,7 +6992,56 @@ let brand = (() => {
   try { return normalizeBrand(JSON.parse(localStorage.getItem(BRAND_KEY))); }
   catch (e){ return null; }
 })();
-const brandActive = () => !!(brand && brand.active && brand.accents.length);
+const brandActive = () => !!(brand && brand.active && brand.primary);
+// the ordered accent list roles flatten into: primary, secondary, then the palette
+function brandAccents(){ return brand ? [brand.primary, brand.secondary, ...brand.palette].filter(Boolean) : []; }
+
+/* ── color math for the one-color → full-system generator ────────────── */
+function hexToHsl(hex){
+  let x = String(hex).replace('#', '');
+  if (x.length === 3) x = x.split('').map(c => c + c).join('');
+  const r = parseInt(x.slice(0,2),16)/255, g = parseInt(x.slice(2,4),16)/255, b = parseInt(x.slice(4,6),16)/255;
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b), l = (mx+mn)/2, d = mx-mn;
+  let h = 0, s = 0;
+  if (d !== 0){
+    s = d / (1 - Math.abs(2*l - 1));
+    if (mx === r) h = ((g-b)/d) % 6; else if (mx === g) h = (b-r)/d + 2; else h = (r-g)/d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return { h, s, l };
+}
+function hslToHex(h, s, l){
+  h = ((h % 360) + 360) % 360; s = clamp(s,0,1); l = clamp(l,0,1);
+  const c = (1 - Math.abs(2*l - 1)) * s, x = c * (1 - Math.abs((h/60) % 2 - 1)), m = l - c/2;
+  let r=0, g=0, b=0;
+  if (h < 60){ r=c; g=x; } else if (h < 120){ r=x; g=c; } else if (h < 180){ g=c; b=x; }
+  else if (h < 240){ g=x; b=c; } else if (h < 300){ r=x; b=c; } else { r=c; b=x; }
+  const to = v => Math.round((v+m)*255).toString(16).padStart(2,'0');
+  return '#' + to(r) + to(g) + to(b);
+}
+function relLuma(hex){
+  let x = String(hex).replace('#',''); if (x.length===3) x = x.split('').map(c=>c+c).join('');
+  const ch = i => { const v = parseInt(x.slice(i,i+2),16)/255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); };
+  return 0.2126*ch(0) + 0.7152*ch(2) + 0.0722*ch(4);
+}
+function contrastRatio(a, b){ const L1 = relLuma(a), L2 = relLuma(b); const hi = Math.max(L1,L2), lo = Math.min(L1,L2); return (hi + 0.05) / (lo + 0.05); }
+// derive a harmonious full system from a single seed color, in KoralPaper's soft register
+function brandFromSeed(seed){
+  const base = hexToHsl(seed);
+  const reg = (h) => {                              // pull any hue into the house's gentle range
+    const s = clamp(base.s < 0.2 ? 0.42 : base.s * 0.92, 0.34, 0.62);
+    const l = clamp(base.l < 0.32 ? 0.55 : (base.l > 0.76 ? 0.6 : base.l), 0.48, 0.66);
+    return hslToHex(h, s, l);
+  };
+  return {
+    primary: (brandHex(seed) || '#d97757'),
+    secondary: reg(base.h + 150),
+    palette: [reg(base.h + 40), reg(base.h + 90), reg(base.h + 200), reg(base.h + 280)],
+    paper: hslToHex(base.h, clamp(base.s * 0.28, 0.05, 0.14), 0.945),
+    ink:   hslToHex(base.h, clamp(base.s * 0.35, 0.06, 0.20), 0.14),
+    muted: hslToHex(base.h, clamp(base.s * 0.18, 0.04, 0.12), 0.55),
+  };
+}
 function saveBrand(){
   try { localStorage.setItem(BRAND_KEY, JSON.stringify(brand)); } catch (e){}
 }
@@ -6915,8 +7055,8 @@ function brandEnsureFonts(){
 }
 const CHART_FILLS = ['coral', 'periwinkle', 'sage', 'butter', 'blush', 'sky', 'terracotta', 'cream'];
 const CHART_STROKES = ['coral', 'blue', 'green', 'plum', 'gdark', 'ink'];
-function chartFill(i){ const p = brandActive() ? brand.accents : CHART_FILLS; return p[i % p.length]; }
-function chartStroke(i){ const p = brandActive() ? brand.accents : CHART_STROKES; return p[i % p.length]; }
+function chartFill(i){ const p = brandActive() ? brandAccents() : CHART_FILLS; return p[i % p.length]; }
+function chartStroke(i){ const p = brandActive() ? brandAccents() : CHART_STROKES; return p[i % p.length]; }
 
 function chartNum(c){
   const v = parseFloat(String(c).replace(/\s/g, '').replace(/^\+/, ''));
@@ -7376,7 +7516,7 @@ function chartBuildHeat(d, spec){
   let vmin = Infinity, vmax = -Infinity;
   for (const row of d.vals) for (const v of row){ vmin = Math.min(vmin, v); vmax = Math.max(vmax, v); }
   if (vmin === vmax) vmax = vmin + 1;
-  const hue = brandActive() ? brand.accents[0] : '#d97757';
+  const hue = brandActive() ? brand.primary : '#d97757';
   const cw = clamp(Math.round(560 / nS), 52, 120), ch = 46;
   const els = [];
   d.series.forEach((name, j) => {
@@ -8620,11 +8760,16 @@ async function claudeExecute(action, args){
       board: state.board ? { w: state.board.w, h: state.board.h, name: state.board.name } : null,
       brand: brandActive() ? {
         name: brand.name || 'Brand',
-        accents: brand.accents,
+        primary: brand.primary,
+        secondary: brand.secondary,
+        palette: brand.palette,
+        ink: brand.ink,
+        muted: brand.muted || null,
+        accents: brandAccents(),
         paper: (brand.usePaper && brand.paper) || null,
         headingFont: brand.headFont.replace(/^cg:/, ''),
         bodyFont: brand.bodyFont.replace(/^cg:/, ''),
-        note: 'A brand kit is active: use these accent colors, this paper, and these fonts for anything new you design here.',
+        note: 'A brand kit is active. Use colors by role: primary = hero / first chart series / headline accent / the ✳; secondary = support / second series; palette = extra categorical colors; ink = outlines and body text; paper = background. Charts should run primary, secondary, then palette in order.',
       } : null,
       theme: state.theme,
       pages: state.pages.map((p, i) => ({

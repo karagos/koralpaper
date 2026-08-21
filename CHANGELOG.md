@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.76.0
+
+**Brand kit becomes a real design system.** Colors now carry roles instead of sitting in one flat list, so the whole app knows which color goes where. **Primary** drives the hero: the first chart series, headline accents and the ✳. **Secondary** is the support color (second series, secondary emphasis). An expandable **Accent palette** holds extra categorical colors — add, remove and reorder as many as you need (up to ten) rather than being stuck at six. Neutrals are explicit too: **Paper** (document background), **Ink** (outlines and body text) and an optional **Muted** gray for subtle text and fills. A live contrast check warns if ink-on-paper gets hard to read. Best of all, paste a single Primary color and **Generate system ✳** builds a harmonious secondary, accent palette and neutrals around it in KoralPaper's soft register. Charts, template headlines, new documents, "Make it mine" and Claude (through the MCP bridge) all read the roles and design on brand. Old one-array kits migrate automatically, and kit files now export as v2.
+
 ## v3.75.0
 
 **Make it mine (restyle engine).** One step recasts a page, or just your selection, into your look: colors remapped to your Brand kit accents, headings and body set in your brand fonts, one fresh and consistent hand-drawn character (the sketch wobble is re-seeded so nothing looks stamped from a template), and stray line weights snapped to your presets. An optional "tidy layout" pass lines up connected flows. It works on anything, a diagram Claude drew, an imported design, a template, and turns it into something that looks like you rather than AI-generated. Reach it from the ☰ menu, right-click, or the command palette (⌘K → "make it mine"). A dialog lets you pick exactly what to change. No Brand kit yet? It uses a house style so the button still works. One undo reverts everything.
