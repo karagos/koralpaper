@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.72.0
+
+**Freehand shape recognition.** Draw a rough shape with the pen and it snaps to a clean KoralPaper shape: a box becomes a rectangle, a loop becomes an ellipse, and it also recognizes triangles, diamonds, other polygons, and straight lines. The snapped shape keeps your hand-drawn wobble and is fully editable (fill it, type in it, resize it) like any shape. It is on by default; toggle it with the new wand button in the top bar, and one **⌘Z** always keeps your raw freehand stroke instead. All local, all offline, no dependencies.
+
 ## v3.71.0
 
 - **Lock elements.** Right-click an element or group and choose **Lock**: it then ignores clicks, drags and marquee selection, so you cannot move or resize it by accident, which is a lifesaver on busy pages. A small padlock marks locked elements; right-click one and choose **Unlock** to release it. Locking also saves with the document.

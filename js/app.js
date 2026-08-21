@@ -1511,6 +1511,17 @@ function onPointerUp(ev){
       el.w = defSize[0]; el.h = defSize[1];
     }
     bindHover = null; bindHoverAnchor = null;
+    if (el.type === 'draw' && recognizeOn()){
+      const rec = recognizeStroke(el);
+      if (rec){
+        commit();                              // 1st step: the raw freehand stroke (so ⌘Z lands here)
+        applyRecognized(el, rec);
+        commit();                              // 2nd step: the recognized clean shape
+        requestRender();
+        showHint('Snapped to a ' + (rec.sides === 3 ? 'triangle' : rec.kind) + ' (⌘Z to keep it freehand)');
+        return;
+      }
+    }
     commit();
     if (el.type === 'draw'){ requestRender(); return; } // pencil stays active
     setTool('select');
@@ -3640,6 +3651,8 @@ $('gridSizeRange').addEventListener('input', ev => {
 });
 $('gridSizeRange').addEventListener('change', scheduleAutosave);
 $('gridMenu').addEventListener('click', ev => ev.stopPropagation());
+$('recognizeBtn').addEventListener('click', () => { setRecognize(!recognizeOn()); showHint(recognizeOn() ? 'Freehand snaps to clean shapes' : 'Freehand stays exactly as you draw it'); });
+syncRecognizeBtn();
 $('snapBtn').addEventListener('click', () => {
   state.snap = !state.snap; syncToggles(); scheduleAutosave();
 });
@@ -4606,6 +4619,124 @@ $('fileMenu').addEventListener('click', ev => {
   closeMenus();
   runFileAction(b.dataset.act);
 });
+/* ── freehand shape recognition ──────────────────────
+   When you draw a rough shape with the pen, snap it to a clean KoralPaper
+   shape (rectangle, ellipse, triangle, diamond, polygon) or a straight line.
+   Pure geometry, offline, reversible with one undo. Toggle in the top bar. */
+const RECOGNIZE_KEY = 'koralpaper.recognize';
+function recognizeOn(){ try { return localStorage.getItem(RECOGNIZE_KEY) !== '0'; } catch (e){ return true; } }
+function setRecognize(on){ try { localStorage.setItem(RECOGNIZE_KEY, on ? '1' : '0'); } catch (e){} syncRecognizeBtn(); }
+function syncRecognizeBtn(){ const b = $('recognizeBtn'); if (b) b.classList.toggle('on', recognizeOn()); }
+
+function rcPolyArea(pts){
+  let a = 0;
+  for (let i = 0, n = pts.length; i < n; i++){
+    const p = pts[i], q = pts[(i + 1) % n];
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return Math.abs(a) / 2;
+}
+function rcResample(pts, N){
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]);
+  if (total <= 0) return pts.slice();
+  const step = total / (N - 1);
+  const out = [pts[0].slice()];
+  let d = 0, prev = pts[0];
+  for (let i = 1; i < pts.length; ){
+    const seg = Math.hypot(pts[i][0] - prev[0], pts[i][1] - prev[1]);
+    if (d + seg >= step && seg > 0){
+      const t = (step - d) / seg;
+      const np = [prev[0] + t * (pts[i][0] - prev[0]), prev[1] + t * (pts[i][1] - prev[1])];
+      out.push(np); prev = np; d = 0;
+      if (out.length >= N) break;
+    } else { d += seg; prev = pts[i]; i++; }
+  }
+  while (out.length < N) out.push(pts[pts.length - 1].slice());
+  return out;
+}
+function rcCorners(rs, closed){
+  const N = rs.length, k = Math.max(2, Math.round(N / 16));
+  const ang = new Array(N).fill(0);
+  const lo = closed ? 0 : k, hi = closed ? N : N - k;
+  for (let i = lo; i < hi; i++){
+    const a = rs[(i - k + N) % N], b = rs[i], c = rs[(i + k) % N];
+    const v1x = b[0]-a[0], v1y = b[1]-a[1], v2x = c[0]-b[0], v2y = c[1]-b[1];
+    ang[i] = Math.abs(Math.atan2(v1x*v2y - v1y*v2x, v1x*v2x + v1y*v2y)); // turn angle
+  }
+  const TH = 0.65;               // ~37 degrees
+  const picks = [];
+  for (let i = lo; i < hi; i++){
+    if (ang[i] < TH) continue;
+    let isMax = true;
+    for (let d = -k; d <= k; d++){ const j = (i + d + N) % N; if (ang[j] > ang[i]){ isMax = false; break; } }
+    if (isMax){
+      if (picks.length && Math.min((i - picks[picks.length-1] + N) % N, (picks[picks.length-1] - i + N) % N) < k) continue;
+      picks.push(i);
+    }
+  }
+  return picks.length;
+}
+function recognizeStroke(el){
+  const pts = el.points;
+  if (!pts || pts.length < 8) return null;
+  const abs = pts.map(p => [el.x + p[0], el.y + p[1]]);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, pathLen = 0;
+  for (let i = 0; i < abs.length; i++){
+    const [x, y] = abs[i];
+    minX = Math.min(minX, x); minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+    if (i) pathLen += Math.hypot(abs[i][0]-abs[i-1][0], abs[i][1]-abs[i-1][1]);
+  }
+  const w = maxX - minX, h = maxY - minY, diag = Math.hypot(w, h);
+  if (diag < 28) return null;                       // too small: leave as a doodle
+  const first = abs[0], last = abs[abs.length - 1];
+  const closeGap = Math.hypot(last[0]-first[0], last[1]-first[1]);
+  const closed = closeGap < 0.32 * Math.max(w, h) && pathLen > diag * 1.15;
+  const style = { stroke: el.stroke, sw: el.sw, sketch: el.sketch == null ? 1 : el.sketch, dash: el.dash || 'solid', opacity: el.opacity };
+
+  if (!closed){
+    const segLen = Math.hypot(last[0]-first[0], last[1]-first[1]);
+    if (segLen < 24) return null;
+    let maxDev = 0;
+    for (const p of abs) maxDev = Math.max(maxDev, distToSegment(p[0], p[1], first[0], first[1], last[0], last[1]));
+    if (maxDev < 0.085 * segLen && pathLen < segLen * 1.28)
+      return { kind: 'line', x: first[0], y: first[1], points: [[0,0],[last[0]-first[0], last[1]-first[1]]], style };
+    return null;                                    // open scribble: keep freehand
+  }
+
+  // closed: ellipse fit against the bounding box
+  const cx = (minX+maxX)/2, cy = (minY+maxY)/2, rx = w/2 || 1, ry = h/2 || 1;
+  let s1 = 0, s2 = 0, n = abs.length;
+  for (const [x, y] of abs){ const r = Math.hypot((x-cx)/rx, (y-cy)/ry); s1 += r; s2 += r*r; }
+  const mean = s1/n, sd = Math.sqrt(Math.max(0, s2/n - mean*mean));
+  // clean-ellipse fast path: radial distances tightly around 1
+  if (Math.abs(mean - 1) < 0.13 && sd < 0.09)
+    return { kind: 'ellipse', x: minX, y: minY, w, h, style };
+
+  const rs = rcResample(abs, 64);
+  const fill = rcPolyArea(rs) / (w * h || 1);
+  const corners = rcCorners(rs, true);           // reliable: rect~4, circle~2, triangle~3, diamond~4
+  if (corners <= 2) return { kind: 'ellipse', x: minX, y: minY, w, h, style };
+  if (corners === 3) return { kind: 'polygon', x: minX, y: minY, w, h, sides: 3, style };
+  if (corners === 4) return (fill > 0.66)
+    ? { kind: 'rect', x: minX, y: minY, w, h, style }
+    : { kind: 'diamond', x: minX, y: minY, w, h, style };
+  if (corners >= 5 && corners <= 12) return { kind: 'polygon', x: minX, y: minY, w, h, sides: corners, style };
+  if (fill > 0.72) return { kind: 'rect', x: minX, y: minY, w, h, style };
+  return null;
+}
+function applyRecognized(drawEl, rec){
+  const style = Object.assign({ fill: 'none', round: 1 }, rec.style);
+  const shape = newElement(rec.kind === 'line' ? 'line' : rec.kind, rec.x, rec.y, style);
+  shape.groupId = drawEl.groupId || null;
+  if (rec.kind === 'line'){ shape.points = rec.points; shape.startHead = 'none'; shape.endHead = 'none'; normalizeLinear(shape); }
+  else { shape.w = rec.w; shape.h = rec.h; if (rec.sides) shape.sides = rec.sides; }
+  const i = state.elements.indexOf(drawEl);
+  if (i >= 0) state.elements[i] = shape; else state.elements.push(shape);
+  return shape;
+}
+
 function newDocument(){
   const hasContent = state.pages.length > 1 || state.pages.some(p => p.elements.length);
   if (hasContent && !confirm('Start a new, empty document?\n\nThe current document will be replaced. Use “Save sketch (.json)” first if you want to keep a copy. (⌘Z still brings the pages back.)')) return;
