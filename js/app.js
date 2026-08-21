@@ -4522,70 +4522,103 @@ function rsAccents(){
   const chromatic = h => { const { s, l } = rsHsl(h); return (l > 0.10 && l < 0.965 && s >= 0.2) ? 1 : 0; };
   return list.map((h, i) => [h, i]).sort((a, b) => (chromatic(b[0]) - chromatic(a[0])) || (a[1] - b[1])).map(e => e[0]);
 }
-/* Build ONE color map for everything being restyled at once. Per-page maps were
-   the bug behind "the footer rule is red on one slide, black on the next, grey on
-   the last": each page ranked its own colors independently. One map means one
-   source color always becomes the same brand color, on every page. */
+/* Build the COMPLETE color translation table once, for everything being restyled.
+   Two problems this solves:
+   1. Per-page maps made the same source color land differently on each slide.
+   2. Flattening every light fill to Paper destroyed diagrams, which encode their
+      hierarchy as a tint ladder (dark node -> mid -> light -> near-white).
+   So: group the source's colors into hue families, give each family one of your
+   brand colors by how much of the document it covers, then reproduce that family's
+   own light-to-dark ladder in your brand color. Nothing is invented out of thin
+   air: every result is a kit color or a tint of one, and a source color always
+   translates to the same result everywhere. Add accents to your palette and the
+   families use them directly instead of needing tints. */
+function rsHue(hex){ return hexToHsl(hex).h; }
+function rsTint(baseHex, srcHex){
+  const b = hexToHsl(baseHex), c = hexToHsl(srcHex);
+  return hslToHex(b.h, Math.min(b.s, Math.max(c.s, 0.05)), c.l);   // brand hue, this rung's lightness
+}
 function rsBuildMap(arrays){
   const accents = rsAccents();
-  const weight = new Map();
-  const bump = (val, area) => { const h = rsHex(val); if (h && rsColored(h)) weight.set(h, (weight.get(h) || 0) + area); };
+  const B = brandActive() ? brand : null;
+  const PAPER = B ? B.paper : 'cream', INK = B ? B.ink : 'ink';
+  const MUTED = (B && B.muted) ? B.muted : INK;
+  const paperHex = rsHex(PAPER), inkHex = rsHex(INK), mutedHex = rsHex(MUTED);
+  // 1. collect every source color with the weight of where it is used
+  const seen = new Map();                                  // hex -> weight
+  const bump = (val, w) => { const h = rsHex(val); if (h) seen.set(h, (seen.get(h) || 0) + w); };
   for (const els of arrays) for (const el of els){
-    if (!el || el.type === 'image' || el.type === 'text') continue; // text always goes to ink, never to an accent
-    let b; try { b = boundsOf(el); } catch (e){ continue; }         // a malformed element is skipped, never fatal
+    if (!el || el.type === 'image' || el.type === 'text') continue;
+    let b; try { b = boundsOf(el); } catch (e){ continue; }
     if (!b) continue;
     if (isLinear(el)){ bump(el.stroke, Math.max(b.w, b.h) * 8); continue; }
     const area = Math.max(1, b.w * b.h);
-    const fh = rsHex(el.fill), filled = el.fill && el.fill !== 'none' && fh;
-    // only rank colors that will actually consume an accent: light cards go to paper instead
-    if (filled && rsHsl(fh).l < 0.72) bump(el.fill, area);
-    if (!filled) bump(el.stroke, area * 0.5);
+    if (el.fill && el.fill !== 'none') bump(el.fill, area); else bump(el.stroke, area * 0.5);
   }
-  const ranked = [...weight.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  // 2. group into hue families; everything desaturated is one neutral family
+  const fams = [];                                         // {hue, neutral, weight, colors[]}
+  for (const [hex, w] of [...seen.entries()].sort((a, b2) => b2[1] - a[1])){
+    const { s, l } = rsHsl(hex);
+    const neutral = !rsColored(hex);
+    const hue = rsHue(hex);
+    let f = fams.find(x => x.neutral === neutral &&
+      (neutral || Math.min(Math.abs(x.hue - hue), 360 - Math.abs(x.hue - hue)) <= 30));
+    if (!f){ f = { hue, neutral, weight: 0, colors: [] }; fams.push(f); }
+    f.weight += w; f.colors.push(hex);
+  }
+  // 3. the biggest colored family gets your first accent, next gets the second, and so on
+  fams.sort((a, b2) => b2.weight - a.weight);
+  let ai = 0;
   const map = new Map();
-  ranked.forEach((h, i) => { if (accents.length) map.set(h, accents[i % accents.length]); });
+  for (const f of fams){
+    const base = f.neutral ? MUTED : (accents.length ? accents[ai++ % accents.length] : null);
+    const baseHex = rsHex(base);
+    for (const hex of f.colors){
+      const { l } = rsHsl(hex);
+      if (l >= 0.93 && paperHex){ map.set(hex, PAPER); continue; }   // a white card stays a white card
+      if (l <= 0.10 && inkHex){ map.set(hex, INK); continue; }       // near-black stays structure
+      if (!baseHex){ map.set(hex, hex); continue; }
+      // one rung of the ladder: your brand color kept at THIS rung's own lightness,
+      // always, so a light node stays light and the hierarchy survives intact
+      map.set(hex, rsTint(baseHex, hex));
+    }
+  }
   return map;
 }
-/* Recolor using ONLY colors that exist in the kit. Never invents a tint: every
-   result is your primary, secondary, a palette accent, your paper, ink or muted. */
+/* Recolor by consulting the table above. Application is a pure lookup, so what
+   you get can never drift from the plan the table describes. */
 function restyleColors(els, map, roles){
   if (!map) map = rsBuildMap([els]);
   const B = brandActive() ? brand : null;
   const INK   = B ? B.ink : 'ink';
   const PAPER = B ? B.paper : 'cream';
-  const MUTED = (B && B.muted) ? B.muted : null;
+  const MUTED = (B && B.muted) ? B.muted : INK;
   const inkHex = rsHex(INK), paperHex = rsHex(PAPER);
-  const remap = val => { const h = rsHex(val); return (h && map.has(h)) ? map.get(h) : val; };
-  const isCol = val => { const h = rsHex(val); return !!(h && rsColored(h)); };
-  // a neutral line/edge: keep subtle ones subtle (muted) but make everything consistent
-  const neutral = val => { const h = rsHex(val); return (MUTED && h && rsHsl(h).l > 0.55) ? MUTED : INK; };
+  const look = val => { const h = rsHex(val); return (h && map.has(h)) ? map.get(h) : val; };
+  // an edge or rule is structure: keep subtle ones subtle, but make them consistent
+  const edge = val => { const h = rsHex(val); return (h && rsHsl(h).l > 0.55) ? MUTED : INK; };
   for (const el of els){
     if (!el) continue;
     try {
-    if (el.type === 'image'){ delete el._tintCv; continue; }
-    if (el.type === 'text'){
-      el.stroke = INK;                                            // all text reads as ink: one consistent, legible color
-      if (el.textColor && el.textColor !== 'auto') el.textColor = INK;
-    } else if (isLinear(el)){
-      if (el.stroke && el.stroke !== 'none')
-        el.stroke = isCol(el.stroke) ? remap(el.stroke) : neutral(el.stroke);   // colored -> accent, grey/black -> unified
-    } else {
-      const fh = rsHex(el.fill), filled = el.fill && el.fill !== 'none' && fh;
-      if (filled){
-        const { l } = rsHsl(fh);
-        if (l >= 0.72) el.fill = PAPER;                           // any light card becomes your paper (a kit color, never a tint)
-        else if (rsColored(fh)) el.fill = remap(el.fill);         // solid colored fill takes its brand accent
-        else el.fill = MUTED || INK;                              // mid/dark neutral fill
+      if (el.type === 'image'){ delete el._tintCv; continue; }
+      if (el.type === 'text'){
+        el.stroke = INK;                                    // all text reads as ink: one consistent, legible color
+        if (el.textColor && el.textColor !== 'auto') el.textColor = INK;
+      } else if (isLinear(el)){
+        if (el.stroke && el.stroke !== 'none')
+          el.stroke = rsColored(rsHex(el.stroke)) ? look(el.stroke) : edge(el.stroke);
+      } else {
+        const filled = el.fill && el.fill !== 'none';
+        if (filled) el.fill = look(el.fill);                // the ladder rung this fill belongs to
+        if (el.stroke && el.stroke !== 'none')
+          el.stroke = (!filled && rsColored(rsHex(el.stroke))) ? look(el.stroke) : edge(el.stroke);
+        // contrast safety: a label always lands on whichever of ink/paper reads on its own fill
+        if (el.text && String(el.text).trim()){
+          const bg = filled ? rsHex(el.fill) : paperHex;
+          el.textColor = (bg && inkHex && paperHex && contrastRatio(paperHex, bg) > contrastRatio(inkHex, bg)) ? PAPER : INK;
+        }
       }
-      if (el.stroke && el.stroke !== 'none')
-        el.stroke = (!filled && isCol(el.stroke)) ? remap(el.stroke) : neutral(el.stroke);
-      // contrast safety: a label always lands on whichever of ink/paper reads on its own fill
-      if (el.text && String(el.text).trim()){
-        const bg = (el.fill && el.fill !== 'none') ? rsHex(el.fill) : paperHex;
-        el.textColor = (bg && inkHex && paperHex && contrastRatio(paperHex, bg) > contrastRatio(inkHex, bg)) ? PAPER : INK;
-      }
-    }
-    delete el._prims; delete el._pkey; delete el._tintCv;
+      delete el._prims; delete el._pkey; delete el._tintCv;
     } catch (e){ /* skip this element, keep restyling the rest */ }
   }
   if (roles) rsApplyRoles(els);
@@ -4706,6 +4739,18 @@ function makeItMine(opts){
   } catch (err){ rollback(err); return; }
   // the restyle itself succeeded; verify we did not corrupt the document
   if (!docIntact(pageCount)){ rollback('document invariants broken'); return; }
+  // PROVE IT DRAWS before we keep it. Every page is rendered once off-screen; if any
+  // page cannot be drawn we roll back, so a restyle can never blank out the canvas.
+  try {
+    const probe = document.createElement('canvas');
+    probe.width = 160; probe.height = 100;
+    const pctx = probe.getContext('2d');
+    for (const pg of state.pages){
+      renderScene(pctx, pg.elements, { width: 160, height: 100,
+        camera: { x: 0, y: 0, z: 0.05 }, pal: pal(), grid: false,
+        bg: pageBgOf(pg), hideBoardFrame: true });
+    }
+  } catch (e){ rollback('the restyled document could not be drawn: ' + e); return; }
   // PERSIST FIRST, before any UI work: a later UI error must never cost the user
   // the restyle itself (that is why a reload used to show the old, unstyled deck)
   let saved = true;

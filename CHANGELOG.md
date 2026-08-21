@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.79.0
+
+**Restyle keeps a design's structure instead of flattening it, and can no longer blank a page.**
+
+Diagrams encode meaning with a tint ladder: a dark node, a mid node, a light node, a near-white node. The old rule sent every light fill to your Paper color, which collapsed that whole ladder into one flat block and destroyed the drawing. It also had no protection against a restyled page that could not be drawn, which is what made elements appear to vanish until a reload.
+
+- **Hue families, not single colors.** The colors in your document are grouped into hue families. Each family is given one of your brand colors, based on how much of the document it covers, and then that family's own light-to-dark ladder is reproduced in your color. A five-step diagram stays a five-step diagram, in your palette.
+- **Nothing is invented from nowhere.** Every result is a kit color or a tint of one, and near-white stays your Paper while near-black stays your Ink. Add accents to your palette and the families use them directly instead of needing tints.
+- **The restyle must prove it draws before it is kept.** Every page is now rendered off-screen first. If any page cannot be drawn, the whole document is rolled back untouched, so a restyle can never leave you with a blank canvas.
+- **One translation table for the whole document**, so a color always becomes the same brand color on every page, and applying it is a pure lookup that cannot drift from the plan.
+
+Verified on a rebuilt copy of a real KoralPaper diagram (22 elements, tint-laddered nodes, elbow connectors with circle heads, an imported logo): all 22 elements survive, all five tint steps are preserved in the brand hue, the page takes the brand paper, and the result persists correctly.
+
 ## v3.78.1
 
 **The vanishing-pages bug is fixed at the source, and a restyle can no longer be lost.**
