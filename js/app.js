@@ -1518,7 +1518,8 @@ function onPointerUp(ev){
         applyRecognized(el, rec);
         commit();                              // 2nd step: the recognized clean shape
         requestRender();
-        showHint('Snapped to a ' + (rec.sides === 3 ? 'triangle' : rec.kind) + ' (⌘Z to keep it freehand)');
+        showHint(rec.kind === 'smooth' ? 'Smoothed the curve (⌘Z to keep it as-is)'
+          : 'Snapped to a ' + (rec.sides === 3 ? 'triangle' : rec.kind) + ' (⌘Z to keep it freehand)');
         return;
       }
     }
@@ -4675,7 +4676,38 @@ function rcCorners(rs, closed){
       picks.push(i);
     }
   }
-  return picks.length;
+  return picks;                                    // indices of the detected corners
+}
+function rcPolyness(rs, picks, cx, cy, rx, ry){
+  // mean normalised radius at corners vs at edge midpoints. Regular N-gon > 1
+  // (hexagon ~1.15, pentagon ~1.24, square ~1.41); any ellipse ~1.0.
+  if (picks.length < 3) return 1;
+  const nr = p => Math.hypot((p[0]-cx)/rx, (p[1]-cy)/ry);
+  const N = rs.length;
+  let sv = 0; for (const i of picks) sv += nr(rs[i]);
+  const Rv = sv / picks.length;
+  let sm = 0;
+  for (let k = 0; k < picks.length; k++){
+    const a = picks[k], b = picks[(k+1) % picks.length];
+    let gap = (b - a + N) % N; if (gap === 0) gap = N;
+    sm += nr(rs[(a + Math.round(gap/2)) % N]);
+  }
+  const Rm = sm / picks.length;
+  return Rm > 0 ? Rv / Rm : 1;
+}
+function rcSmooth(abs, ox, oy){
+  // tidy a freehand curve: resample evenly, two [1,2,1] passes, endpoints pinned
+  let len = 0; for (let i = 1; i < abs.length; i++) len += Math.hypot(abs[i][0]-abs[i-1][0], abs[i][1]-abs[i-1][1]);
+  const N = clamp(Math.round(len / 14), 8, 64);
+  let pts = rcResample(abs, N);
+  for (let pass = 0; pass < 2; pass++){
+    const out = [pts[0]];
+    for (let i = 1; i < pts.length - 1; i++)
+      out.push([(pts[i-1][0] + 2*pts[i][0] + pts[i+1][0]) / 4, (pts[i-1][1] + 2*pts[i][1] + pts[i+1][1]) / 4]);
+    out.push(pts[pts.length - 1]);
+    pts = out;
+  }
+  return pts.map(p => [p[0] - ox, p[1] - oy]);
 }
 function recognizeStroke(el){
   const pts = el.points;
@@ -4697,12 +4729,12 @@ function recognizeStroke(el){
 
   if (!closed){
     const segLen = Math.hypot(last[0]-first[0], last[1]-first[1]);
-    if (segLen < 24) return null;
     let maxDev = 0;
     for (const p of abs) maxDev = Math.max(maxDev, distToSegment(p[0], p[1], first[0], first[1], last[0], last[1]));
     if (maxDev < 0.085 * segLen && pathLen < segLen * 1.28)
       return { kind: 'line', x: first[0], y: first[1], points: [[0,0],[last[0]-first[0], last[1]-first[1]]], style };
-    return null;                                    // open scribble: keep freehand
+    if (segLen < 24) return null;
+    return { kind: 'smooth', points: rcSmooth(abs, el.x, el.y) };   // open curve: tidy it
   }
 
   // closed: ellipse fit against the bounding box
@@ -4710,23 +4742,24 @@ function recognizeStroke(el){
   let s1 = 0, s2 = 0, n = abs.length;
   for (const [x, y] of abs){ const r = Math.hypot((x-cx)/rx, (y-cy)/ry); s1 += r; s2 += r*r; }
   const mean = s1/n, sd = Math.sqrt(Math.max(0, s2/n - mean*mean));
-  // clean-ellipse fast path: radial distances tightly around 1
-  if (Math.abs(mean - 1) < 0.13 && sd < 0.09)
-    return { kind: 'ellipse', x: minX, y: minY, w, h, style };
-
   const rs = rcResample(abs, 64);
   const fill = rcPolyArea(rs) / (w * h || 1);
-  const corners = rcCorners(rs, true);           // reliable: rect~4, circle~2, triangle~3, diamond~4
-  if (corners <= 2) return { kind: 'ellipse', x: minX, y: minY, w, h, style };
+  const picks = rcCorners(rs, true);
+  const corners = picks.length;
+  const poly = rcPolyness(rs, picks, cx, cy, rx, ry);
+  // A real polygon has vertices sticking out past its edge midpoints (poly high)
+  // AND meaningful radial variation (sd). A hand-drawn circle fools poly alone
+  // because noise bumps read as corners, but its sd stays tiny.
+  const isPolygon = corners >= 3 && corners <= 12 && poly >= 1.11 && sd >= 0.055;
+  if (!isPolygon) return { kind: 'ellipse', x: minX, y: minY, w, h, style };
   if (corners === 3) return { kind: 'polygon', x: minX, y: minY, w, h, sides: 3, style };
   if (corners === 4) return (fill > 0.66)
     ? { kind: 'rect', x: minX, y: minY, w, h, style }
     : { kind: 'diamond', x: minX, y: minY, w, h, style };
-  if (corners >= 5 && corners <= 12) return { kind: 'polygon', x: minX, y: minY, w, h, sides: corners, style };
-  if (fill > 0.72) return { kind: 'rect', x: minX, y: minY, w, h, style };
-  return null;
+  return { kind: 'polygon', x: minX, y: minY, w, h, sides: corners, style };
 }
 function applyRecognized(drawEl, rec){
+  if (rec.kind === 'smooth'){ drawEl.points = rec.points; delete drawEl._prims; delete drawEl._pkey; return drawEl; }
   const style = Object.assign({ fill: 'none', round: 1 }, rec.style);
   const shape = newElement(rec.kind === 'line' ? 'line' : rec.kind, rec.x, rec.y, style);
   shape.groupId = drawEl.groupId || null;

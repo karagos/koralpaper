@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.72.1
+
+Freehand recognition improvements: pentagons and hexagons now snap correctly (they were being read as circles), and a freehand curve is now smoothed into a clean line instead of staying jittery. Recognition covers triangle through hexagon plus circle, ellipse, rectangle, diamond, straight line, and smooth curves.
+
 ## v3.72.0
 
 **Freehand shape recognition.** Draw a rough shape with the pen and it snaps to a clean KoralPaper shape: a box becomes a rectangle, a loop becomes an ellipse, and it also recognizes triangles, diamonds, other polygons, and straight lines. The snapped shape keeps your hand-drawn wobble and is fully editable (fill it, type in it, resize it) like any shape. It is on by default; toggle it with the new wand button in the top bar, and one **⌘Z** always keeps your raw freehand stroke instead. All local, all offline, no dependencies.
