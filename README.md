@@ -60,7 +60,7 @@ includes roasting your own diagram.
 </tr>
 </table>
 
-![Version](https://img.shields.io/badge/Version-3.82.1-1F1E1B)
+![Version](https://img.shields.io/badge/Version-3.83.0-1F1E1B)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 ![Works on: Mac, Windows, Linux, iPad](https://img.shields.io/badge/Works%20on-Mac%20·%20Windows%20·%20Linux%20·%20iPad-1F1E1B)
 ![Offline: 100%](https://img.shields.io/badge/Offline-100%25-2ea44f)

@@ -2514,6 +2514,13 @@ function syncPanel(){
   $('groupBtn').classList.toggle('hidden', sel.length < 2);
   $('ungroupBtn').classList.toggle('hidden', !sel.some(e => e.groupId));
 
+  /* Everything above decided WHICH rows the panel shows. Everything below only
+     fills those rows in. Keep the two apart: if filling in a detail throws, the
+     rows themselves must still be correct, or a control like the Font picker
+     silently disappears from the sidebar and never comes back. */
+  try { syncPanelDetails(sel, tool); } catch (e){ console.error('style panel detail sync failed', e); }
+}
+function syncPanelDetails(sel, tool){
   const val = key => {
     const src = sel.length ? sel : [defaults];
     const v0 = sel.length ? sel[0][key] : defaults[key];

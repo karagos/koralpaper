@@ -182,8 +182,26 @@ body.dark .menu button.danger{color:#F09070;}
   top:76px; left:14px; width:212px;
   flex-direction:column; align-items:stretch; gap:9px;
   padding:13px 13px 11px;
-  max-height:calc(100vh - 170px); overflow-y:auto;
+  /* use as much height as the window allows: with a shape that holds text the
+     panel is long, and the text controls used to sit far below the fold */
+  max-height:calc(100vh - 104px); overflow-y:auto;
+  scrollbar-width:thin;                      /* Firefox: keep the bar visible */
+  scrollbar-color:var(--line-soft) transparent;
 }
+/* macOS hides overlay scrollbars until you scroll, so the panel looked like it
+   simply ended. Keep a visible track so there is always a hint of more below. */
+.stylePanel::-webkit-scrollbar{width:10px;}
+.stylePanel::-webkit-scrollbar-track{background:var(--card-2); border-radius:8px;}
+.stylePanel::-webkit-scrollbar-thumb{
+  background:var(--line-soft); border-radius:8px;
+  border:2px solid var(--card);
+}
+.stylePanel::-webkit-scrollbar-thumb:hover{background:var(--ink-soft);}
+/* the colour grids are the tallest things in the panel: cap them so everything
+   below (Font, Size, Text colour) stays within reach */
+.stylePanel .swatches{max-height:108px; overflow-y:auto; padding-right:2px;}
+.stylePanel .swatches::-webkit-scrollbar{width:8px;}
+.stylePanel .swatches::-webkit-scrollbar-thumb{background:var(--line-soft); border-radius:6px;}
 .stylePanel .row{display:flex; flex-direction:column; gap:5px;}
 .stylePanel label{
   font-size:10.5px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase;

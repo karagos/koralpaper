@@ -1,5 +1,14 @@
 # KoralPaper — Changelog
 
+## v3.83.0
+
+**The font selector is reachable again when you work with text.** Selecting a shape that holds text (a box, a hexagon) filled the style panel with every shape control first, and pushed Text colour, Font, Size and Align roughly 950px down a panel that only shows about 690px. macOS hides overlay scrollbars until you scroll, so the panel looked like it simply ended after Fill pattern, and the font controls appeared to be gone.
+
+- **Text controls now sit directly under Outline and Fill**, before the shape options, so Font is visible the moment you select anything holding text. Measured: with a hexagon selected the Font row moved from 851px (below the fold) to 518px (in view).
+- **The colour grids are capped and scroll on their own**, so Outline, Fill and Text colour no longer consume 200px each.
+- **The panel keeps a visible scrollbar** instead of an invisible overlay one, and uses more of the window height.
+- **Row visibility is now separated from filling those rows in.** If populating a control ever fails, the rows themselves still appear correctly, so a control can no longer vanish from the sidebar because of an unrelated error.
+
 ## v3.82.1
 
 **Fixed: the font picker could stop opening entirely.** Loading a Google font by typing its name saved that name even when the font registry had refused it, and the registry refuses anything outside letters, numbers and spaces. From then on, building the font list hit an entry it could not construct and threw, which aborted opening the menu before it ever appeared. The result: the Font row was there, but clicking it did nothing, and no element's font could be changed. Because the bad name was saved in the browser, it survived every reload.

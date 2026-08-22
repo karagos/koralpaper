@@ -189,6 +189,35 @@
   <div class="island stylePanel hidden" id="stylePanel">
     <div class="row" id="rowStroke"><label id="strokeLabel">Outline</label><div class="swatches" id="strokeSwatches"></div></div>
     <div class="row" id="rowFill"><label>Fill</label><div class="swatches" id="fillSwatches"></div></div>
+    <div class="row zonegap" id="rowTextColor"><label>Text color</label><div class="swatches" id="textSwatches"></div></div>
+    <div class="row" id="rowFont"><label>Font</label>
+      <div class="fontrow">
+        <button class="fontbtn" id="fontBtn" title="Font family">
+          <span id="fontBtnLabel">Sans</span><span class="fontcaret">▾</span>
+        </button>
+        <button class="fontbtn weightbtn" id="weightBtn" title="Font weight, from 100 Thin to 900 Black">
+          <span id="weightBtnLabel">400</span><span class="fontcaret">▾</span>
+        </button>
+      </div>
+      <div class="menu fontmenu hidden" id="fontMenu"></div>
+      <div class="menu weightmenu hidden" id="weightMenu"></div>
+    </div>
+    <div class="row" id="rowSize"><label>Size</label>
+      <div class="sizerow">
+        <div class="segment" id="sizeSeg">
+          <button data-v="16">S</button><button data-v="21">M</button><button data-v="29">L</button><button data-v="42">XL</button>
+        </div>
+        <input type="number" id="sizeInput" min="8" max="600" step="1"
+          title="Exact font size in px: type a value and press Enter" autocomplete="off">
+      </div>
+    </div>
+    <div class="row" id="rowAlign"><label>Align</label>
+      <div class="segment" id="alignSeg">
+        <button data-v="left" title="Left"><svg viewBox="0 0 20 20"><path d="M3.5 5.5 H16.5 M3.5 10 H12 M3.5 14.5 H14.5"/></svg></button>
+        <button data-v="center" title="Center"><svg viewBox="0 0 20 20"><path d="M3.5 5.5 H16.5 M6 10 H14 M4.5 14.5 H15.5"/></svg></button>
+        <button data-v="right" title="Right"><svg viewBox="0 0 20 20"><path d="M3.5 5.5 H16.5 M8 10 H16.5 M5.5 14.5 H16.5"/></svg></button>
+      </div>
+    </div>
     <div class="row" id="rowFillOpacity"><label>Fill opacity <span class="labelval" id="fillOpacityVal"></span></label>
       <input type="range" id="fillOpacityRange" min="0" max="100" step="5" value="100">
     </div>
@@ -302,35 +331,6 @@
           <option value="circle-filled">End: ● solid circle</option>
           <option value="bar">End: | bar</option>
         </select>
-      </div>
-    </div>
-    <div class="row zonegap" id="rowTextColor"><label>Text color</label><div class="swatches" id="textSwatches"></div></div>
-    <div class="row" id="rowFont"><label>Font</label>
-      <div class="fontrow">
-        <button class="fontbtn" id="fontBtn" title="Font family">
-          <span id="fontBtnLabel">Sans</span><span class="fontcaret">▾</span>
-        </button>
-        <button class="fontbtn weightbtn" id="weightBtn" title="Font weight, from 100 Thin to 900 Black">
-          <span id="weightBtnLabel">400</span><span class="fontcaret">▾</span>
-        </button>
-      </div>
-      <div class="menu fontmenu hidden" id="fontMenu"></div>
-      <div class="menu weightmenu hidden" id="weightMenu"></div>
-    </div>
-    <div class="row" id="rowSize"><label>Size</label>
-      <div class="sizerow">
-        <div class="segment" id="sizeSeg">
-          <button data-v="16">S</button><button data-v="21">M</button><button data-v="29">L</button><button data-v="42">XL</button>
-        </div>
-        <input type="number" id="sizeInput" min="8" max="600" step="1"
-          title="Exact font size in px: type a value and press Enter" autocomplete="off">
-      </div>
-    </div>
-    <div class="row" id="rowAlign"><label>Align</label>
-      <div class="segment" id="alignSeg">
-        <button data-v="left" title="Left"><svg viewBox="0 0 20 20"><path d="M3.5 5.5 H16.5 M3.5 10 H12 M3.5 14.5 H14.5"/></svg></button>
-        <button data-v="center" title="Center"><svg viewBox="0 0 20 20"><path d="M3.5 5.5 H16.5 M6 10 H14 M4.5 14.5 H15.5"/></svg></button>
-        <button data-v="right" title="Right"><svg viewBox="0 0 20 20"><path d="M3.5 5.5 H16.5 M8 10 H16.5 M5.5 14.5 H16.5"/></svg></button>
       </div>
     </div>
     <div class="row" id="rowRich"><label>Emphasis</label>
