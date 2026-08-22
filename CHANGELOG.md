@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.83.1
+
+**The fold arrows in the style panel are visible now.** Each collapsible section carries a small triangle on the right of its heading, but at 9px and 45% opacity it barely registered as a control. It is now double the size (18px) and drawn in near-black ink at 85% opacity, going fully solid on hover. It follows the theme, so it stays light on dark backgrounds.
+
 ## v3.83.0
 
 **The font selector is reachable again when you work with text.** Selecting a shape that holds text (a box, a hexagon) filled the style panel with every shape control first, and pushed Text colour, Font, Size and Align roughly 950px down a panel that only shows about 690px. macOS hides overlay scrollbars until you scroll, so the panel looked like it simply ended after Fill pattern, and the font controls appeared to be gone.
