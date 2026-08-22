@@ -1,5 +1,16 @@
 # KoralPaper — Changelog
 
+## v3.82.1
+
+**Fixed: the font picker could stop opening entirely.** Loading a Google font by typing its name saved that name even when the font registry had refused it, and the registry refuses anything outside letters, numbers and spaces. From then on, building the font list hit an entry it could not construct and threw, which aborted opening the menu before it ever appeared. The result: the Font row was there, but clicking it did nothing, and no element's font could be changed. Because the bad name was saved in the browser, it survived every reload.
+
+- A name the registry refuses is no longer saved, and you are told why.
+- The saved list is filtered when the menu is built, and repaired in storage, so an already-broken list heals itself on the next load.
+- The menu now opens even if that section fails.
+- The Brand kit dropdown no longer offers a saved font that cannot be applied.
+
+The Brand kit's font dropdown kept working throughout because it never looked the font up the same way, which is exactly why the two behaved differently.
+
 ## v3.82.0
 
 **Security and robustness pass.** A full audit of the app and the MCP bridge. Four real issues found and fixed; everything else came back clean.

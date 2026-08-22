@@ -2831,7 +2831,13 @@ function fontSearchRow(menu){
 }
 function applyCustomFont(family){
   const key = 'cg:' + family;
-  ensureCustomFont(key);
+  // a name the registry refuses must never be saved: it used to be remembered anyway,
+  // and every later attempt to build the font menu then threw on the missing entry,
+  // which silently disabled the whole font picker until storage was cleared
+  if (!ensureCustomFont(key)){
+    showHint('“' + family + '” is not a usable font name: use letters, numbers and spaces only');
+    return;
+  }
   rememberGFont(family);
   loadFontCssFor(family);
   requestFontLoad(key);
@@ -2843,7 +2849,13 @@ function buildCustomFontButtons(){
   const box = $('fontCustomGroup');
   if (!box) return;
   box.replaceChildren();
-  const fams = savedGFonts();
+  const all = savedGFonts();
+  // drop any saved name the registry cannot build, so one bad entry can never
+  // break the menu again, and repair the stored list while we are here
+  const fams = all.filter(f => !!ensureCustomFont('cg:' + f));
+  if (fams.length !== all.length){
+    try { localStorage.setItem(GFONTS_KEY, JSON.stringify(fams)); } catch (e){}
+  }
   if (!fams.length) return;
   const head = document.createElement('div');
   head.className = 'menuhead';
@@ -2993,7 +3005,8 @@ function buildWeightMenu(){
 }
 function openFontMenu(){
   const m = $('fontMenu');
-  buildCustomFontButtons();
+  // never let one bad saved font stop the picker from opening
+  try { buildCustomFontButtons(); } catch (e){ console.error('custom font list failed', e); }
   const fs = $('fontSearch');
   if (fs && fs.value){ fs.value = ''; fontMenuFilter(''); }
   const r = $('fontBtn').getBoundingClientRect();
@@ -3027,7 +3040,7 @@ function brandFontOptions(sel, current){
     sel.appendChild(o);
   };
   for (const [key, f] of Object.entries(FONTS)) if (!f.custom) add(key, f.label);
-  for (const fam of savedGFonts()) add('cg:' + fam, fam + ' (Google)');
+  for (const fam of savedGFonts()) if (ensureCustomFont('cg:' + fam)) add('cg:' + fam, fam + ' (Google)');
   sel.value = (current && [...sel.options].some(o => o.value === current)) ? current : 'sans';
 }
 // DOM → brand (authoritative + normalized). Palette is read from its live inputs.
