@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.83.2
+
+**Fixed: the style panel could cover the zoom bar.** Giving the panel more height in 3.83.0 let it run 37px into the zoom and fit controls at the bottom left when a long selection filled it. The panel now stops a clear 17px above that bar at any window size, and the text controls still sit in view without scrolling.
+
 ## v3.83.1
 
 **The fold arrows in the style panel are visible now.** Each collapsible section carries a small triangle on the right of its heading, but at 9px and 45% opacity it barely registered as a control. It is now double the size (18px) and drawn in near-black ink at 85% opacity, going fully solid on hover. It follows the theme, so it stays light on dark backgrounds.

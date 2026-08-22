@@ -182,9 +182,10 @@ body.dark .menu button.danger{color:#F09070;}
   top:76px; left:14px; width:212px;
   flex-direction:column; align-items:stretch; gap:9px;
   padding:13px 13px 11px;
-  /* use as much height as the window allows: with a shape that holds text the
-     panel is long, and the text controls used to sit far below the fold */
-  max-height:calc(100vh - 104px); overflow-y:auto;
+  /* Use as much height as the window allows, but STOP ABOVE THE ZOOM BAR:
+     that island sits at bottom:14px and is ~51px tall, so the panel must end
+     by 100vh-65px. 76 (panel top) + 65 + 17 gap = 158. */
+  max-height:calc(100vh - 158px); overflow-y:auto;
   scrollbar-width:thin;                      /* Firefox: keep the bar visible */
   scrollbar-color:var(--line-soft) transparent;
 }
