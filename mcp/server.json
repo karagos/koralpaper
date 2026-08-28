@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://karagos.github.io/koralpaper/",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/karagos/koralpaper/releases/download/v3.67.0/koralpaper.mcpb",
-      "fileSha256": "99d0504c958e6c688e01cda3a5da429645b67b543fe0917b5e7d944344fe7349",
+      "identifier": "https://github.com/karagos/koralpaper/releases/download/v3.83.3/koralpaper.mcpb",
+      "fileSha256": "31762caf58294f49f2ea07e9b3a31bcd81af34c69ae3103e453f8eb21e46df25",
       "transport": {
         "type": "stdio"
       }

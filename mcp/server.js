@@ -368,7 +368,7 @@ function onMessage(msg){
     reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'koralpaper', version: '1.4.3' },
+      serverInfo: { name: 'koralpaper', version: '1.4.4' },
       instructions: 'These tools draw directly in the KoralPaper app (hand-drawn diagram studio) running in the user\'s browser. Workflow: koralpaper_status → koralpaper_read_document (if editing) → create/add/update → koralpaper_render_page to visually check the result, and iterate until the layout is clean.',
     });
     return;
