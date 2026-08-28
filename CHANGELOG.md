@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.83.3
+
+**Bold, italic and highlight are reachable for text inside a shape.** Moving the text controls up in 3.83.0 only took Text colour, Font, Size and Align; Emphasis and Text position were left behind the shape options and ended up far below the visible panel. Selecting a plain text element showed them, selecting a box or a hexagon did not, which is why the two behaved differently. Both now sit with the rest of the text controls, directly after Align.
+
+Measured with a box selected: the Emphasis row moved from 907px, well below a panel ending at 718px, to 493px. The controls themselves always worked; they simply could not be seen.
+
 ## v3.83.2
 
 **Fixed: the style panel could cover the zoom bar.** Giving the panel more height in 3.83.0 let it run 37px into the zoom and fit controls at the bottom left when a long selection filled it. The panel now stops a clear 17px above that bar at any window size, and the text controls still sit in view without scrolling.
