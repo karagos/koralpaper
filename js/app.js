@@ -2163,9 +2163,7 @@ function openCtxMenu(ev){
   }
   closeMenus();
   menu.classList.remove('hidden');
-  const mw = 200, mh = menu.scrollHeight || 300;
-  menu.style.left = clamp(ev.clientX, 8, window.innerWidth - mw - 8) + 'px';
-  menu.style.top = clamp(ev.clientY, 8, window.innerHeight - mh - 8) + 'px';
+  placeMenuAt(menu, ev.clientX, ev.clientY);
 }
 canvas.addEventListener('contextmenu', ev => {
   if (presenting){ ev.preventDefault(); return; }
@@ -4311,6 +4309,28 @@ function buildPageStrip(){
   add.addEventListener('click', addPage);
   strip.appendChild(add);
 }
+/* Put a popup menu at a point by MEASURING it, not guessing its size. The page
+   menus used to assume a fixed height and subtract a magic 190px, so opening one
+   from the page strip at the bottom of the window ran the menu off the screen and
+   cut off "Delete page". Flips above or left of the point when there is no room,
+   and scrolls if the menu is taller than the window. The menu must already be
+   visible when this is called, or it cannot be measured. */
+function placeMenuAt(menu, x, y){
+  const M = 8;
+  menu.style.maxHeight = ''; menu.style.overflowY = '';
+  menu.style.left = '0px'; menu.style.top = '0px';        // measure unconstrained
+  let w = menu.offsetWidth, h = menu.offsetHeight;
+  const maxH = window.innerHeight - M * 2;
+  if (h > maxH){ menu.style.maxHeight = maxH + 'px'; menu.style.overflowY = 'auto'; h = maxH; }
+  let left = x;
+  if (left + w > window.innerWidth - M) left = x - w;     // flip to the left of the point
+  left = Math.max(M, Math.min(left, window.innerWidth - w - M));
+  let top = y;
+  if (top + h > window.innerHeight - M) top = y - h;      // flip above the point
+  top = Math.max(M, Math.min(top, window.innerHeight - h - M));
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+}
 function openPageMenu(ev, i){
   const menu = $('ctxMenu');
   menu.replaceChildren();
@@ -4332,8 +4352,7 @@ function openPageMenu(ev, i){
   add('Delete page…', () => deletePage(i), state.pages.length <= 1);
   closeMenus();
   menu.classList.remove('hidden');
-  menu.style.left = clamp(ev.clientX, 8, window.innerWidth - 200) + 'px';
-  menu.style.top = clamp(ev.clientY - 190, 8, window.innerHeight - 220) + 'px';
+  placeMenuAt(menu, ev.clientX, ev.clientY);
 }
 
 function openPageMultiMenu(ev){
@@ -4355,8 +4374,7 @@ function openPageMultiMenu(ev){
   add(`Delete ${n} pages…`, deletePages, n >= state.pages.length);
   closeMenus();
   menu.classList.remove('hidden');
-  menu.style.left = clamp(ev.clientX, 8, window.innerWidth - 200) + 'px';
-  menu.style.top = clamp(ev.clientY - 190, 8, window.innerHeight - 220) + 'px';
+  placeMenuAt(menu, ev.clientX, ev.clientY);
 }
 function duplicatePages(){
   syncPageRef();

@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.83.4
+
+**Fixed: the page menu opened off the bottom of the screen.** Right-clicking a page thumbnail placed the menu using a guessed height, so on the page strip at the bottom of the window it ran past the edge and "Delete page…" could not be reached. The menu is 295px tall; the code assumed 220px.
+
+Context menus are now measured instead of guessed, and flip above or to the left of the pointer when there is no room. If a menu is ever taller than the window it scrolls rather than overflowing. This covers the page menu, the multi-page menu and the right-click menu on the canvas.
+
 ## v3.83.3
 
 **Bold, italic and highlight are reachable for text inside a shape.** Moving the text controls up in 3.83.0 only took Text colour, Font, Size and Align; Emphasis and Text position were left behind the shape options and ended up far below the visible panel. Selecting a plain text element showed them, selecting a box or a hexagon did not, which is why the two behaved differently. Both now sit with the rest of the text controls, directly after Align.
