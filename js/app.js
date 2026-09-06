@@ -1630,7 +1630,21 @@ function positionEditor(){
   editorEl.style.font = fontCSS(el.font, fs, null, el.fweight);
   editorEl.style.lineHeight = lineHeightOf(el.size, el.lh) * z + 'px';
   editorEl.style.letterSpacing = ((el.lspace || 0) * z) + 'px';
-  if (el.type === 'text'){
+  if (el.type === 'text' && el.wrap){
+    /* Dragging a text box's side sets el.wrap and fixes its width, and the canvas
+       reflows the text at that width. The editor has to wrap at the SAME width:
+       left unwrapped, its lines stayed at the old full-width layout, so the
+       selection highlight was drawn over where the text used to be. */
+    const [px, py] = toScreen(el.x, el.y);
+    const maxW = Math.max(40, el.w);
+    const lay = layoutText(el, maxW);
+    editorEl.style.whiteSpace = 'pre-wrap';
+    editorEl.style.textAlign = el.align || 'left';
+    editorEl.style.left = px + 'px';
+    editorEl.style.top = py + 'px';
+    editorEl.style.width = maxW * z + 'px';
+    editorEl.style.height = (lay.totalH + lineHeightOf(el.size, el.lh)) * z + 'px';
+  } else if (el.type === 'text'){
     const [px, py] = toScreen(el.x, el.y);
     const m = measureText(editorEl.value || ' ', el.font, el.size);
     editorEl.style.whiteSpace = 'pre';

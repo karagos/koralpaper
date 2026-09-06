@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.83.5
+
+**Fixed: selecting text in a resized text box highlighted the wrong place.** Dragging a text box's side fixes its width and the text reflows on the canvas, but the invisible editing layer on top of it kept laying the text out unwrapped at its original full width. Selecting then painted the highlight over where the text used to be, in long bands running past the edge of the box, while the visible text sat elsewhere.
+
+The editing layer now wraps at exactly the same width and alignment as the canvas, so a selection lands on the words you are actually pointing at. Verified on a resized box: the canvas wraps the text into 7 lines and the editor now wraps into the same 7, at the same 520px width.
+
 ## v3.83.4
 
 **Fixed: the page menu opened off the bottom of the screen.** Right-clicking a page thumbnail placed the menu using a guessed height, so on the page strip at the bottom of the window it ran past the edge and "Delete page…" could not be reached. The menu is 295px tall; the code assumed 220px.
