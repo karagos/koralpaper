@@ -12,7 +12,7 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/karagos/koralpaper/releases/download/v3.83.3/koralpaper.mcpb",
+      "identifier": "https://github.com/karagos/koralpaper/releases/download/v3.83.7/koralpaper.mcpb",
       "fileSha256": "31762caf58294f49f2ea07e9b3a31bcd81af34c69ae3103e453f8eb21e46df25",
       "transport": {
         "type": "stdio"
