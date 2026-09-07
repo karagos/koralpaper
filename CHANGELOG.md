@@ -1,5 +1,13 @@
 # KoralPaper — Changelog
 
+## v3.83.6
+
+**The app can no longer be stopped from starting by anything the browser has stored.** Startup read your saved fonts, brand kit, settings and document as one unbroken sequence, so a single unreadable value anywhere in it stopped the rest and the app never appeared at all.
+
+Each startup step is now isolated. A step that fails is logged and skipped, and the essentials always run: the document is checked before anything draws it and replaced with a blank page if it cannot be used, the page index is brought back into range, and the canvas, tools and history are always set up. If anything was skipped you are told which part, instead of being left with a blank screen.
+
+Verified by corrupting every stored source at once, a document whose elements were not a list and whose page index pointed past the end, font names the app cannot build, a brand kit with an invalid colour and a broken style, and a malformed environment list. The app still started with a working canvas, a valid page, the full font menu and a repaired brand kit.
+
 ## v3.83.5
 
 **Fixed: selecting text in a resized text box highlighted the wrong place.** Dragging a text box's side fixes its width and the text reflows on the canvas, but the invisible editing layer on top of it kept laying the text out unwrapped at its original full width. Selecting then painted the highlight over where the text used to be, in long bands running past the edge of the box, while the visible text sat elsewhere.

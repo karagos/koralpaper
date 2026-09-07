@@ -9519,43 +9519,70 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
   });
 }
 
-/* ── boot ──────────────────────────────────────────── */
+/* ── boot ────────────────────────────────────────────
+   Every step here reads something the browser stored: saved fonts, the brand
+   kit, settings, the document itself. Any one of them throwing used to stop
+   the whole sequence, and the app simply never appeared. Each step is now
+   isolated: a failure is logged and skipped, and the essentials (a valid
+   document, a drawn canvas, a working tool) always run. */
 function boot(){
-  $('menuVersion').textContent = `KoralPaper v${APP_VERSION}`;
-  syncExpToggle();
-  document.querySelector('.brand .name').title = `KoralPaper v${APP_VERSION}`;
-  buildSwatches();
-  buildPaperSwatches();
-  registerSavedGFonts();
-  buildFontSelect();
-  buildWeightMenu();
-  initBrandUI();
-  syncSettingsUI();
-  applyWidthPresets();
-  buildIconMenu();
-  buildBoardMenu();
-  loadGoogleFonts();
-  const hadSave = loadSaved();
-  document.body.classList.toggle('dark', state.theme === 'dark');
-  paintSwatches();
-  syncToggles();
-  syncPaperUI();
-  syncBoardBtn();
-  buildBoardMenuSel();
-  if (!state.pages.length){
+  const failed = [];
+  const step = (name, fn) => { try { fn(); } catch (e){ failed.push(name); console.error('boot step failed: ' + name, e); } };
+
+  step('version label', () => {
+    $('menuVersion').textContent = `KoralPaper v${APP_VERSION}`;
+    document.querySelector('.brand .name').title = `KoralPaper v${APP_VERSION}`;
+  });
+  step('export toggle', syncExpToggle);
+  step('swatches', buildSwatches);
+  step('paper swatches', buildPaperSwatches);
+  step('saved Google fonts', registerSavedGFonts);
+  step('font menu', buildFontSelect);
+  step('weight menu', buildWeightMenu);
+  step('brand kit', initBrandUI);
+  step('settings', syncSettingsUI);
+  step('width presets', applyWidthPresets);
+  step('icon menu', buildIconMenu);
+  step('board menu', buildBoardMenu);
+  step('Google fonts', loadGoogleFonts);
+
+  let hadSave = false;
+  step('saved document', () => { hadSave = loadSaved(); });
+  // whatever happened above, the document must be usable before anything draws
+  if (!docUsable()){
+    if (hadSave) console.error('boot: the saved document was unusable; starting a blank page');
     state.pages = [{ id: uid(), name: 'Page 1', elements: [] }];
     state.pageIndex = 0;
     state.elements = state.pages[0].elements;
+    if (hadSave) failed.push('saved document');
+    hadSave = false;
   }
-  updateBoundArrows(state.elements);
-  buildPageStrip();
-  history = [serialize()];
-  histIndex = 0;
-  syncHistoryButtons();
-  setTool('select');
-  syncZoomLabel();
-  requestRender();
-  maybeShowWelcome(hadSave);
-  showHint('Double-click any shape to type in it · press ? for shortcuts');
+  state.pageIndex = clamp(state.pageIndex | 0, 0, state.pages.length - 1);
+  state.elements = state.pages[state.pageIndex].elements;
+
+  step('theme', () => document.body.classList.toggle('dark', state.theme === 'dark'));
+  step('swatch paint', paintSwatches);
+  step('toggles', syncToggles);
+  step('paper', syncPaperUI);
+  step('board button', syncBoardBtn);
+  step('board list', buildBoardMenuSel);
+  step('bound arrows', () => updateBoundArrows(state.elements));
+  step('page strip', buildPageStrip);
+  step('history', () => { history = [serialize()]; histIndex = 0; syncHistoryButtons(); });
+  step('tool', () => setTool('select'));
+  step('zoom label', syncZoomLabel);
+  step('render', requestRender);
+  step('welcome', () => maybeShowWelcome(hadSave));
+
+  if (failed.length){
+    showHint('KoralPaper started, but some saved settings could not be read: ' + failed.join(', '));
+  } else {
+    showHint('Double-click any shape to type in it · press ? for shortcuts');
+  }
+}
+/* the minimum a document must satisfy before the app draws it */
+function docUsable(){
+  if (!Array.isArray(state.pages) || !state.pages.length) return false;
+  return state.pages.every(p => p && Array.isArray(p.elements));
 }
 boot();
