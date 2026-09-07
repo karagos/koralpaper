@@ -9513,6 +9513,14 @@ window.addEventListener('pagehide', () => {
 });
 
 /* ── PWA: offline + installable when served over the web ── */
+/* A web app manifest can only be fetched over http(s): opening index.html straight
+   from disk made Chrome log a CORS failure and a failed GET for it on every load,
+   which looks alarming but changes nothing. Add it only where it can be read. */
+if (location.protocol.startsWith('http')){
+  const mf = document.createElement('link');
+  mf.rel = 'manifest'; mf.href = 'manifest.webmanifest';
+  document.head.appendChild(mf);
+}
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});

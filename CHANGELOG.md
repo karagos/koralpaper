@@ -1,5 +1,11 @@
 # KoralPaper — Changelog
 
+## v3.83.7
+
+**No more manifest errors when you open the app straight from a file.** Opening `index.html` from disk made Chrome log a CORS refusal and a failed request for the web app manifest on every load. A manifest can only be fetched over http or https, so browsers always reject it from a local file. It changed nothing about how the app worked, but it looked like a fault.
+
+The manifest is now attached only when the page is served over http or https, matching what the service worker already did. Opened from a file the app starts silently; served over the web, installing it as an app still works exactly as before.
+
 ## v3.83.6
 
 **The app can no longer be stopped from starting by anything the browser has stored.** Startup read your saved fonts, brand kit, settings and document as one unbroken sequence, so a single unreadable value anywhere in it stopped the rest and the app never appeared at all.
