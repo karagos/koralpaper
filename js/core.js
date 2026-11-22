@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.86.0';
+const APP_VERSION = '3.86.1';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -465,7 +465,8 @@ function layoutText(el, maxW){
   const widthOf = (raw, a, b) => mkSegs(raw, a, b).reduce((acc, s) => acc + s.w, 0);
   const pushLine = (raw, a, b, para) => {
     const segs = mkSegs(raw, a, b);
-    lines.push({ segs, text: raw.slice(a, b), w: segs.reduce((acc, s) => acc + s.w, 0), para });
+    // start / end: where this line sits in the whole text, so a caret position can be found on it
+    lines.push({ segs, text: raw.slice(a, b), w: segs.reduce((acc, s) => acc + s.w, 0), para, start: charBase + a, end: charBase + b });
   };
   /* every hard line break (Enter) starts a new PARAGRAPH and receives the
      paragraph gap; soft-wrapped continuation lines inside a shape use only
@@ -523,6 +524,94 @@ function drawRichLine(ctx, el, line, x0, ty, color, pal){
     }
     x += seg.w;
   }
+}
+/* ── where text sits: one description for the painter and the editor ──
+   The caret and the selection of the text editor are drawn from this, on the
+   canvas, from the same layout that paints the letters. They used to belong to
+   an invisible text field laid over the canvas, which wrapped the text with the
+   browser's own rules: a bold or italic text, a hyphen or a slash was enough for
+   its lines to break elsewhere, and the caret and the highlight then showed in
+   places that had nothing to do with the letters. */
+function textRows(el){
+  let lay, left, top;
+  if (el.type === 'text'){
+    lay = layoutText(el, el.wrap ? Math.max(40, el.w) : null);
+    top = textBlockTop(el, lay.totalH);
+    left = ln => lineLeft(el.align || 'left', el.x, el.x + el.w, ln.w);
+  } else if (isLinear(el)){
+    lay = layoutText(el, null);
+    const mid = pathMidpoint(linearPathPoints(el));
+    top = mid[1] - lay.totalH / 2;
+    left = ln => mid[0] - ln.w / 2;
+  } else {
+    const box = boundsOf(el), pad = el.type === 'chip' ? 10 : 12;
+    lay = layoutText(el, Math.max(20, box.w - pad * 2));
+    top = boxTextTop(el, box, lay.totalH, pad);
+    left = ln => lineLeft(el.align || 'center', box.x + pad, box.x + box.w - pad, ln.w);
+  }
+  const rows = [];
+  let y = top;
+  for (const ln of lay.lines){
+    if (ln.para) y += lay.pgap;
+    rows.push({ ln, x: left(ln), top: y, h: lay.lh, start: ln.start, end: ln.end });
+    y += lay.lh;
+  }
+  return { lay, rows };
+}
+/* how far along a line its first k characters reach, measured the way they are painted */
+function linePrefixWidth(el, ln, k){
+  if (k <= 0) return 0;
+  if (k >= ln.text.length) return ln.w;
+  applyTracking(_measureCtx, el);
+  let w = 0, left = k;
+  for (const seg of ln.segs){
+    if (left >= seg.text.length){ w += seg.w; left -= seg.text.length; continue; }
+    if (left > 0){
+      _measureCtx.font = fontCSS(el.font, el.size, seg, el.fweight);
+      w += _measureCtx.measureText(seg.text.slice(0, left)).width;
+    }
+    break;
+  }
+  applyTracking(_measureCtx, null);
+  return w;
+}
+/* the row a caret position belongs to */
+function textRowOf(rows, index){
+  for (let i = 0; i < rows.length; i++) if (index >= rows[i].start && index <= rows[i].end) return i;
+  for (let i = rows.length - 1; i >= 0; i--) if (index >= rows[i].start) return i;
+  return 0;
+}
+/* the caret position on one row nearest to x */
+function textRowIndexAt(el, row, x){
+  const n = row.ln.text.length;
+  let best = 0, bestD = Infinity;
+  for (let k = 0; k <= n; k++){
+    const d = Math.abs(row.x + linePrefixWidth(el, row.ln, k) - x);
+    if (d < bestD){ bestD = d; best = k; }
+    else if (d > bestD + 1) break;                     // past the nearest one: widths only grow
+  }
+  return row.start + best;
+}
+/* the caret position nearest to a point (page units, before the element's rotation) */
+function textIndexAt(el, x, y){
+  const { rows } = textRows(el);
+  let r = rows.length - 1;
+  for (let i = 0; i < rows.length; i++) if (y < rows[i].top + rows[i].h){ r = i; break; }
+  return textRowIndexAt(el, rows[r], x);
+}
+/* the bands that show characters a to b as selected: one per row they touch */
+function textSelectionRects(el, a, b){
+  const out = [];
+  if (b <= a) return out;
+  const tail = el.size * 0.28;                           // a selected line break shows as a little extra
+  for (const row of textRows(el).rows){
+    if (b <= row.start || a > row.end) continue;
+    const s = Math.max(a, row.start), e = Math.min(b, row.end);
+    const x1 = row.x + linePrefixWidth(el, row.ln, s - row.start);
+    const x2 = row.x + linePrefixWidth(el, row.ln, e - row.start) + (b > row.end ? tail : 0);
+    if (x2 > x1) out.push({ x: x1, y: row.top, w: x2 - x1, h: row.h });
+  }
+  return out;
 }
 function lineLeft(align, boxL, boxR, lineW){
   if (align === 'right') return boxR - lineW;

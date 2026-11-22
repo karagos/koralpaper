@@ -121,12 +121,16 @@ describe('text box handles', () => {
       const el = state.elements.find(e => e.id === ${JSON.stringify(id)});
       const svg = renderSceneSVG([el], { pal: pal(), board: state.board, transparent: true });
       const ys = [...svg.matchAll(/<text[^>]* y="([-\\d.]+)"/g)].map(m => Number(m[1]));
-      openTextEditor(el, false); positionEditor();
-      const edTop = parseFloat(editorEl.style.top), [, py] = toScreen(el.x, el.y), z = state.camera.z;
+      // the editor's selection is painted on the canvas: its first band starts where the first line does
+      openTextEditor(el, false);
+      const band = textSelectionRects(el, 0, el.text.length)[0];
+      const rc = editorEl.getBoundingClientRect(), [, bandTop] = toScreen(band.x, band.y), [, bandBottom] = toScreen(band.x, band.y + band.h);
+      const covers = rc.top <= bandTop && rc.bottom >= bandBottom;
       commitTextEdit();
-      return JSON.stringify({ svgFirst: ys[0], middle: el.y + (el.h - ${th}) / 2 + elLH(el) / 2, edOffset: (edTop - py) / z, want: (el.h - ${th}) / 2 });`));
+      return JSON.stringify({ svgFirst: ys[0], middle: el.y + (el.h - ${th}) / 2 + elLH(el) / 2, edOffset: band.y - el.y, want: (el.h - ${th}) / 2, covers });`));
     near(where.svgFirst, where.middle, 0.6, 'SVG export');
-    near(where.edOffset, where.want, 1, 'the editor opens over the text');
+    near(where.edOffset, where.want, 1, 'the editor shows its selection over the text');
+    assert.equal(where.covers, true, 'and the typing layer covers that line, so a click on it reaches the editor');
     await k.page(`document.querySelector('#valignSeg button[data-v="top"]').click(); return 0;`);
     near((await painted(id))[0], top, 0.6, 'top again');
   });

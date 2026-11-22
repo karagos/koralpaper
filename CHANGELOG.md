@@ -1,5 +1,19 @@
 # KoralPaper — Changelog
 
+## v3.86.1
+
+**Fixed: the cursor and the selection did not sit on the text.** In a bold or italic paragraph you could not select all of it: the highlight stopped short, and the cursor showed in a different place from where you clicked.
+
+The cause was two layouts of the same text. The letters are painted on the canvas, and an invisible text field lay on top to take the typing and to show the cursor and the highlight. That field wrapped the text with the browser's own rules and in the regular weight. A bold or italic text, a few bold words, a hyphen or a slash was enough for its lines to break elsewhere.
+
+- **The canvas now draws the cursor and the selection**, from the same layout that paints the letters. The text field only takes the typing, the clipboard and undo, and shows nothing.
+- **Clicks, drags, double click (word) and triple click (everything)** find the letter under the pointer from that same layout, in turned text too.
+- **Up, down, line start and line end** follow the lines as they are painted. Up and down keep their column.
+- **Words typed at the end of an all-bold or all-italic text** keep that style.
+- A box that grows while you type into it is now measured the way its text is painted.
+
+The connector is unchanged at 1.7.0. 160 automated tests, 17 of them new, clicking, dragging and typing in the real app and comparing with where the painter puts each line.
+
 ## v3.86.0 · connector v1.7.0
 
 **Second carousel round: what building a real 10-slide carousel turned up.** Five faults fixed, and two abilities added for Claude: pictures from files, and page tools.

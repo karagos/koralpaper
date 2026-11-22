@@ -338,6 +338,7 @@ function drawOverlay(){
   }
 
   drawBridgeOverlay(ctx, z);   // safe-area guide and comment badges (editor only, never exported)
+  drawTextCaret(ctx, z);       // the caret and the selection of the text being edited
 
   // lock badges: a small padlock at the top-right of each locked element
   if (state.tool === 'select' && !presenting){
@@ -1697,15 +1698,14 @@ function openTextEditor(el, isNew){
   editing = { el, isNew };
   el._editing = true;
   editorEl.value = el.text || '';
-  // the canvas draws the (rich) text live underneath; the editor only
-  // contributes the caret and the selection band
+  // the canvas draws the text, the caret and the selection; the field only takes the typing
   editorEl.style.color = 'transparent';
-  const pnow = pal();
-  editorEl.style.caretColor = textColorOf(pnow, el);
+  editorEl.style.caretColor = 'transparent';
   editorEl.classList.remove('hidden');
   positionEditor();
   editorEl.focus();
   editorEl.select();
+  caretStart();
   // defend the focus: if a default action (or anything else) steals it in
   // this same tick, take it back on the next frame
   requestAnimationFrame(() => {
@@ -1716,90 +1716,189 @@ function openTextEditor(el, isNew){
   });
   requestRender();
 }
+/* The text field is an input layer only: it takes the typing, the clipboard, the
+   undo and the keyboard's text composition. It shows nothing. The letters, the
+   caret and the selection are all painted on the canvas from one layout
+   (textRows in core.js), and clicks and the up / down / line-start / line-end
+   keys are worked out from that same layout. So where the caret is, and where it
+   looks to be, cannot differ, whatever the weight, the style or the wrapping. */
 function positionEditor(){
   if (!editing) return;
   const el = editing.el;
   const z = state.camera.z;
-  const fs = el.size * z;
-  editorEl.style.font = fontCSS(el.font, fs, null, el.fweight);
+  editorEl.style.font = fontCSS(el.font, el.size * z, null, el.fweight);
   editorEl.style.lineHeight = lineHeightOf(el.size, el.lh) * z + 'px';
   editorEl.style.letterSpacing = ((el.lspace || 0) * z) + 'px';
-  if (el.type === 'text' && el.wrap){
-    /* Dragging a text box's side sets el.wrap and fixes its width, and the canvas
-       reflows the text at that width. The editor has to wrap at the SAME width:
-       left unwrapped, its lines stayed at the old full-width layout, so the
-       selection highlight was drawn over where the text used to be. */
-    const maxW = Math.max(40, el.w);
-    const lay = layoutText(el, maxW);
-    const [px, py] = toScreen(el.x, textBlockTop(el, lay.totalH));
-    editorEl.style.whiteSpace = 'pre-wrap';
-    editorEl.style.textAlign = el.align || 'left';
-    editorEl.style.left = px + 'px';
-    editorEl.style.top = py + 'px';
-    editorEl.style.width = maxW * z + 'px';
-    editorEl.style.height = (lay.totalH + lineHeightOf(el.size, el.lh)) * z + 'px';
-  } else if (el.type === 'text'){
-    const [px, py] = toScreen(el.x, textBlockTop(el, layoutText(el, null).totalH));
-    const m = measureText(editorEl.value || ' ', el.font, el.size);
-    editorEl.style.whiteSpace = 'pre';
-    editorEl.style.textAlign = 'left';
-    editorEl.style.left = px + 'px';
-    editorEl.style.top = py + 'px';
-    editorEl.style.width = Math.max(40, (m.w + 20) * z) + 'px';
-    editorEl.style.height = Math.max(lineHeightOf(el.size, el.lh), m.h) * z + 6 + 'px';
-  } else if (isLinear(el)){
-    // label editor floats centered on the arrow's midpoint
-    const mid = linearMidpoint(el);
-    const m = measureText(editorEl.value || ' ', el.font, el.size);
-    const [px, py] = toScreen(mid[0], mid[1]);
-    const w = Math.max(60, (m.w + 26) * z);
-    editorEl.style.whiteSpace = 'pre';
-    editorEl.style.textAlign = 'center';
-    editorEl.style.left = (px - w / 2) + 'px';
-    editorEl.style.top = (py - (m.h * z) / 2 - 3) + 'px';
-    editorEl.style.width = w + 'px';
-    editorEl.style.height = Math.max(lineHeightOf(el.size, el.lh), m.h) * z + 6 + 'px';
-  } else {
-    const pad = el.type === 'chip' ? 10 : 12;
-    const maxW = Math.max(20, el.w - pad*2);
-    const lines = wrapText(editorEl.value || ' ', maxW, el.font, el.size);
-    const th = lines.length * lineHeightOf(el.size, el.lh);
-    const [px, py] = toScreen(el.x + pad, el.y + el.h/2 - th/2);
-    editorEl.style.whiteSpace = 'pre-wrap';
-    editorEl.style.textAlign = el.align;
-    editorEl.style.left = px + 'px';
-    editorEl.style.top = py + 'px';
-    editorEl.style.width = maxW * z + 'px';
-    editorEl.style.height = (th + lineHeightOf(el.size, el.lh)) * z + 'px';
+  editorEl.style.whiteSpace = 'pre';
+  editorEl.style.textAlign = 'left';
+  // cover the block the text occupies, with room to click beside and below it
+  const { rows, lay } = textRows(el);
+  let x0 = Infinity, x1 = -Infinity;
+  for (const r of rows){ x0 = Math.min(x0, r.x); x1 = Math.max(x1, r.x + r.ln.w); }
+  if (el.type === 'text' && el.wrap){ x0 = Math.min(x0, el.x); x1 = Math.max(x1, el.x + el.w); }
+  else if (!isLinear(el) && el.type !== 'text'){ x0 = Math.min(x0, el.x); x1 = Math.max(x1, el.x + el.w); }
+  const pad = Math.max(10, lay.lh * 0.4);
+  let box = { x: x0 - pad, y: rows[0].top - pad * 0.5, w: (x1 - x0) + pad * 2,
+    h: rows[rows.length - 1].top + rows[rows.length - 1].h - rows[0].top + pad };
+  if (el.angle){
+    const b = boundsOf(el), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    const pts = [[box.x, box.y], [box.x + box.w, box.y], [box.x + box.w, box.y + box.h], [box.x, box.y + box.h]]
+      .map(([px, py]) => rotatePoint(px, py, cx, cy, el.angle));
+    const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+    box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
   }
-  const p = pal();
-  // the canvas paints the text; the editor stays a transparent input layer
+  const [px, py] = toScreen(box.x, box.y);
+  editorEl.style.left = px + 'px';
+  editorEl.style.top = py + 'px';
+  editorEl.style.width = Math.max(24, box.w * z) + 'px';
+  editorEl.style.height = Math.max(16, box.h * z) + 'px';
   editorEl.style.color = 'transparent';
-  editorEl.style.caretColor = textColorOf(p, el);
+  editorEl.style.caretColor = 'transparent';
 }
+/* ── the caret and the selection, on the canvas ── */
+let caretBlinkFrom = 0, caretBlinkTimer = null, caretWantX = null, caretDrag = null, caretClicks = { n: 0, at: 0, x: 0, y: 0 };
+function caretWake(){ caretBlinkFrom = performance.now(); requestRender(); }
+function caretStart(){
+  clearInterval(caretBlinkTimer);
+  caretBlinkTimer = setInterval(() => { if (editing) requestRender(); }, 265);
+  caretWantX = null;
+  caretWake();
+}
+function caretStop(){ clearInterval(caretBlinkTimer); caretBlinkTimer = null; caretDrag = null; caretWantX = null; }
+/* a point on screen, as a point on the page before the element's own rotation */
+function editorLocalPoint(el, clientX, clientY){
+  let [sx, sy] = toScene(clientX, clientY);
+  if (el.angle){
+    const b = boundsOf(el);
+    [sx, sy] = rotatePoint(sx, sy, b.x + b.w / 2, b.y + b.h / 2, -el.angle);
+  }
+  return [sx, sy];
+}
+/* the end of the selection that moves (the other end is the anchor) */
+function caretFocus(){ return editorEl.selectionDirection === 'backward' ? editorEl.selectionStart : editorEl.selectionEnd; }
+function caretAnchor(){ return editorEl.selectionDirection === 'backward' ? editorEl.selectionEnd : editorEl.selectionStart; }
+function caretSet(anchor, focus){
+  const n = editorEl.value.length;
+  anchor = clamp(anchor, 0, n); focus = clamp(focus, 0, n);
+  editorEl.setSelectionRange(Math.min(anchor, focus), Math.max(anchor, focus), focus < anchor ? 'backward' : 'forward');
+  caretWake();
+}
+function caretXY(el, rows, index){
+  const row = rows[textRowOf(rows, index)];
+  return { row, x: row.x + linePrefixWidth(el, row.ln, index - row.start) };
+}
+/* the word around a position: letters and digits, or the single mark or space there */
+function wordRangeAt(text, i){
+  const isWord = ch => /[\p{L}\p{N}_'’]/u.test(ch || '');
+  if (i >= text.length) i = text.length - 1;
+  if (i < 0) return [0, 0];
+  if (!isWord(text[i])) return [i, i + 1];
+  let a = i, b = i + 1;
+  while (a > 0 && isWord(text[a - 1])) a--;
+  while (b < text.length && isWord(text[b])) b++;
+  return [a, b];
+}
+function caretMoveLine(dir, extend){
+  const el = editing.el, { rows } = textRows(el);
+  let from = caretFocus();
+  if (!extend && editorEl.selectionStart !== editorEl.selectionEnd)
+    from = dir < 0 ? editorEl.selectionStart : editorEl.selectionEnd;
+  const at = caretXY(el, rows, from);
+  const want = caretWantX != null ? caretWantX : at.x;
+  const r = rows.indexOf(at.row) + dir;
+  const to = r < 0 ? 0 : r >= rows.length ? editorEl.value.length : textRowIndexAt(el, rows[r], want);
+  caretSet(extend ? caretAnchor() : to, to);
+  caretWantX = want;                                       // going on up or down keeps the same column
+}
+function caretLineEdge(dir, extend){
+  const el = editing.el, { rows } = textRows(el);
+  const row = rows[textRowOf(rows, caretFocus())];
+  const to = dir < 0 ? row.start : row.end;
+  caretSet(extend ? caretAnchor() : to, to);
+}
+function drawTextCaret(c, z){
+  if (!editing || editorEl.classList.contains('hidden')) return;
+  const el = editing.el;
+  const a = editorEl.selectionStart, b = editorEl.selectionEnd;
+  c.save();
+  if (el.angle){
+    const bb = boundsOf(el), cx = bb.x + bb.w / 2, cy = bb.y + bb.h / 2;
+    c.translate(cx, cy); c.rotate(el.angle); c.translate(-cx, -cy);
+  }
+  if (a !== b){
+    c.fillStyle = 'rgba(91,107,184,.32)';
+    for (const r of textSelectionRects(el, a, b)) c.fillRect(r.x, r.y, r.w, r.h);
+  } else if (document.activeElement === editorEl && ((performance.now() - caretBlinkFrom) % 1060) < 530){
+    const { rows } = textRows(el);
+    const at = caretXY(el, rows, a);
+    const h = Math.min(at.row.h, el.size * 1.18), w = Math.max(1.5 / z, el.size * 0.045);
+    c.fillStyle = textColorOf(pal(), el);
+    c.fillRect(at.x - w / 2, at.row.top + (at.row.h - h) / 2, w, h);
+  }
+  c.restore();
+}
+editorEl.addEventListener('pointerdown', ev => {
+  if (!editing || ev.button !== 0) return;
+  ev.preventDefault();                                       // the field never places its own caret
+  const el = editing.el;
+  const i = textIndexAt(el, ...editorLocalPoint(el, ev.clientX, ev.clientY));
+  const now = performance.now();
+  const again = now - caretClicks.at < 450 && Math.hypot(ev.clientX - caretClicks.x, ev.clientY - caretClicks.y) < 6;
+  caretClicks = { n: again ? caretClicks.n + 1 : 1, at: now, x: ev.clientX, y: ev.clientY };
+  caretWantX = null;
+  if (caretClicks.n >= 3){
+    caretSet(0, editorEl.value.length);                      // third click: everything
+    caretDrag = null;
+  } else if (caretClicks.n === 2){
+    const [wa, wb] = wordRangeAt(editorEl.value, i);         // double click: the word
+    caretSet(wa, wb);
+    caretDrag = { anchor: wa, anchorEnd: wb, words: true };
+  } else {
+    const anchor = ev.shiftKey ? caretAnchor() : i;
+    caretSet(anchor, i);
+    caretDrag = { anchor, words: false };
+  }
+  try { editorEl.setPointerCapture(ev.pointerId); } catch (e){}
+  if (document.activeElement !== editorEl) editorEl.focus({ preventScroll: true });
+});
+editorEl.addEventListener('pointermove', ev => {
+  if (!editing || !caretDrag) return;
+  const el = editing.el;
+  const i = textIndexAt(el, ...editorLocalPoint(el, ev.clientX, ev.clientY));
+  if (caretDrag.words){
+    const [wa, wb] = wordRangeAt(editorEl.value, i);
+    if (i < caretDrag.anchor) caretSet(caretDrag.anchorEnd, wa); else caretSet(caretDrag.anchor, wb);
+  } else caretSet(caretDrag.anchor, i);
+});
+for (const type of ['pointerup', 'pointercancel'])
+  editorEl.addEventListener(type, ev => { caretDrag = null; try { editorEl.releasePointerCapture(ev.pointerId); } catch (e){} });
+document.addEventListener('selectionchange', () => { if (editing && document.activeElement === editorEl) caretWake(); });
 editorEl.addEventListener('input', () => {
   if (!editing) return;
   const el = editing.el;
   // keep bold/italic/highlight runs anchored across the edit
   const oldT = String(el.text || ''), newT = editorEl.value;
   if (el.runs && oldT !== newT){
+    // a style that covered the whole text (a bold paragraph) keeps covering it, words typed at the end included
+    const whole = (el.runs.length === 1 && el.runs[0].s === 0 && el.runs[0].e >= oldT.length && oldT.length) ? el.runs[0] : null;
     let p = 0;
     while (p < oldT.length && p < newT.length && oldT[p] === newT[p]) p++;
     let so = oldT.length, sn = newT.length;
     while (so > p && sn > p && oldT[so - 1] === newT[sn - 1]){ so--; sn--; }
     el.runs = remapRuns(el.runs, p, so - p, sn - p);
+    if (whole && newT.length) el.runs = [Object.assign({}, whole, { s: 0, e: newT.length })];
   }
   el.text = editorEl.value;
   if (el.type === 'text') autosizeText(el);
   else if (!isLinear(el)){
-    // grow the container if the text no longer fits
+    // grow the container if the text no longer fits, measured the way it is painted
     const pad = el.type === 'chip' ? 10 : 12;
-    const lines = wrapText(el.text || ' ', Math.max(20, el.w - pad*2), el.font, el.size);
-    const needH = lines.length * lineHeightOf(el.size, el.lh) + pad * 2;
+    const needH = layoutText(el, Math.max(20, el.w - pad * 2)).totalH + pad * 2;
     if (needH > el.h) el.h = needH;
   }
+  caretWantX = null;
   positionEditor();
-  requestRender();
+  caretWake();
 });
 editorEl.addEventListener('keydown', ev => {
   ev.stopPropagation();
@@ -1808,6 +1907,18 @@ editorEl.addEventListener('keydown', ev => {
   if (mod && k === 'b'){ ev.preventDefault(); applyTextFormat('b'); return; }
   if (mod && !ev.shiftKey && k === 'i'){ ev.preventDefault(); applyTextFormat('i'); return; }
   if (mod && ev.shiftKey && k === 'h'){ ev.preventDefault(); applyTextFormat('hl', defaults.hlColor); return; }
+  /* up, down, line start and line end follow the lines as they are painted.
+     Everything else (letters, left / right, word jumps, top and bottom of the text,
+     select all) is the text field's own, and has no line to get wrong. */
+  if (editing && !ev.isComposing){
+    const vertical = ev.key === 'ArrowUp' || ev.key === 'ArrowDown';
+    if (vertical && !mod && !ev.altKey){ ev.preventDefault(); caretMoveLine(ev.key === 'ArrowUp' ? -1 : 1, ev.shiftKey); return; }
+    const lineStart = ev.key === 'Home' || (ev.metaKey && ev.key === 'ArrowLeft');
+    const lineEnd = ev.key === 'End' || (ev.metaKey && ev.key === 'ArrowRight');
+    if ((lineStart || lineEnd) && !ev.ctrlKey && !ev.altKey){ ev.preventDefault(); caretLineEdge(lineStart ? -1 : 1, ev.shiftKey); caretWantX = null; return; }
+    caretWantX = null;
+    caretWake();
+  }
   if (ev.key === 'Escape'){ ev.preventDefault(); commitTextEdit(); }
   if (ev.key === 'Enter' && mod){ ev.preventDefault(); commitTextEdit(); }
   if (ev.key === 'Tab' && editing && editing.el.type !== 'text'){
@@ -1825,6 +1936,7 @@ function commitTextEdit(){
   if (!editing) return;
   const { el, isNew } = editing;
   editing = null;
+  caretStop();
   delete el._editing;
   el.text = editorEl.value;
   editorEl.classList.add('hidden');

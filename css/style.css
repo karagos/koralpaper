@@ -917,8 +917,8 @@ body.dark #tooltip{box-shadow:0 4px 14px -4px rgba(0,0,0,.7);}
 #textEditor{
   position:fixed; z-index:20;
   background:transparent; border:none; outline:none; resize:none; overflow:hidden;
-  color:var(--ink); caret-color:var(--coral);
-  white-space:pre; padding:0;
+  color:transparent; caret-color:transparent;
+  white-space:pre; padding:0; cursor:text;
 }
 
 .hidden{display:none !important;}
@@ -926,9 +926,8 @@ body.dark #tooltip{box-shadow:0 4px 14px -4px rgba(0,0,0,.7);}
 ::-webkit-scrollbar{width:9px;}
 ::-webkit-scrollbar-thumb{background:var(--line-soft); border-radius:8px;}
 
-/* while editing, the textarea is a transparent input layer over the live
-   canvas text — keep its selection band visible but let the glyphs show */
-#textEditor::selection{background:rgba(91,107,184,.30); color:transparent;}
+/* the field shows nothing of its own: the canvas paints the caret and the selection */
+#textEditor::selection{background:transparent; color:transparent;}
 
 /* ── tablet / iPad layout ───────────────────────── */
 @media (max-width:1024px){
