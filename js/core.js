@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.83.7';
+const APP_VERSION = '3.84.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -73,6 +73,8 @@ const FONTS = {
   sans:  { label:'Sans · notes', stack:'"Avenir Next",Avenir,"Helvetica Neue",Helvetica,Arial,sans-serif', weight:'600', group:'Built-in' },
   hand:  { label:'Hand · marker', stack:'"Chalkboard SE","Comic Sans MS","Segoe Print","Bradley Hand",cursive', weight:'400', group:'Built-in' },
 
+  intertight: { label:'Inter Tight', stack:'"Inter Tight","Helvetica Neue",Helvetica,Arial,sans-serif', weight:'400', group:'Sans & display',
+    local:{ file:'inter-tight', normal:[400,500,600,700,800,900], italic:[400,700] } },
   inter:      { label:'Inter', stack:'"Inter","Helvetica Neue",sans-serif', weight:'500', google:'Inter:wght@400;500;700', group:'Sans & display' },
   montserrat: { label:'Montserrat', stack:'"Montserrat","Helvetica Neue",sans-serif', weight:'500', google:'Montserrat:wght@400;500;700', group:'Sans & display' },
   robotocond: { label:'Roboto Condensed', stack:'"Roboto Condensed","Helvetica Neue",sans-serif', weight:'500', google:'Roboto+Condensed:wght@400;700', group:'Sans & display' },
@@ -85,9 +87,12 @@ const FONTS = {
 
   playfair:   { label:'Playfair Display', stack:'"Playfair Display",Georgia,serif', weight:'500', google:'Playfair+Display:wght@400;500;600', group:'Serif' },
   ptserif:    { label:'PT Serif', stack:'"PT Serif",Georgia,serif', weight:'400', google:'PT+Serif:wght@400;700', group:'Serif' },
+  gelasio:    { label:'Gelasio', stack:'"Gelasio",Georgia,serif', weight:'400', group:'Serif',
+    local:{ file:'gelasio', normal:[400,700], italic:[400,700] } },
   lora:       { label:'Lora', stack:'"Lora",Georgia,serif', weight:'500', google:'Lora:wght@400;500;600', group:'Serif' },
 
-  jetbrains:  { label:'JetBrains Mono', stack:'"JetBrains Mono","SF Mono",Menlo,monospace', weight:'500', google:'JetBrains+Mono:wght@400;500;600', group:'Mono' },
+  jetbrains:  { label:'JetBrains Mono', stack:'"JetBrains Mono","SF Mono",Menlo,monospace', weight:'500', google:'JetBrains+Mono:wght@400;500;600', group:'Mono',
+    local:{ file:'jetbrains-mono', normal:[400,500,700], italic:[] } },
   ibmplex:    { label:'IBM Plex Mono', stack:'"IBM Plex Mono","SF Mono",Menlo,monospace', weight:'500', google:'IBM+Plex+Mono:wght@400;500;600', group:'Mono' },
   sharetech:  { label:'Share Tech Mono', stack:'"Share Tech Mono","SF Mono",Menlo,monospace', weight:'400', google:'Share+Tech+Mono', group:'Mono' },
 
@@ -107,6 +112,45 @@ const FONTS = {
   tiny5:      { label:'Tiny5', stack:'"Tiny5",monospace', weight:'400', google:'Tiny5', group:'Pixel & dot' },
   doto:       { label:'Doto', stack:'"Doto",monospace', weight:'600', google:'Doto:wght@400;600;700', group:'Pixel & dot' },
 };
+/* ── fonts that ship with the app (fonts/ folder) ───
+   Inter Tight, JetBrains Mono and Gelasio load from files next to index.html,
+   so they work offline and render identically on every machine. Each weight
+   and style is its own @font-face; a weight with no file of its own uses the
+   nearest one, the way browsers always match weights. */
+const LOCAL_FONT_DIR = 'fonts/';
+function localFontFaces(){
+  const out = [];
+  for (const f of Object.values(FONTS)){
+    if (!f.local) continue;
+    const family = f.stack.split(',')[0].replace(/"/g, '');
+    for (const style of ['normal', 'italic'])
+      for (const w of f.local[style] || [])
+        out.push({ family, weight: w, style, url: `${LOCAL_FONT_DIR}${f.local.file}-latin-${w}-${style}.woff2` });
+  }
+  return out;
+}
+function localFontCss(){
+  return localFontFaces().map(x =>
+    `@font-face{font-family:"${x.family}";font-style:${x.style};font-weight:${x.weight};font-display:swap;` +
+    `src:url("${x.url}") format("woff2");}`).join('\n');
+}
+function installLocalFonts(){
+  if (document.getElementById('kpLocalFonts')) return;
+  const st = document.createElement('style');
+  st.id = 'kpLocalFonts';
+  st.textContent = localFontCss();
+  document.head.appendChild(st);
+}
+/* a font by any name people use for it: the key ("intertight"), the family
+   ("Inter Tight", any letter case), or null when nothing in the registry matches */
+function fontKeyByName(name){
+  if (typeof name !== 'string' || !name) return null;
+  if (FONTS[name]) return name;
+  const n = name.trim().toLowerCase();
+  for (const [key, f] of Object.entries(FONTS))
+    if (f.label.toLowerCase() === n || f.stack.split(',')[0].replace(/"/g, '').toLowerCase() === n) return key;
+  return null;
+}
 /* any Google font by name: the key IS the family ('cg:Archivo Black'), so
    documents stay portable — every app instance can rebuild the entry */
 function ensureCustomFont(key){
@@ -132,7 +176,11 @@ function weightUp(base){
 function boldWeightOf(f){
   if (f._bw) return f._bw;
   let bw = 700;
-  if (f.google){
+  if (f.local){
+    // bundled fonts: bold is the file that exists, 700 when there is one
+    const heavy = f.local.normal.filter(w => w >= 600);
+    if (heavy.length) bw = heavy.includes(700) ? 700 : Math.min(...heavy);
+  } else if (f.google){
     const m = f.google.match(/wght@([\d;]+)/);
     if (m){
       const ws = m[1].split(';').map(Number);

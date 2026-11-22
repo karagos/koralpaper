@@ -1,5 +1,48 @@
 # KoralPaper — Changelog
 
+## v3.84.0 · connector v1.5.0
+
+**Claude can now build and maintain carousels safely, in its own document, without touching your other work.** The Claude connector grows from 7 tools to 21. Everything that worked before works the same way when the new options are left out.
+
+**Documents**
+
+- **A document library.** ☰ → Documents lists every document kept in this browser, with Open, Rename and Delete. Opening one, or starting a new one, files the current document on that list first, so New document and Open sketch no longer replace your work.
+- **Claude starts its own document** for a carousel or a deck (`koralpaper_create_document`), can list and open documents, and every drawing tool takes an optional `documentId` and `pageId` so a change always lands exactly where it is meant to.
+
+**Safe edits**
+
+- **A version on every page.** `koralpaper_read_document` returns one per page. Every write accepts `ifVersion` and is refused, with nothing changed, if you edited that page since Claude last read it. Undo counts as an edit. Changing one page never touches the version of another.
+- **Locked elements are left alone.** Claude can lock an element (`locked: true`); updates and deletes skip locked elements and say so. You unlock with a right-click, as before.
+- **Snapshots from Claude** (`koralpaper_snapshot`, `koralpaper_restore`): a named checkpoint of the whole document before a big rework, up to 20 per document.
+- **What changed** (`koralpaper_get_changes`): elements added, changed and removed since a version, so Claude sees what you did without re-reading everything.
+- **Your selection** (`koralpaper_get_selection`): "make this one bigger" now works.
+
+**Type and layout**
+
+- **Three fonts ship with the app**: Inter Tight (400 to 900, italic 400 and 700), JetBrains Mono (400, 500, 700) and Gelasio (400 and 700, with italics). They load from the `fonts/` folder, so they work with no internet and look the same everywhere. They are in the font menu, and Claude can ask for them by name, with `weight` and `italic`.
+- **Real text measurement** (`koralpaper_measure`): for each text, the rendered line breaks, the real height, and whether it overflows its box, a `maxHeight`, or the artboard, with the reason in plain words.
+- **Wrapped text boxes for Claude**: `wrap: true` keeps the width and breaks lines inside it. Line height, letter spacing and vertical alignment can be set too.
+- **Named styles** (`koralpaper_set_styles`): text styles and colour tokens referenced by name (`style: "headline"`, `"$accent"`). Change one and every element using it follows, on every page.
+- **A master page** (`koralpaper_set_master`): elements repeated on every page, with an automatic page number. `{page} / {pages}` becomes "03 / 10" and follows along when pages are added, removed or reordered.
+- **Safe-area guide**: an optional inset per artboard, drawn as a dashed line in the editor and never exported.
+- **Several pages in one call**, and **SVG import** (`koralpaper_import_svg`): text stays text with its font, size, weight and colour; rectangles, circles and lines become shapes; anything else is kept as one vector picture behind them.
+
+**Export**
+
+- **`koralpaper_export`** writes PDF, PNG or JPG files into a folder inside Documents and returns their paths. A multi-page PDF keeps the page order, and each page is a JPEG placed as-is, the same bytes a JPG export gives. `scale` 1 is exactly the artboard size. Nothing can be written outside Documents, and an existing file is never overwritten unless asked.
+
+**Comments**
+
+- **Pin a note to an element**: right-click, Add comment. A coral dot marks it; ☰ → Comments shows every comment with its replies. Claude reads them, replies, and marks them resolved.
+
+**Under the hood**
+
+- Text Claude draws is sized again once its real font has loaded, so stored sizes match what is drawn.
+- Comments, styles and the master page are saved with the document and travel inside `.json` files.
+- A test suite drives the real connector and the real app in headless Chrome: 78 tests, run with `node --test mcp/test/*.test.js`.
+
+Known limits: the three bundled fonts are the Latin sets, so Greek text in them falls back to the system font. SVG and web-page exports made from the app's own Export menu reference these fonts by name and do not embed them.
+
 ## v3.83.7
 
 **No more manifest errors when you open the app straight from a file.** Opening `index.html` from disk made Chrome log a CORS refusal and a failed request for the web app manifest on every load. A manifest can only be fetched over http or https, so browsers always reject it from a local file. It changed nothing about how the app worked, but it looked like a fault.

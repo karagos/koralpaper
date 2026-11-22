@@ -3,18 +3,35 @@
    Strategy: network-first with cache fallback, so updates arrive the
    moment they are online and the app still opens with no connection.
    The cache name carries the app version; bump it with APP_VERSION. */
-const CACHE = 'koralpaper-v3.83.7';
+const CACHE = 'koralpaper-v3.84.0';
 const SHELL = [
   './',
   './index.html',
   './css/style.css',
   './js/core.js',
+  './js/bridge.js',
   './js/app.js',
   './js/material-icons.js',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',
+  // bundled fonts: Inter Tight, JetBrains Mono, Gelasio
+  './fonts/gelasio-latin-400-italic.woff2',
+  './fonts/gelasio-latin-400-normal.woff2',
+  './fonts/gelasio-latin-700-italic.woff2',
+  './fonts/gelasio-latin-700-normal.woff2',
+  './fonts/inter-tight-latin-400-italic.woff2',
+  './fonts/inter-tight-latin-400-normal.woff2',
+  './fonts/inter-tight-latin-500-normal.woff2',
+  './fonts/inter-tight-latin-600-normal.woff2',
+  './fonts/inter-tight-latin-700-italic.woff2',
+  './fonts/inter-tight-latin-700-normal.woff2',
+  './fonts/inter-tight-latin-800-normal.woff2',
+  './fonts/inter-tight-latin-900-normal.woff2',
+  './fonts/jetbrains-mono-latin-400-normal.woff2',
+  './fonts/jetbrains-mono-latin-500-normal.woff2',
+  './fonts/jetbrains-mono-latin-700-normal.woff2',
 ];
 
 self.addEventListener('install', e => {

@@ -60,7 +60,7 @@ includes roasting your own diagram.
 </tr>
 </table>
 
-![Version](https://img.shields.io/badge/Version-3.83.7-1F1E1B)
+![Version](https://img.shields.io/badge/Version-3.84.0-1F1E1B)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 ![Works on: Mac, Windows, Linux, iPad](https://img.shields.io/badge/Works%20on-Mac%20·%20Windows%20·%20Linux%20·%20iPad-1F1E1B)
 ![Offline: 100%](https://img.shields.io/badge/Offline-100%25-2ea44f)
@@ -147,14 +147,15 @@ and Settings.
   .excalidraw file imports it onto a new page (bound labels, groups, images
   and colors survive the round trip)
 - **Fonts:** 3 built-in stacks (serif/sans/hand) plus a grouped Google
-  Fonts picker with 32 families, Sans & display (Inter, Montserrat,
+  Fonts picker with 34 families, Sans & display (Inter Tight, Inter, Montserrat,
   Roboto Condensed, Bebas Neue, Fjalla One, Oswald, Imbue, DM Sans, Space
-  Grotesk), Serif (Playfair Display, PT Serif, Lora), Mono (JetBrains
+  Grotesk), Serif (Playfair Display, PT Serif, Gelasio, Lora), Mono (JetBrains
   Mono, IBM Plex Mono, Share Tech Mono), Hand & script (Caveat, Patrick
   Hand, Kalam, Architects Daughter, Shadows Into Light, Lobster Two,
   Playwrite NZ Guides, Unkempt, Kaushan Script), and Pixel & dot
   (Bitcount ×3, Tiny5, Doto), need internet once; system fallbacks
-  offline
+  offline. Inter Tight, JetBrains Mono and Gelasio ship in the `fonts/`
+  folder and work with no internet at all
 - **Design with Claude (MCP):** install the one-click **koralpaper.mcpb**
   extension (in the `mcp/` folder) into the free
   [Claude Desktop](https://claude.ai/download) app, keep KoralPaper open,
@@ -163,7 +164,13 @@ and Settings.
   elements you can edit, restyle and undo (one ⌘Z per Claude step).
   Claude can also **read the page** and **look at a rendered picture of
   it**, so *"tidy this layout"* or *"make the third box green"* work on
-  whatever is on the paper, including what you drew by hand. The ✳ in the
+  whatever is on the paper, including what you drew by hand. For carousels
+  and decks Claude starts **its own document** (☰ → Documents) and never
+  draws over other work, refuses to overwrite a page you changed since it
+  last read it, **measures real text** so copy fits its box, defines
+  **named styles and a master page** with automatic page numbers
+  ("03 / 10"), reads and answers **comments** you pin to elements, and
+  **exports PDF, PNG or JPG** straight into a folder inside Documents. The ✳ in the
   top bar glows while the link is alive; the **Claude tab in the ? panel**
   has the one-minute setup. No API key, no extra billing, nothing leaves
   your machine except your conversation with Claude. Without Claude
@@ -369,6 +376,8 @@ and Settings.
 | `css/style.css` | Cream "island" UI theme, light+dark |
 | `js/core.js` | Engine: element model, geometry, seeded hand-drawn renderer, arrow routing, exports |
 | `js/app.js` | Interactions: selection, snapping, history, text editing, templates, autosave |
+| `js/bridge.js` | Documents library, page versions, comments, named styles, master page, and the Claude link |
+| `fonts/` | Inter Tight, JetBrains Mono and Gelasio (OFL), loaded from disk so they work offline |
 | `js/material-icons.js` | Generated catalog of Google Material icon names + search tags |
 | `mcp/` | Claude Desktop extension: `koralpaper.mcpb` (one-click install) + the dependency-free bridge |
 | `examples/` | Ready-to-open documents (the KoralPaper tour) |

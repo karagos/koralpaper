@@ -44,7 +44,9 @@
       <button data-act="save">Save sketch… &nbsp;<span class="menukey">⌘S</span></button>
       <button data-act="image">Import image… &nbsp;<span class="menukey">I</span></button>
       <button data-act="templates">Templates…</button>
+      <button data-act="documents">Documents…</button>
       <button data-act="snapshots">Snapshots…</button>
+      <button data-act="comments">Comments…</button>
       <button data-act="timelapse">Time-lapse recorder</button>
       <hr>
       <button data-act="present">Present &nbsp;<span class="menukey">⇧⌘P</span></button>
@@ -598,6 +600,30 @@
     </div>
   </div>
 
+  <!-- ── Documents dialog ─────────────────────────── -->
+  <div class="island pdfdialog snapdialog hidden" id="docsDialog">
+    <h3>Documents</h3>
+    <p>Every document kept in this browser. Opening one puts the current document
+      back on this list, so nothing is lost. Claude creates its carousels here as
+      separate documents and never draws over another one.</p>
+    <div id="docsList"></div>
+    <div class="row actions tplfoot">
+      <button class="minipill" id="docsCloseBtn">Close</button>
+    </div>
+  </div>
+
+  <!-- ── Comments dialog ──────────────────────────── -->
+  <div class="island pdfdialog snapdialog cmtdialog hidden" id="commentsDialog">
+    <h3>Comments</h3>
+    <p>Notes pinned to elements. Right-click an element and choose Add comment.
+      Claude reads them, replies here, and marks them resolved.</p>
+    <div id="commentsList"></div>
+    <div class="row actions tplfoot">
+      <label class="cmtdone"><input type="checkbox" id="commentsShowDone"> Show resolved</label>
+      <button class="minipill" id="commentsCloseBtn">Close</button>
+    </div>
+  </div>
+
   <!-- ── Time-lapse frames bar ────────────────────── -->
   <div class="island tlbar hidden" id="tlBar">
     <div class="tlrow">
@@ -721,6 +747,12 @@
         the page and look at a picture of it, so "make the third box green" or
         "clean up this layout" work on whatever is on the paper, even things you
         drew by hand.</p>
+      <p>For a carousel or a deck Claude starts its own document, so your other work is
+        never drawn over: every document is in ☰ → Documents. If you change a page after
+        Claude read it, Claude's next edit to that page is refused until it has read your
+        change. Right-click an element and choose Add comment to leave Claude a note; it
+        replies in ☰ → Comments. Locked elements are left alone. Exports Claude makes
+        land in a folder inside Documents.</p>
       
       <details class="setsec"><summary>Set up once (about a minute)</summary><div class="setsecbody"><table><tr><td><b>1.</b> Install the free <a href="https://claude.ai/download" target="_blank" rel="noopener">Claude Desktop</a> app and sign in.</td></tr>
         <tr><td><b>2.</b> Double-click <b>koralpaper.mcpb</b> (it ships in the <code>mcp</code> folder of this app, or grab it from the
@@ -789,6 +821,10 @@
         Carousels become animations</td></tr>
       <tr><td><b>Snapshots:</b> ☰ → Snapshots saves a named checkpoint of the whole
         document and restores it anytime</td></tr>
+      <tr><td><b>Documents:</b> ☰ → Documents lists every document kept in this browser.
+        Opening one, or starting a new one, puts the current document back on the list</td></tr>
+      <tr><td><b>Comments:</b> right-click an element, Add comment. ☰ → Comments shows
+        them all, with replies; a coral dot marks elements with open comments</td></tr>
       <tr><td><b>Color single letters:</b> while typing, select the characters and pick a
         Text color in the left panel. Works with the custom color wheel too; the
         <b>auto</b> dot puts them back</td></tr>
@@ -1027,6 +1063,7 @@
 
 <script src="js/core.js"></script>
 <script src="js/material-icons.js"></script>
+<script src="js/bridge.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

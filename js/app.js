@@ -24,6 +24,7 @@ const state = {
   bgColor: null,         // custom paper color (hex) or null = theme default
   board: null,           // {name,w,h,x,y} artboard, or null = unlimited canvas
   images: {},            // shared image store: imgId → data URL (pixels live ONCE)
+  meta: null,            // document identity, versions, comments, styles, master (js/bridge.js)
 };
 /* user-adjustable width + text-size presets (Settings panel), persisted separately */
 const SETTINGS_KEY = 'koralpaper.settings';
@@ -336,6 +337,8 @@ function drawOverlay(){
     }
   }
 
+  drawBridgeOverlay(ctx, z);   // safe-area guide and comment badges (editor only, never exported)
+
   // lock badges: a small padlock at the top-right of each locked element
   if (state.tool === 'select' && !presenting){
     for (const el of visibleEls(state.elements)){
@@ -620,6 +623,7 @@ function usedImages(){
 }
 function commit(){
   lastCoalesce.key = null; // an unrelated commit breaks any coalescing run
+  masterSync();            // master-page copies and page numbers follow the page list
   history = history.slice(0, histIndex + 1);
   history.push(serialize());
   if (history.length > 120) history.shift();
@@ -655,6 +659,7 @@ function restore(json){
   state.pageIndex = clamp(doc.pageIndex, 0, doc.pages.length - 1);
   state.elements = state.pages[state.pageIndex].elements;
   for (const p of state.pages) adoptImages(p.elements);
+  masterSync();            // an undo may bring back a different page list: page numbers follow
   const ids = new Set(state.elements.map(e => e.id));
   state.selection = new Set([...state.selection].filter(id => ids.has(id)));
   updateBoundArrows(state.elements);
@@ -678,18 +683,26 @@ function setStorageWarn(on){
 // the one place the document is written to local storage. Returns true on success
 // so callers that MUST persist can react to a failure
 // instead of silently losing the work on the next reload.
+/* the whole document as one storable object: what autosave writes, and what
+   the document library (js/bridge.js) keeps for every other document */
+function docPayload(){
+  const doc = JSON.parse(serialize());
+  return {
+    v: 6, appVersion: APP_VERSION,
+    pages: doc.pages, pageIndex: doc.pageIndex,
+    images: { ...usedImages(), ...tlImages() },
+    camera: state.camera, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
+    theme: state.theme, bgColor: state.bgColor, board: state.board,
+    timelapse: tl.frames.length ? { frames: tl.frames } : undefined,
+    meta: state.meta || undefined,
+  };
+}
 function writeAutosave(){
   try {
-    const doc = JSON.parse(serialize());
-    localStorage.setItem(STORE_KEY, JSON.stringify({
-      v: 6, appVersion: APP_VERSION,
-      pages: doc.pages, pageIndex: doc.pageIndex,
-      images: { ...usedImages(), ...tlImages() },
-      camera: state.camera, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
-      theme: state.theme, bgColor: state.bgColor, board: state.board,
-      timelapse: tl.frames.length ? { frames: tl.frames } : undefined,
-    }));
+    docTrack();                        // page and element versions are current before they are stored
+    localStorage.setItem(STORE_KEY, JSON.stringify(docPayload()));
     setStorageWarn(false);
+    libraryTouch();                    // the document library keeps its copy of this document fresh
     return true;
   } catch (e){
     // storage full/unavailable — the sketch still lives in memory, but
@@ -712,7 +725,12 @@ function loadSaved(){
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (!raw) return false;
-    const data = JSON.parse(raw);
+    return applyDocData(JSON.parse(raw));
+  } catch (e){ return false; }
+}
+/* put a stored document (autosave or library copy) into the live state */
+function applyDocData(data){
+  try {
     if (Array.isArray(data.pages) && data.pages.length){
       state.pages = data.pages.map(p => ({
         id: p.id || uid(), name: p.name || 'Page',
@@ -735,6 +753,8 @@ function loadSaved(){
     state.bgColor = (typeof data.bgColor === 'string' && data.bgColor[0] === '#') ? data.bgColor : null;
     state.board = (data.board && data.board.w > 0 && data.board.h > 0) ? data.board : null;
     if (data.timelapse && Array.isArray(data.timelapse.frames)) tlRestore(data.timelapse.frames);
+    else if (typeof tl !== 'undefined' && tl.frames.length) tlRestore([]);
+    state.meta = normalizeMeta(data.meta);
     return true;
   } catch (e){ return false; }
 }
@@ -2160,6 +2180,11 @@ function openCtxMenu(ev){
     const anyLocked = sel.some(e => e.locked);
     add(anyLocked ? (sel.length > 1 ? 'Unlock these' : 'Unlock') : (sel.length > 1 ? 'Lock these' : 'Lock'),
       () => toggleLockSelection(!anyLocked));
+    if (sel.length === 1 && !sel[0].master){
+      add('Add comment…', () => commentAddFor(sel[0]));
+      const nOpen = commentsFor(sel[0].id).length;
+      if (nOpen) add(`Show comments (${nOpen})`, openCommentsDialog);
+    }
     add('Delete', deleteSelection);
     hr();
     if (sel.length >= 2) add('Group', () => { groupSelection(); syncPanel(); });
@@ -3395,18 +3420,25 @@ function preloadDocFonts(){
 function requestFontLoad(key, weight){
   ensureCustomFont(key);
   const f = FONTS[key];
-  if (!f || !f.google) return;
+  if (!f || !(f.google || f.local)) return;
   const tag = key + '@' + (weight || f.weight);
   if (fontLoadRequested.has(tag)) return;
   fontLoadRequested.add(tag);
-  try { document.fonts.load(`${weight || f.weight} 21px ${f.stack.split(',')[0]}`).catch(() => {}); }
-  catch (e){}
+  try {
+    const fam = f.stack.split(',')[0];
+    document.fonts.load(`${weight || f.weight} 21px ${fam}`).catch(() => {});
+    // bundled fonts: bold and italic runs are separate files, fetch them alongside
+    if (f.local){
+      document.fonts.load(`${weightUp(weight || f.weight)} 21px ${fam}`).catch(() => {});
+      if ((f.local.italic || []).length) document.fonts.load(`italic ${weight || f.weight} 21px ${fam}`).catch(() => {});
+    }
+  } catch (e){}
 }
 if (document.fonts && document.fonts.addEventListener){
   document.fonts.addEventListener('loadingdone', () => {
     // a font file just arrived: re-measure text drawn with fallbacks, repaint
     for (const p of state.pages) for (const el of p.elements)
-      if (el.type === 'text' && FONTS[el.font] && FONTS[el.font].google) autosizeText(el);
+      if (el.type === 'text' && FONTS[el.font] && (FONTS[el.font].google || FONTS[el.font].local)) autosizeText(el);
     requestRender(); scheduleThumbRefresh();
   });
 }
@@ -4635,6 +4667,8 @@ function buildCommands(){
   add('Import image…', 'File', fa('image'), 'photo svg', 'I');
   add('Templates…', 'File', fa('templates'), 'preset layout');
   add('Snapshots…', 'File', fa('snapshots'), 'checkpoint version');
+  add('Documents…', 'File', fa('documents'), 'library switch open carousel');
+  add('Comments…', 'File', fa('comments'), 'notes feedback review');
   add('Time-lapse recorder', 'File', fa('timelapse'), 'animation gif video');
   add('Present', 'File', fa('present'), 'slideshow', '⇧⌘P');
   add('Replay the drawing', 'File', fa('replay'), 'animate');
@@ -5159,7 +5193,8 @@ function applyRecognized(drawEl, rec){
 
 function newDocument(){
   const hasContent = state.pages.length > 1 || state.pages.some(p => p.elements.length);
-  if (hasContent && !confirm('Start a new, empty document?\n\nThe current document will be replaced. Use “Save sketch (.json)” first if you want to keep a copy. (⌘Z still brings the pages back.)')) return;
+  if (hasContent && !confirm('Start a new, empty document?\n\nThe current document stays in ☰ → Documents, so nothing is lost.')) return;
+  docFork(null);           // the outgoing document goes to the library; this one gets its own identity
   state.pages = [{ id: uid(), name: 'Page 1', elements: [] }];
   state.pageIndex = 0;
   state.elements = state.pages[0].elements;
@@ -5195,6 +5230,8 @@ function runFileAction(act){
   if (act === 'open') fileInput.click();
   if (act === 'save') saveJSON();
   if (act === 'snapshots') openSnapDialog();
+  if (act === 'documents') openDocsDialog();
+  if (act === 'comments') openCommentsDialog();
   if (act === 'gif') openGifDialog();
   if (act === 'timelapse') tlToggleBar();
   if (act === 'image') $('imgInput').click();
@@ -6275,6 +6312,7 @@ async function saveJSONAsync(){
     appState: { theme: state.theme, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
       bgColor: state.bgColor, board: state.board },
     timelapse: tl.frames.length ? { frames: tl.frames } : undefined,
+    meta: state.meta || undefined,     // comments, named styles, master page travel with the file
   };
   const stamp = new Date().toISOString().slice(0, 10);
   const remembered = localStorage.getItem('asterisk.docname') || `koralpaper-${stamp}`;
@@ -6331,9 +6369,6 @@ fileInput.addEventListener('change', () => {
     alert('This file is over ' + FILE_OPEN_MAX_MB + ' MB, which is more than KoralPaper can open safely in the browser.');
     return;
   }
-  if (/\.json$/i.test(f.name)){
-    try { localStorage.setItem('asterisk.docname', f.name.replace(/\.json$/i, '')); } catch (e){}
-  }
   const reader = new FileReader();
   reader.onload = () => {
     try {
@@ -6346,6 +6381,7 @@ fileInput.addEventListener('change', () => {
         importExcalidraw(data);
         return;
       }
+      docFork(null);       // the document being replaced stays in ☰ → Documents
       if (Array.isArray(data.pages) && data.pages.length){
         state.pages = data.pages.map(p => ({
           id: p.id || uid(), name: p.name || 'Page',
@@ -6362,6 +6398,8 @@ fileInput.addEventListener('change', () => {
       state.elements = state.pages[state.pageIndex].elements;
       state.images = data.images || {};
       for (const pg of state.pages) adoptImages(pg.elements);
+      // an opened file is its own document: keep its comments, styles and master page
+      docAdopt(data.meta, /\.json$/i.test(f.name) ? f.name.replace(/\.json$/i, '') : null);
       buildPageStrip();
       if (data.appState){
         state.theme = data.appState.theme === 'dark' ? 'dark' : 'light';
@@ -8389,6 +8427,8 @@ window.addEventListener('keydown', ev => {
     $('pdfDialog').classList.add('hidden');
     $('chartDialog').classList.add('hidden');
     $('snapDialog').classList.add('hidden');
+    $('docsDialog').classList.add('hidden');
+    $('commentsDialog').classList.add('hidden');
     $('gifDialog').classList.add('hidden');
     return; }
   if (ev.key === 'Enter'){
@@ -8663,307 +8703,9 @@ function mindClearPage(){
   showHint('Mind map unmarked: every branch is visible again');
 }
 
-/* ── Claude link: the MCP bridge client ─────────────
-   When the KoralPaper MCP extension runs inside Claude Desktop it
-   opens a tiny bridge on 127.0.0.1:8137. The app long-polls it;
-   Claude's tool calls arrive as commands, results go back, and the
-   ✳ indicator lights up while the link is alive. Everything Claude
-   draws lands as ordinary elements — editable, undoable (one ⌘Z per
-   command), saved like anything else. */
-const CLAUDE_BRIDGE = 'http://127.0.0.1:8137';
-let claudeLinked = false;
-
-function setClaudeLinked(on){
-  if (on === claudeLinked) return;
-  claudeLinked = on;
-  $('claudeLinkBtn').classList.toggle('hidden', !on);
-  const s = $('claudeTabStatus');
-  if (s){
-    s.textContent = on ? 'Linked: Claude Desktop can draw on this paper right now.'
-      : 'Not linked. Install the extension and keep Claude Desktop open, then this page links automatically.';
-    s.classList.toggle('on', on);
-  }
-}
-
-function claudeColor(v, keys, fallback){
-  if (typeof v !== 'string') return fallback;
-  if (/^#[0-9a-fA-F]{3,8}$/.test(v)) return v;
-  const k = v.toLowerCase().replace('black', 'ink');
-  return keys.includes(k) ? k : fallback;
-}
-/* Values arriving over the bridge are untrusted: NaN, Infinity and 1e308 all used
-   to pass straight through into geometry, where they poison sceneBounds and make an
-   export try to allocate an impossible canvas. Everything is clamped to a finite,
-   sane canvas range instead. */
-const CLAUDE_COORD = 1e6, CLAUDE_SIZE = 1e5, CLAUDE_TEXT_MAX = 20000;
-function claudeNum(v, fallback, lo, hi){
-  const n = Number(v);
-  return Number.isFinite(n) ? clamp(n, lo, hi) : fallback;
-}
-function claudeText(v){
-  return typeof v === 'string' ? v.slice(0, CLAUDE_TEXT_MAX) : '';
-}
-function claudeBuildElement(spec, idMap){
-  const kind = ['rect', 'diamond', 'ellipse', 'polygon', 'chip', 'text', 'arrow', 'line'].includes(spec.type)
-    ? spec.type : 'rect';
-  // When a brand kit is active it supplies every value Claude did not specify, so
-  // anything drawn over the bridge comes out in the same line style, weight,
-  // corners, fill style, arrowheads, ink and body font as the rest of your work.
-  const BK = brandActive() ? brand : null;
-  const BS = BK ? BK.style : null;
-  const style = {
-    stroke: claudeColor(spec.stroke, STROKE_KEYS, BK ? BK.ink : 'ink'),
-    fill: claudeColor(spec.fill, FILL_KEYS,
-      kind === 'text' || kind === 'arrow' || kind === 'line' ? 'none' : defaults.fillByType[kind] || 'none'),
-    fillStyle: ['solid', 'hachure', 'dense', 'cross', 'dots', 'waves'].includes(spec.fillStyle)
-      ? spec.fillStyle : (BS ? BS.fillStyle : 'solid'),
-    dash: ['solid', 'dotted', 'dashed'].includes(spec.dash) ? spec.dash : (BS ? BS.dash : 'solid'),
-    sw: Number(spec.sw) > 0 ? clamp(Number(spec.sw), 0.5, 40) : (BS ? swForWeight(BS.weight) : widths.medium),
-    sketch: [0, 1, 2].includes(spec.sketch) ? spec.sketch : (BS ? BS.sketch : 1),
-    round: [0, 1].includes(spec.round) ? spec.round : (BS ? BS.round : 1),
-    opacity: spec.opacity != null ? clamp(Number(spec.opacity), 0, 100) : 100,
-    fillOpacity: spec.fillOpacity != null ? clamp(Number(spec.fillOpacity), 0, 100) : 100,
-    font: (typeof spec.font === 'string' && FONTS[spec.font]) ? spec.font
-      : (typeof spec.font === 'string' && spec.font.startsWith('cg:') && ensureCustomFont(spec.font)) ? spec.font
-      : (typeof spec.font === 'string' && /^[A-Z][A-Za-z0-9 ]{2,30}$/.test(spec.font) && ensureCustomFont('cg:' + spec.font)) ? 'cg:' + spec.font
-      : (BK ? BK.bodyFont : 'sans'),
-    size: Number(spec.size) > 0 ? clamp(Number(spec.size), 8, 600)
-      : (kind === 'chip' || kind === 'arrow' || kind === 'line' ? 16 : 21),
-    align: ['left', 'center', 'right'].includes(spec.align) ? spec.align : (kind === 'text' ? 'left' : 'center'),
-    lh: typo.lh, pgap: typo.pgap, lspace: typo.lspace, valign: 'middle',
-  };
-  if (spec.textColor) style.textColor = claudeColor(spec.textColor, STROKE_KEYS, null);
-  if (kind === 'polygon') style.sides = clamp(Math.round(Number(spec.sides) || 6), 3, 12);
-  const x = claudeNum(spec.x, 0, -CLAUDE_COORD, CLAUDE_COORD), y = claudeNum(spec.y, 0, -CLAUDE_COORD, CLAUDE_COORD);
-  const el = newElement(kind, x, y, style);
-  el.x = x; el.y = y;
-  if (spec.bold && typeof spec.text === 'string' && spec.text.length)
-    el.runs = [{ s: 0, e: spec.text.length, b: true, i: false, hl: null, co: null }];
-  if (Number(spec.weight) >= 100 && Number(spec.weight) <= 900){
-    el.fweight = Math.round(Number(spec.weight) / 100) * 100;
-    ensureWeightCss(el.font); requestFontLoad(el.font, el.fweight);
-  }
-  if (el.font.startsWith('cg:')){
-    const fam = el.font.slice(3).trim();
-    loadFontCssFor(fam);
-    rememberGFont(fam); // Claude-loaded fonts appear in the font menu too
-  }
-  if (kind === 'arrow' || kind === 'line'){
-    el.curve = 0;
-    el.elbow = !!spec.elbow;
-    el.startHead = HEAD_KINDS.includes(spec.startHead) ? spec.startHead : (BS ? BS.startHead : 'none');
-    el.endHead = HEAD_KINDS.includes(spec.endHead) ? spec.endHead
-      : (kind === 'arrow' ? (BS ? BS.endHead : 'arrow') : 'none');   // a plain line never sprouts a head
-    const fromId = spec.from && idMap.get(String(spec.from));
-    const toId = spec.to && idMap.get(String(spec.to));
-    if (fromId && toId && fromId !== toId){
-      el.startBind = fromId; el.endBind = toId;
-      el.points = [[0, 0], [10, 0]];
-    } else {
-      const x2 = claudeNum(spec.x2, NaN, -CLAUDE_COORD, CLAUDE_COORD);
-      const y2 = claudeNum(spec.y2, NaN, -CLAUDE_COORD, CLAUDE_COORD);
-      el.points = [[0, 0], [isNaN(x2) ? 160 : x2 - x, isNaN(y2) ? 0 : y2 - y]];
-    }
-    el.text = claudeText(spec.text);
-  } else {
-    const defSize = { rect: [190, 92], diamond: [170, 120], ellipse: [160, 110], chip: [140, 40] }[kind];
-    // a missing OR non-positive size means "use the default", not "make it 1px wide"
-    const wPos = Number(spec.w) > 0 ? spec.w : undefined, hPos = Number(spec.h) > 0 ? spec.h : undefined;
-    el.w = claudeNum(wPos, defSize ? defSize[0] : 120, 1, CLAUDE_SIZE);
-    el.h = claudeNum(hPos, defSize ? defSize[1] : 60, 1, CLAUDE_SIZE);
-    el.text = claudeText(spec.text);
-    if (kind === 'text') autosizeText(el);
-  }
-  if (spec.id) idMap.set(String(spec.id), el.id);
-  return el;
-}
-function claudeCompact(el){
-  const c = { id: el.id, type: el.type, x: Math.round(el.x), y: Math.round(el.y),
-    w: Math.round(el.w), h: Math.round(el.h) };
-  if (el.text) c.text = el.text;
-  if (el.stroke && el.stroke !== 'ink') c.stroke = el.stroke;
-  if (el.fill && el.fill !== 'none') c.fill = el.fill;
-  if (el.sw != null) c.sw = Math.round(el.sw * 10) / 10;
-  if (el.sketch === 0) c.sketch = 0;
-  if (el.fillStyle && el.fillStyle !== 'solid') c.fillStyle = el.fillStyle;
-  if (el.opacity != null && el.opacity < 100) c.opacity = el.opacity;
-  if (el.fillOpacity != null && el.fillOpacity < 100) c.fillOpacity = el.fillOpacity;
-  if (el.type === 'arrow' || el.type === 'line'){
-    if (el.startBind) c.from = el.startBind;
-    if (el.endBind) c.to = el.endBind;
-    if (el.startHead && el.startHead !== 'none') c.startHead = el.startHead;
-    if (el.endHead) c.endHead = el.endHead;
-  }
-  if (el.type === 'icon') c.icon = el.kind;
-  if (el.type === 'polygon') c.sides = el.sides || 6;
-  if (el.textColor) c.textColor = el.textColor;
-  if (el.mindRoot) c.mindRoot = true;
-  if (el.folded) c.folded = true;
-  return c;
-}
-
-async function claudeExecute(action, args){
-  if (action === 'read_document'){
-    syncPageRef();
-    return {
-      board: state.board ? { w: state.board.w, h: state.board.h, name: state.board.name } : null,
-      brand: brandActive() ? {
-        name: brand.name || 'Brand',
-        primary: brand.primary,
-        secondary: brand.secondary,
-        palette: brand.palette,
-        ink: brand.ink,
-        muted: brand.muted || null,
-        accents: brandAccents(),
-        paper: (brand.usePaper && brand.paper) || null,
-        headingFont: brand.headFont.replace(/^cg:/, ''),
-        bodyFont: brand.bodyFont.replace(/^cg:/, ''),
-        style: brand.style,
-        note: 'A brand kit is active. Use colors by role: primary = hero / first chart series / headline accent / the ✳; secondary = support / second series; palette = extra categorical colors; ink = outlines and body text; paper = background. Charts should run primary, secondary, then palette in order. Also match the brand style: draw shapes with sketch=style.sketch (0 neat, 1 sketchy, 2 scribbly), dash=style.dash, corners round=style.round, fill fillStyle=style.fillStyle, and arrows with style.startHead/endHead. Weight "' + brand.style.weight + '" ≈ sw ' + swForWeight(brand.style.weight) + '.',
-      } : null,
-      theme: state.theme,
-      pages: state.pages.map((p, i) => ({
-        name: p.name, current: i === state.pageIndex,
-        elements: p.elements.map(claudeCompact),
-      })),
-    };
-  }
-  if (action === 'create_page'){
-    const specs = Array.isArray(args.elements) ? args.elements : [];
-    if (!specs.length) return { error: 'No elements given.' };
-    syncPageRef();
-    const idMap = new Map();
-    const shapes = specs.filter(s => s.type !== 'arrow' && s.type !== 'line');
-    const linears = specs.filter(s => s.type === 'arrow' || s.type === 'line');
-    const els = shapes.map(s => claudeBuildElement(s, idMap))
-      .concat(linears.map(s => claudeBuildElement(s, idMap)));
-    state.pages.push(makePage(els, typeof args.name === 'string' && args.name.trim() ? args.name.trim() : 'Claude page'));
-    state.pageIndex = state.pages.length - 1;
-    state.elements = state.pages[state.pageIndex].elements;
-    state.selection = new Set();
-    if (args.board && Number(args.board.w) > 0 && Number(args.board.h) > 0){
-      state.board = { name: args.board.name || 'Custom', w: Number(args.board.w), h: Number(args.board.h), x: 0, y: 0 };
-    }
-    if (typeof args.paper === 'string' && args.paper[0] === '#') state.pages[state.pageIndex].bg = args.paper;
-    updateBoundArrows(state.elements);
-    preloadDocFonts();
-    syncToggles(); syncBoardBtn(); buildBoardMenuSel(); syncPaperUI();
-    commit(); buildPageStrip(); zoomToFit(); syncPanel();
-    showHint('Claude drew a new page: every element is fully editable');
-    return { ok: true, page: state.pages[state.pageIndex].name,
-      ids: Object.fromEntries(idMap), elements: state.elements.length };
-  }
-  if (action === 'add_elements'){
-    const specs = Array.isArray(args.elements) ? args.elements : [];
-    if (!specs.length) return { error: 'No elements given.' };
-    const idMap = new Map();
-    for (const el of state.elements) idMap.set(el.id, el.id); // arrows may bind existing shapes
-    const shapes = specs.filter(s => s.type !== 'arrow' && s.type !== 'line');
-    const linears = specs.filter(s => s.type === 'arrow' || s.type === 'line');
-    for (const s of shapes) state.elements.push(claudeBuildElement(s, idMap));
-    for (const s of linears) state.elements.push(claudeBuildElement(s, idMap));
-    updateBoundArrows(state.elements);
-    preloadDocFonts();
-    commit(); requestRender(); syncPanel();
-    showHint('Claude added to this page');
-    return { ok: true, ids: Object.fromEntries(idMap), elements: state.elements.length };
-  }
-  if (action === 'update_elements'){
-    const ups = Array.isArray(args.updates) ? args.updates : [];
-    let touched = 0;
-    for (const u of ups){
-      const el = byId(String(u.id));
-      if (!el) continue;
-      touched++;
-      if (u.x !== undefined) el.x = Number(u.x) || el.x;
-      if (u.y !== undefined) el.y = Number(u.y) || el.y;
-      if (u.w !== undefined && Number(u.w) > 0) el.w = Number(u.w);
-      if (u.h !== undefined && Number(u.h) > 0) el.h = Number(u.h);
-      if (u.text !== undefined){ el.text = String(u.text); delete el.runs; }
-      if (u.stroke !== undefined) el.stroke = claudeColor(u.stroke, STROKE_KEYS, el.stroke);
-      if (u.fill !== undefined) el.fill = claudeColor(u.fill, FILL_KEYS, el.fill);
-      if (u.fillStyle !== undefined && ['solid','hachure','dense','cross','dots','waves'].includes(u.fillStyle)) el.fillStyle = u.fillStyle;
-      if (u.dash !== undefined && ['solid','dotted','dashed'].includes(u.dash)) el.dash = u.dash;
-      if (u.size !== undefined && Number(u.size) > 0) el.size = clamp(Number(u.size), 8, 600);
-      if (u.font !== undefined && FONTS[u.font]) el.font = u.font;
-      if (u.align !== undefined && ['left','center','right'].includes(u.align)) el.align = u.align;
-      if (u.textColor !== undefined) el.textColor = (!u.textColor || u.textColor === 'auto') ? null : claudeColor(u.textColor, STROKE_KEYS, el.textColor);
-      if (u.folded !== undefined) el.folded = !!u.folded;
-      if (u.mindRoot !== undefined){
-        if (u.mindRoot) for (const other of state.elements) delete other.mindRoot;
-        el.mindRoot = !!u.mindRoot;
-        if (!u.mindRoot) delete el.mindRoot;
-      }
-      if (u.sketch !== undefined) el.sketch = u.sketch === 0 ? 0 : 1;
-      if (u.sw !== undefined && Number(u.sw) > 0) el.sw = clamp(Number(u.sw), 0.5, 40);
-      if (u.opacity !== undefined && Number(u.opacity) >= 0) el.opacity = clamp(Number(u.opacity), 0, 100);
-      if (u.fillOpacity !== undefined && Number(u.fillOpacity) >= 0) el.fillOpacity = clamp(Number(u.fillOpacity), 0, 100);
-      if (u.sides !== undefined && el.type === 'polygon') el.sides = clamp(Math.round(Number(u.sides) || 6), 3, 12);
-      if (u.startHead !== undefined && HEAD_KINDS.includes(u.startHead)) el.startHead = u.startHead;
-      if (u.endHead !== undefined && HEAD_KINDS.includes(u.endHead)) el.endHead = u.endHead;
-      if (el.type === 'text') autosizeText(el);
-      delete el._prims; delete el._pkey;
-    }
-    if (!touched) return { error: 'No matching element ids on the current page.' };
-    updateBoundArrows(state.elements);
-    preloadDocFonts();
-    commit(); requestRender(); syncPanel();
-    return { ok: true, updated: touched };
-  }
-  if (action === 'delete_elements'){
-    const ids = new Set((Array.isArray(args.ids) ? args.ids : []).map(String));
-    const before = state.elements.length;
-    state.elements = state.elements.filter(e => !ids.has(e.id));
-    state.pages[state.pageIndex].elements = state.elements;
-    state.selection = new Set();
-    updateBoundArrows(state.elements);
-    commit(); requestRender(); syncPanel();
-    return { ok: true, deleted: before - state.elements.length };
-  }
-  if (action === 'render_page'){
-    const blob = await renderPagePNGBlob(state.elements, false);
-    if (!blob) return { error: 'The current page is empty.' };
-    // downscale for the eye check — Claude needs layout, not print quality
-    const img = await createImageBitmap(blob);
-    const scale = Math.min(1, 1100 / img.width);
-    const off = document.createElement('canvas');
-    off.width = Math.round(img.width * scale);
-    off.height = Math.round(img.height * scale);
-    off.getContext('2d').drawImage(img, 0, 0, off.width, off.height);
-    const dataUrl = off.toDataURL('image/png');
-    return { png: dataUrl.slice(dataUrl.indexOf(',') + 1),
-      note: `Current page "${state.pages[state.pageIndex].name}", ${state.elements.length} elements.` };
-  }
-  return { error: 'Unknown action: ' + action };
-}
-
-async function claudePollLoop(){
-  for (;;){
-    try {
-      // quick status ping first: the long-poll below holds ~25s, and the
-      // ✳ indicator should light up within a second of the bridge appearing
-      const s = await fetch(CLAUDE_BRIDGE + '/status');
-      if (!s.ok) throw new Error('bridge');
-      setClaudeLinked(true);
-      const r = await fetch(CLAUDE_BRIDGE + '/poll', { headers: { 'X-Koralpaper': '1' } });
-      if (!r.ok) throw new Error('bridge');
-      const cmds = await r.json();
-      for (const c of cmds){
-        let result;
-        try { result = await claudeExecute(c.action, c.args); }
-        catch (e){ result = { error: String(e && e.message || e) }; }
-        await fetch(CLAUDE_BRIDGE + '/result', {
-          method: 'POST', headers: { 'Content-Type': 'text/plain', 'X-Koralpaper': '1' },
-          body: JSON.stringify({ id: c.id, result }),
-        });
-      }
-    } catch (e){
-      setClaudeLinked(false);
-      await new Promise(res => setTimeout(res, 4000));
-    }
-  }
-}
-claudePollLoop();
+/* ── Claude link ────────────────────────────────────
+   The MCP bridge client, the document library, versions, comments, named
+   styles, the master page and export rendering live in js/bridge.js. */
 
 /* ── share as a self-contained web page ─────────────
    One .html file, zero dependencies: every page becomes an inline SVG
@@ -9544,6 +9286,7 @@ function boot(){
   step('export toggle', syncExpToggle);
   step('swatches', buildSwatches);
   step('paper swatches', buildPaperSwatches);
+  step('bundled fonts', installLocalFonts);
   step('saved Google fonts', registerSavedGFonts);
   step('font menu', buildFontSelect);
   step('weight menu', buildWeightMenu);
@@ -9567,6 +9310,8 @@ function boot(){
   }
   state.pageIndex = clamp(state.pageIndex | 0, 0, state.pages.length - 1);
   state.elements = state.pages[state.pageIndex].elements;
+  step('document identity', () => { state.meta = normalizeMeta(state.meta); docTrack(); });
+  step('documents and comments', bridgeInitUI);
 
   step('theme', () => document.body.classList.toggle('dark', state.theme === 'dark'));
   step('swatch paint', paintSwatches);
@@ -9581,6 +9326,7 @@ function boot(){
   step('zoom label', syncZoomLabel);
   step('render', requestRender);
   step('welcome', () => maybeShowWelcome(hadSave));
+  step('Claude link', claudePollLoop);
 
   if (failed.length){
     showHint('KoralPaper started, but some saved settings could not be read: ' + failed.join(', '));
