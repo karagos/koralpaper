@@ -435,6 +435,28 @@ describe('13. batch pages and 14. safe area', () => {
       return other;`);
     assert.equal(whites, 0, 'no guide or grid pixels in the export');
   });
+  test('the guide is a neutral grey that reads on dark and on light paper, never an accent colour', async () => {
+    const got = JSON.parse(await k.page(`
+      const seen = {};
+      const fake = () => { const o = { strokes: [], fills: [] };
+        const c = new Proxy({}, { get: (t, k) => k in t ? t[k] : (k === 'strokeRect' ? () => o.strokes.push(t.strokeStyle) : k === 'fillText' ? () => o.fills.push(t.fillStyle) : () => {}),
+          set: (t, k, v) => { t[k] = v; return true; } });
+        return { c, o }; };
+      const page = state.pages[state.pageIndex], keep = page.bg, hadComments = state.meta.comments;
+      state.meta.comments = [];
+      for (const [name, bg] of [['dark', '#111111'], ['light', '#FFFFFF']]){
+        page.bg = bg; const f = fake(); drawBridgeOverlay(f.c, 1); seen[name] = { line: f.o.strokes[0], label: f.o.fills[0] };
+      }
+      page.bg = keep; state.meta.comments = hadComments;
+      return JSON.stringify(seen);`));
+    const rgb = s => s.match(/rgba\((\d+),(\d+),(\d+)/).slice(1).map(Number);
+    for (const v of Object.values(got)) for (const colour of [v.line, v.label]){
+      const [r, g, b] = rgb(colour);
+      assert.ok(r === g && g === b, colour + ' is grey');
+    }
+    assert.ok(rgb(got.dark.line)[0] > 150, 'a light grey on dark paper');
+    assert.ok(rgb(got.light.line)[0] < 120, 'a dark grey on light paper');
+  });
   test('create_page can set the safe area on an existing document', async () => {
     const d2 = ok(await k.tool('koralpaper_create_document', { name: 'Late guide' })).documentId;
     ok(await k.tool('koralpaper_create_page', { documentId: d2, name: 'P', board: { w: 1080, h: 1080, safeArea: 60 }, elements: [{ type: 'rect' }] }));

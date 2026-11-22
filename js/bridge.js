@@ -597,13 +597,17 @@ function drawBridgeOverlay(c, z){
   const b = state.board;
   if (b && b.safe > 0){
     c.save();
-    c.strokeStyle = state.theme === 'light' ? 'rgba(214,84,56,.75)' : 'rgba(255,150,120,.8)';
+    /* a neutral grey, never an accent colour, so the guide is not mistaken for part
+       of the design: darker on light paper, lighter on dark paper */
+    const greyOn = bg => { let l = 1; try { l = hexLuma(bg); } catch (e){} return l > 0.5 ? 'rgba(96,96,96,.8)' : 'rgba(176,176,176,.8)'; };
+    const guide = greyOn(pageBgOf(state.pages[state.pageIndex]));
+    c.strokeStyle = guide;
     c.lineWidth = 1.2 / z;
     c.setLineDash([7 / z, 5 / z]);
     c.strokeRect(b.x + b.safe, b.y + b.safe, b.w - b.safe * 2, b.h - b.safe * 2);
     c.setLineDash([]);
     c.font = `600 ${11 / z}px ${FONTS.sans.stack}`;
-    c.fillStyle = c.strokeStyle;
+    c.fillStyle = greyOn(outsideColor());             // the label sits above the artboard, on the workspace
     c.textAlign = 'right'; c.textBaseline = 'alphabetic';
     c.fillText(`safe area · ${b.safe}px`, b.x + b.w, b.y - 8 / z);
     c.restore();

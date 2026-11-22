@@ -1,5 +1,9 @@
 # KoralPaper — Changelog
 
+## v3.85.2
+
+**The safe-area guide is grey.** It was drawn in a reddish accent colour, which could be mistaken for part of the design. It is now a neutral grey dashed line: a darker grey on light paper, a lighter grey on dark paper, so it reads on both. The small "safe area" label above the artboard is grey too. As before, the guide shows in the editor only and is never exported.
+
 ## v3.85.1
 
 **Fixed: the top and bottom handles of a text box did nothing.** The corner handles scaled the letters and the left and right handles set the width, but the bottom handle did not move at all and the top one only slid the text up. A text box had no height of its own: it always snapped back to the height of its text.
