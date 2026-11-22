@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.85.0';
+const APP_VERSION = '3.85.1';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -1472,7 +1472,7 @@ function drawTextElement(ctx, el, pal){
   applyTracking(ctx, el);
   ctx.textBaseline = 'middle';
   const color = textColorOf(pal, el);
-  let ty = el.y + lay.lh/2;
+  let ty = textBlockTop(el, lay.totalH) + lay.lh/2;
   for (const ln of lay.lines){
     if (ln.para) ty += lay.pgap;
     drawRichLine(ctx, el, ln, lineLeft(el.align || 'left', el.x, el.x + el.w, ln.w), ty, color, pal);
@@ -2778,7 +2778,7 @@ function renderSceneSVG(elements, opts){
     const boxR = isText ? el.x + el.w : box.x + box.w - pad2;
     const align = el.align || (isText ? 'left' : 'center');
     let ty = isText
-      ? el.y + lay.lh / 2
+      ? textBlockTop(el, lay.totalH) + lay.lh / 2
       : boxTextTop(el, box, lay.totalH, pad2) + lay.lh / 2;
     for (const ln of lay.lines){
       if (ln.para) ty += lay.pgap;
@@ -3109,8 +3109,20 @@ function buildPDF(pages){
 
 /* refresh a text element's box from its content */
 function autosizeText(el){
-  /* wrapped texts keep their dragged width and only grow downward */
+  /* wrapped texts keep their dragged width and only grow downward. A text box
+     can also carry a height of its own (el.maxH, set by dragging its top or
+     bottom handle, or by Claude): the box is then that tall, and grows past it
+     only when the text needs more room. Nothing is ever clipped. */
   const lay = layoutText(el, el.wrap ? Math.max(40, el.w) : null);
   if (!el.wrap) el.w = Math.max(10, lay.w);
-  el.h = Math.max(elLH(el), lay.totalH);
+  el.h = Math.max(elLH(el), lay.totalH, el.maxH > 0 ? el.maxH : 0);
+}
+/* where the first line of a text element starts: the top of its box, or lower
+   when the box is taller than the text and Text position says middle or bottom */
+function textBlockTop(el, totalH){
+  if (!(el.maxH > 0)) return el.y;
+  const spare = Math.max(0, el.h - totalH);
+  if (el.valign === 'middle') return el.y + spare / 2;
+  if (el.valign === 'bottom') return el.y + spare;
+  return el.y;
 }

@@ -727,7 +727,7 @@ function claudeBuildElement(rawSpec, idMap, warnings){
     lh: Number(spec.lineHeight) > 0 ? clamp(Number(spec.lineHeight), 0.5, 2.5) : typo.lh,
     pgap: typo.pgap,
     lspace: spec.letterSpacing != null ? claudeNum(spec.letterSpacing, typo.lspace, -7, 15) : typo.lspace,
-    valign: ['top', 'middle', 'bottom'].includes(spec.valign) ? spec.valign : 'middle',
+    valign: ['top', 'middle', 'bottom'].includes(spec.valign) ? spec.valign : (kind === 'text' ? 'top' : 'middle'),
   };
   if (spec.textColor) style.textColor = claudeColor(spec.textColor, STROKE_KEYS, null);
   if (kind === 'polygon') style.sides = clamp(Math.round(Number(spec.sides) || 6), 3, 12);
@@ -825,7 +825,12 @@ function claudeApplyUpdate(el, u){
   if (u.endHead !== undefined && HEAD_KINDS.includes(u.endHead)) el.endHead = u.endHead;
   if (el.type === 'text'){
     if (u.wrap !== undefined) el.wrap = u.wrap === true;
-    if (u.maxHeight !== undefined){ if (Number(u.maxHeight) > 0) el.maxH = claudeNum(u.maxHeight, 0, 1, CLAUDE_SIZE); else delete el.maxH; }
+    if (u.maxHeight !== undefined){
+      if (Number(u.maxHeight) > 0){
+        if (!el.maxH && u.valign === undefined) el.valign = 'top';       // a new box starts with its text at the top
+        el.maxH = claudeNum(u.maxHeight, 0, 1, CLAUDE_SIZE);
+      } else delete el.maxH;
+    }
     autosizeText(el);
   }
   if (u.locked !== undefined) el.locked = u.locked === true;
@@ -850,7 +855,8 @@ function claudeCompact(el){
   }
   if (el.type === 'text'){
     if (el.wrap) c.wrap = true;
-    if (el.maxH) c.maxHeight = el.maxH;
+    if (el.maxH) c.maxHeight = Math.round(el.maxH * 10) / 10;
+    if (el.maxH && el.valign && el.valign !== 'top') c.valign = el.valign;
   }
   if (tok.stroke) c.stroke = '$' + tok.stroke; else if (el.stroke && el.stroke !== 'ink') c.stroke = el.stroke;
   if (tok.fill) c.fill = '$' + tok.fill; else if (el.fill && el.fill !== 'none') c.fill = el.fill;

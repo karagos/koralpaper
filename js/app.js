@@ -729,6 +729,15 @@ function loadSaved(){
   } catch (e){ return false; }
 }
 /* put a stored document (autosave or library copy) into the live state */
+/* true when version string a ("3.84.0") is older than b, or missing */
+function versionBefore(a, b){
+  if (typeof a !== 'string' || !/^\d+(\.\d+)*$/.test(a)) return true;
+  const x = a.split('.').map(Number), y = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++){
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0);
+  }
+  return false;
+}
 function applyDocData(data){
   try {
     if (Array.isArray(data.pages) && data.pages.length){
@@ -743,6 +752,11 @@ function applyDocData(data){
       state.pageIndex = 0;
     } else return false;
     state.elements = state.pages[state.pageIndex].elements;
+    /* before 3.85.1 a text's stored Text position meant nothing and its text always
+       started at the top of the box. Keep it there now that the position counts. */
+    if (versionBefore(data.appVersion, '3.85.1'))
+      for (const p of state.pages) for (const el of p.elements)
+        if (el.type === 'text' && el.maxH && el.valign !== 'top') el.valign = 'top';
     state.images = data.images || {};
     for (const p of state.pages) adoptImages(p.elements);
     if (data.camera) state.camera = data.camera;
@@ -1141,11 +1155,19 @@ function onPointerDown(ev){
   };
 }
 
+/* give a text box back to its text: drop the height set with the top or bottom handle */
+function fitTextHeight(el){
+  if (!el || el.type !== 'text') return;
+  delete el.maxH;
+  autosizeText(el);
+  commit(); syncPanel(); requestRender();
+}
+
 function makeResize(sel, sb, handle, shiftKey){
   return {
     kind:'resize', handle, startB: { ...sb },
     orig: sel.map(e => ({
-      id: e.id, x: e.x, y: e.y, w: e.w, h: e.h, size: e.size,
+      id: e.id, x: e.x, y: e.y, w: e.w, h: e.h, size: e.size, maxH: e.maxH || 0,
       points: e.points ? e.points.map(p => p.slice()) : null,
     })),
   };
@@ -1380,8 +1402,14 @@ function resizeTo(it, sx, sy, shiftKey){
   }
   let nw = x1 - x0, nh = y1 - y0;
   const onlyText = it.orig.every(o => { const e = byId(o.id); return e && e.type === 'text'; });
-  // text keeps its aspect on corner drags; side drags are free (they wrap)
-  if (shiftKey || (onlyText && h.length === 2)){
+  // text keeps its aspect on corner drags; side drags are free: left and right
+  // set the width (the text wraps), top and bottom set the height of the box
+  if (onlyText && (h === 'n' || h === 's')){
+    // a text box never turns inside out: dragged past its other edge, it just stops
+    if (h === 's') y1 = Math.max(y1, y0 + 8); else y0 = Math.min(y0, y1 - 8);
+    nh = y1 - y0;
+  }
+  if ((shiftKey && !(onlyText && (h === 'n' || h === 's'))) || (onlyText && h.length === 2)){
     // preserve aspect
     const arx = Math.abs(nw) / (b.w || 1), ary = Math.abs(nh) / (b.h || 1);
     const s = (h === 'n' || h === 's') ? ary : (h === 'e' || h === 'w') ? arx : Math.max(arx, ary);
@@ -1406,14 +1434,27 @@ function resizeTo(it, sx, sy, shiftKey){
         const s = Math.max(kx, ky);
         el.size = clamp(Math.round(o.size * s), 8, 600);
         if (el.wrap) el.w = Math.max(40, o.w * kx);
+        if (o.maxH) el.maxH = o.maxH * (el.size / (o.size || 1));      // the box height scales with the letters
       } else if (h === 'e' || h === 'w'){
         // side drag on a text box sets its wrap width; the text reflows
         el.wrap = true;
         el.w = Math.max(40, o.w * kx);
+      } else {
+        /* top or bottom drag: the HEIGHT of the box, never the font size. The box
+           cannot be shorter than its text: dragged that far, it hugs the text again. */
+        const lay = layoutText(el, el.wrap ? Math.max(40, el.w) : null);
+        const textH = Math.max(elLH(el), lay.totalH);
+        const want = o.h * ky;
+        if (want > textH + 0.5){
+          if (!el.maxH) el.valign = 'top';               // a new box starts with its text at the top
+          el.maxH = want;
+        } else delete el.maxH;
       }
       el.x = fx + (o.x - b.x) * kx;
       el.y = fy + (o.y - b.y) * ky;
       autosizeText(el);
+      // the top handle moves the top edge: the bottom edge stays exactly where it was
+      if (!cornerDrag && h === 'n') el.y = fy + (o.y + o.h - b.y) * ky - el.h;
       continue;
     }
     if (isLinear(el) && o.points){
@@ -1655,9 +1696,9 @@ function positionEditor(){
        reflows the text at that width. The editor has to wrap at the SAME width:
        left unwrapped, its lines stayed at the old full-width layout, so the
        selection highlight was drawn over where the text used to be. */
-    const [px, py] = toScreen(el.x, el.y);
     const maxW = Math.max(40, el.w);
     const lay = layoutText(el, maxW);
+    const [px, py] = toScreen(el.x, textBlockTop(el, lay.totalH));
     editorEl.style.whiteSpace = 'pre-wrap';
     editorEl.style.textAlign = el.align || 'left';
     editorEl.style.left = px + 'px';
@@ -1665,7 +1706,7 @@ function positionEditor(){
     editorEl.style.width = maxW * z + 'px';
     editorEl.style.height = (lay.totalH + lineHeightOf(el.size, el.lh)) * z + 'px';
   } else if (el.type === 'text'){
-    const [px, py] = toScreen(el.x, el.y);
+    const [px, py] = toScreen(el.x, textBlockTop(el, layoutText(el, null).totalH));
     const m = measureText(editorEl.value || ' ', el.font, el.size);
     editorEl.style.whiteSpace = 'pre';
     editorEl.style.textAlign = 'left';
@@ -2119,6 +2160,8 @@ function openCtxMenu(ev){
         delete sel[0].imgFillId; delete sel[0]._imgFillSrc;
         commit(); requestRender();
       });
+    if (sel.length === 1 && sel[0].type === 'text' && sel[0].maxH)
+      add('Fit height to text', () => fitTextHeight(sel[0]));
     if (sel.length === 1 && sel[0].type === 'text' && sel[0].wrap)
       add('Fit width to text (unwrap)', () => {
         sel[0].wrap = false;
@@ -2529,7 +2572,8 @@ function syncPanel(){
   show('rowAlign', textish);
   show('rowRich', textish);
   show('rowTypo', textish);
-  show('rowValign', has('rect','diamond','ellipse','chip','polygon'));
+  // a text box has a Text position only once it has a height of its own
+  show('rowValign', has('rect','diamond','ellipse','chip','polygon') || sel.some(e => e.type === 'text' && e.maxH));
   const polyOn = has('polygon');
   show('rowSides', polyOn);
   if (polyOn){ const sd = (sel.length ? sel[0].sides : defaults.sides) || 6; $('sidesRange').value = sd; $('sidesVal').textContent = sd; }
@@ -2613,7 +2657,7 @@ function syncPanelDetails(sel, tool){
     $('sizeInput').value = szv == null ? '' : szv;
   }
   markSel('#alignSeg button', b => b.dataset.v === val('align'));
-  markSel('#valignSeg button', b => b.dataset.v === (val('valign') || 'middle'));
+  markSel('#valignSeg button', b => b.dataset.v === (val('valign') || (onlyText ? 'top' : 'middle')));
   const fmtEls = sel.filter(e => canHaveText(e) && e.text && e.text.trim());
   $('tsBold').classList.toggle('sel', fmtEls.length > 0 && fmtEls.every(e => rangeHasStyle(e, 0, e.text.length, 'b')));
   $('tsItal').classList.toggle('sel', fmtEls.length > 0 && fmtEls.every(e => rangeHasStyle(e, 0, e.text.length, 'i')));

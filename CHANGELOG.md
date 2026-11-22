@@ -1,5 +1,18 @@
 # KoralPaper — Changelog
 
+## v3.85.1
+
+**Fixed: the top and bottom handles of a text box did nothing.** The corner handles scaled the letters and the left and right handles set the width, but the bottom handle did not move at all and the top one only slid the text up. A text box had no height of its own: it always snapped back to the height of its text.
+
+- **Top and bottom handles now set the height of the box.** The font size never changes. The bottom handle moves the bottom edge, the top handle moves the top edge and leaves the bottom where it was.
+- **The box cannot be shorter than its text.** Dragged that far, it hugs the text again. Nothing is ever clipped: if you later type more than fits, the box grows.
+- **Text position works for text boxes.** Once a box is taller than its text, the Text position row (top, middle, bottom) appears in the panel. A new box starts with its text at the top.
+- **Fit height to text** in the right-click menu gives the box back to its text.
+- Corner handles scale the box height together with the letters. The PDF, PNG, JPG and SVG exports and the text editor all follow the text position.
+- For Claude, the dragged height is the same thing as `maxHeight`: `koralpaper_measure` checks the copy against it, and `valign` places the text inside it.
+
+Texts made before this change look exactly as they did. The connector is unchanged at 1.6.0. 95 automated tests, 12 of them new, dragging the handles with real pointer events.
+
 ## v3.85.0 · connector v1.6.0
 
 **The three bundled fonts are now complete, and exported PDFs carry real text.**
