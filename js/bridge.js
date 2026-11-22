@@ -890,9 +890,10 @@ async function claudeFontsReady(els){
     for (const r of el.runs || []) variants.push({ b: !!r.b, i: !!r.i });
     for (const st of variants){
       const css = fontCSS(el.font, 21, st, el.fweight);
-      if (seen.has(css)) continue;
-      seen.add(css);
-      try { jobs.push(document.fonts.load(css).catch(() => [])); } catch (e){}
+      const tag = f.local ? css + '|' + el.text : css;       // bundled fonts load per script, so the text matters
+      if (seen.has(tag)) continue;
+      seen.add(tag);
+      try { jobs.push(document.fonts.load(css, f.local ? 'A' + el.text : undefined).catch(() => [])); } catch (e){}
     }
   }
   if (!jobs.length) return;
@@ -937,7 +938,9 @@ async function claudeRenderPage(page, opts){
   const off = document.createElement('canvas');
   off.width = Math.max(1, Math.round(crop.w * sc));
   off.height = Math.max(1, Math.round(crop.h * sc));
-  renderScene(off.getContext('2d'), els, {
+  const offCtx = off.getContext('2d');
+  if (opts.texts) offCtx._kpText = [];
+  renderScene(offCtx, els, {
     width: off.width, height: off.height,
     camera: { x: -crop.x * sc, y: -crop.y * sc, z: sc },
     pal: pal(), bg: pageBgOf(page), transparent: false,
@@ -946,8 +949,33 @@ async function claudeRenderPage(page, opts){
   });
   const mime = opts.format === 'jpg' ? 'image/jpeg' : 'image/png';
   const url = off.toDataURL(mime, 0.92);
-  return { data: url.slice(url.indexOf(',') + 1), mime, pxW: off.width, pxH: off.height,
+  const out = { data: url.slice(url.indexOf(',') + 1), mime, pxW: off.width, pxH: off.height,
     w: Math.round(crop.w), h: Math.round(crop.h), scale: Math.round(sc * 1000) / 1000 };
+  if (opts.texts) out.texts = claudePageTexts(offCtx._kpText || [], sc);
+  return out;
+}
+/* the lines the canvas really painted, in page units (1 unit = 1 artboard px, origin top-left),
+   grouped by element and put in reading order: top to bottom, then left to right */
+function claudePageTexts(raw, sc){
+  const r2 = n => Math.round(n * 100) / 100;
+  const groups = new Map();
+  for (const t of raw){
+    const [a, b, c, d, e, f] = t.m;
+    const k = Math.hypot(a, b) || 1;                     // how much the page and any scaling enlarge the text
+    const by = t.y + t.size * 0.34;                      // lines are painted around their middle; the baseline sits below it
+    const line = {
+      text: t.text, x: r2((a * t.x + c * by + e) / sc), y: r2((b * t.x + d * by + f) / sc),
+      w: r2(t.w * k / sc), size: r2(t.size * k / sc), angle: Math.round(Math.atan2(b, a) * 10000) / 10000,
+    };
+    if (!groups.has(t.id)) groups.set(t.id, []);
+    groups.get(t.id).push(line);
+  }
+  const ordered = [...groups.values()].sort((g1, g2) => {
+    const y1 = Math.min(...g1.map(l => l.y - l.size)), y2 = Math.min(...g2.map(l => l.y - l.size));
+    if (Math.abs(y1 - y2) > 4) return y1 - y2;
+    return Math.min(...g1.map(l => l.x)) - Math.min(...g2.map(l => l.x));
+  });
+  return ordered.flat();
 }
 
 /* what a text really does inside its box */
@@ -1426,7 +1454,7 @@ async function claudeExecute(action, args){
   if (action === 'export_page'){
     const t = await claudeTarget(args, false);
     if (t.error) return t;
-    return claudeRenderPage(t.page, { format: args.format === 'jpg' ? 'jpg' : 'png', scale: args.scale, grid: args.grid === true });
+    return claudeRenderPage(t.page, { format: args.format === 'jpg' ? 'jpg' : 'png', scale: args.scale, grid: args.grid === true, texts: args.texts === true });
   }
 
   /* ── drawing ── */

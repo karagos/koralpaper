@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.84.1';
+const APP_VERSION = '3.85.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -74,7 +74,7 @@ const FONTS = {
   hand:  { label:'Hand · marker', stack:'"Chalkboard SE","Comic Sans MS","Segoe Print","Bradley Hand",cursive', weight:'400', group:'Built-in' },
 
   intertight: { label:'Inter Tight', stack:'"Inter Tight","Helvetica Neue",Helvetica,Arial,sans-serif', weight:'400', group:'Sans & display',
-    local:{ file:'inter-tight', normal:[400,500,600,700,800,900], italic:[400,700] } },
+    local:{ file:'inter-tight', wght:[400,900], italic:true } },
   inter:      { label:'Inter', stack:'"Inter","Helvetica Neue",sans-serif', weight:'500', google:'Inter:wght@400;500;700', group:'Sans & display' },
   montserrat: { label:'Montserrat', stack:'"Montserrat","Helvetica Neue",sans-serif', weight:'500', google:'Montserrat:wght@400;500;700', group:'Sans & display' },
   robotocond: { label:'Roboto Condensed', stack:'"Roboto Condensed","Helvetica Neue",sans-serif', weight:'500', google:'Roboto+Condensed:wght@400;700', group:'Sans & display' },
@@ -88,11 +88,11 @@ const FONTS = {
   playfair:   { label:'Playfair Display', stack:'"Playfair Display",Georgia,serif', weight:'500', google:'Playfair+Display:wght@400;500;600', group:'Serif' },
   ptserif:    { label:'PT Serif', stack:'"PT Serif",Georgia,serif', weight:'400', google:'PT+Serif:wght@400;700', group:'Serif' },
   gelasio:    { label:'Gelasio', stack:'"Gelasio",Georgia,serif', weight:'400', group:'Serif',
-    local:{ file:'gelasio', normal:[400,700], italic:[400,700] } },
+    local:{ file:'gelasio', wght:[400,700], italic:true } },
   lora:       { label:'Lora', stack:'"Lora",Georgia,serif', weight:'500', google:'Lora:wght@400;500;600', group:'Serif' },
 
   jetbrains:  { label:'JetBrains Mono', stack:'"JetBrains Mono","SF Mono",Menlo,monospace', weight:'500', google:'JetBrains+Mono:wght@400;500;600', group:'Mono',
-    local:{ file:'jetbrains-mono', normal:[400,500,700], italic:[] } },
+    local:{ file:'jetbrains-mono', wght:[400,700], italic:true } },
   ibmplex:    { label:'IBM Plex Mono', stack:'"IBM Plex Mono","SF Mono",Menlo,monospace', weight:'500', google:'IBM+Plex+Mono:wght@400;500;600', group:'Mono' },
   sharetech:  { label:'Share Tech Mono', stack:'"Share Tech Mono","SF Mono",Menlo,monospace', weight:'400', google:'Share+Tech+Mono', group:'Mono' },
 
@@ -114,25 +114,65 @@ const FONTS = {
 };
 /* ── fonts that ship with the app (fonts/ folder) ───
    Inter Tight, JetBrains Mono and Gelasio load from files next to index.html,
-   so they work offline and render identically on every machine. Each weight
-   and style is its own @font-face; a weight with no file of its own uses the
-   nearest one, the way browsers always match weights. */
+   so they work offline and render identically on every machine. They are the
+   official variable files from Google Fonts (OFL), one per style and script:
+   each file covers the whole weight range, and the browser fetches a script
+   (Latin, extended Latin, Greek) only when a text needs it. Gelasio has no
+   Greek: Greek text set in it falls back to the next font in its stack. */
 const LOCAL_FONT_DIR = 'fonts/';
+// [file, style, weight range, unicode range]
+const LOCAL_FONT_FILES = [
+  ['gelasio-latin-ext-italic', 'italic', '400 700',
+    'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF'],
+  ['gelasio-latin-italic', 'italic', '400 700',
+    'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'],
+  ['gelasio-latin-ext-normal', 'normal', '400 700',
+    'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF'],
+  ['gelasio-latin-normal', 'normal', '400 700',
+    'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'],
+  ['inter-tight-greek-ext-italic', 'italic', '400 900',
+    'U+1F00-1FFF'],
+  ['inter-tight-greek-italic', 'italic', '400 900',
+    'U+0370-0377,U+037A-037F,U+0384-038A,U+038C,U+038E-03A1,U+03A3-03FF'],
+  ['inter-tight-latin-ext-italic', 'italic', '400 900',
+    'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF'],
+  ['inter-tight-latin-italic', 'italic', '400 900',
+    'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'],
+  ['inter-tight-greek-ext-normal', 'normal', '400 900',
+    'U+1F00-1FFF'],
+  ['inter-tight-greek-normal', 'normal', '400 900',
+    'U+0370-0377,U+037A-037F,U+0384-038A,U+038C,U+038E-03A1,U+03A3-03FF'],
+  ['inter-tight-latin-ext-normal', 'normal', '400 900',
+    'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF'],
+  ['inter-tight-latin-normal', 'normal', '400 900',
+    'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'],
+  ['jetbrains-mono-greek-italic', 'italic', '400 700',
+    'U+0370-0377,U+037A-037F,U+0384-038A,U+038C,U+038E-03A1,U+03A3-03FF'],
+  ['jetbrains-mono-latin-ext-italic', 'italic', '400 700',
+    'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF'],
+  ['jetbrains-mono-latin-italic', 'italic', '400 700',
+    'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'],
+  ['jetbrains-mono-greek-normal', 'normal', '400 700',
+    'U+0370-0377,U+037A-037F,U+0384-038A,U+038C,U+038E-03A1,U+03A3-03FF'],
+  ['jetbrains-mono-latin-ext-normal', 'normal', '400 700',
+    'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF'],
+  ['jetbrains-mono-latin-normal', 'normal', '400 700',
+    'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'],
+];
 function localFontFaces(){
   const out = [];
   for (const f of Object.values(FONTS)){
     if (!f.local) continue;
     const family = f.stack.split(',')[0].replace(/"/g, '');
-    for (const style of ['normal', 'italic'])
-      for (const w of f.local[style] || [])
-        out.push({ family, weight: w, style, url: `${LOCAL_FONT_DIR}${f.local.file}-latin-${w}-${style}.woff2` });
+    for (const [file, style, weight, range] of LOCAL_FONT_FILES)
+      if (file.startsWith(f.local.file + '-')) out.push({ family, weight, style, range, url: `${LOCAL_FONT_DIR}${file}.woff2` });
   }
   return out;
 }
 function localFontCss(){
   return localFontFaces().map(x =>
     `@font-face{font-family:"${x.family}";font-style:${x.style};font-weight:${x.weight};font-display:swap;` +
-    `src:url("${x.url}") format("woff2");}`).join('\n');
+    `src:url("${x.url}") format("woff2");unicode-range:${x.range};}`).join('\n');
 }
 function installLocalFonts(){
   if (document.getElementById('kpLocalFonts')) return;
@@ -177,9 +217,7 @@ function boldWeightOf(f){
   if (f._bw) return f._bw;
   let bw = 700;
   if (f.local){
-    // bundled fonts: bold is the file that exists, 700 when there is one
-    const heavy = f.local.normal.filter(w => w >= 600);
-    if (heavy.length) bw = heavy.includes(700) ? 700 : Math.min(...heavy);
+    bw = Math.min(700, f.local.wght[1]);        // bundled fonts are variable: every weight in the range exists
   } else if (f.google){
     const m = f.google.match(/wght@([\d;]+)/);
     if (m){
@@ -461,6 +499,12 @@ function layoutText(el, maxW){
 }
 /* draw one laid-out line's highlights + styled segments, left edge at x0 */
 function drawRichLine(ctx, el, line, x0, ty, color, pal){
+  // an export that wants real text in its PDF listens here: every line the canvas paints passes through
+  if (ctx._kpText && line.text && line.text.trim() && line.w > 0){
+    let m = null;
+    try { m = ctx.getTransform(); } catch (e){}
+    if (m) ctx._kpText.push({ id: el.id, text: line.text, x: x0, y: ty, w: line.w, size: el.size, m: [m.a, m.b, m.c, m.d, m.e, m.f] });
+  }
   let x = x0;
   for (const seg of line.segs){
     if (seg.hl && seg.text){

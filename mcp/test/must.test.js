@@ -246,8 +246,84 @@ describe('3. export', () => {
     // the cross-reference table points at real objects
     const xref = Number(body.slice(body.lastIndexOf('startxref') + 9).trim().split('\n')[0]);
     assert.equal(body.slice(xref, xref + 4), 'xref');
-    const rows = body.slice(xref).split('\n').slice(3, 3 + 11);
+    const count = Number(body.slice(xref).split('\n')[1].split(' ')[1]);
+    assert.equal(count, 19, '2 + 3 per page + 6 for the text font + 1 for the title');
+    const rows = body.slice(xref).split('\n').slice(3, 3 + count - 1);
     rows.forEach((row, i) => assert.equal(body.slice(Number(row.slice(0, 10)), Number(row.slice(0, 10)) + String(i + 1).length + 6), `${i + 1} 0 obj`));
+  });
+
+  const pdfTexts = body => [...body.matchAll(/BT \/KPT ([\d.]+) Tf ([\d.]+) Tz ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) Tm <([0-9A-F]+)> Tj ET/g)]
+    .map(m => ({ size: +m[1], stretch: +m[2], cos: +m[3], sin: +m[4], x: +m[7], y: +m[8], text: Buffer.from(m[9], 'hex').swap16().toString('utf16le') }));
+
+  test('pdf: the text of every page is real, invisible text placed over the picture', async () => {
+    const r = ok(await k.tool('koralpaper_export', { documentId: docId, format: 'pdf', scale: 1, folder: 'Carousels/Test', filenamePrefix: 'text' }));
+    assert.equal(r.files[0].selectableText, true);
+    assert.equal(r.files[0].textLines, 3);
+    const body = fs.readFileSync(r.paths[0]).toString('latin1');
+    const runs = pdfTexts(body);
+    assert.deepEqual(runs.map(t => t.text), ['One', 'Two', 'Three'], 'one run per page, in page order');
+    assert.equal(body.split('3 Tr').length - 1, 3, 'the text is invisible (render mode 3) on each page');
+    for (const key of ['/Subtype /Type0', '/Encoding /Identity-H', '/ToUnicode', '/CIDFontType2', '/FontFile2', '/Title <FEFF'])
+      assert.ok(body.includes(key), key + ' is in the file');
+    const one = runs[0];
+    assert.equal(one.size, 120);
+    assert.ok(Math.abs(one.x - 80) < 1, 'starts at the left edge of the text, got ' + one.x);
+    assert.ok(one.y > 1350 - 80 - 120 * 1.3 && one.y < 1350 - 80, 'baseline sits inside the first line, got ' + one.y);
+    assert.deepEqual([one.cos, one.sin], [1, 0]);
+    // stretched to cover exactly the width the canvas drew
+    const w = JSON.parse(await k.page(`
+      const el = state.pages[0].elements.find(e => e.text === 'One');
+      return JSON.stringify(layoutText(el, null).w);`));
+    assert.ok(Math.abs(one.stretch / 100 * 3 * 120 * 0.5 - w) < 1, 'the run is as wide as the painted word');
+    // the embedded font is a well-formed TrueType file
+    const at = body.indexOf('/Length1 ');
+    const len = Number(body.slice(at + 9).split(' ')[0]);
+    const start = body.indexOf('stream\n', at) + 7;
+    const font = Buffer.from(body.slice(start, start + len), 'latin1');
+    assert.equal(font.readUInt32BE(0), 0x00010000);
+    let sum = 0;
+    for (let i = 0; i + 4 <= font.length; i += 4) sum = (sum + font.readUInt32BE(i)) >>> 0;
+    assert.equal(font.length % 4, 0);
+    assert.equal(sum, 0xB1B0AFBA, 'the font checksum adds up');
+    // macOS Preview drops the whole text layer when the font has no height below the baseline
+    assert.match(body, /\/Ascent 800 \/Descent -200/);
+    const hheaAt = font.indexOf(Buffer.from('hhea', 'latin1'));
+    const hhea = font.readUInt32BE(hheaAt + 8);
+    assert.deepEqual([font.readInt16BE(hhea + 4), font.readInt16BE(hhea + 6)], [800, -200]);
+  });
+
+  test('pdf text: wrapped lines, Greek, text inside shapes, rotation and reading order', async () => {
+    const d = ok(await k.tool('koralpaper_create_document', { name: '\u0394\u03BF\u03BA\u03B9\u03BC\u03AE PDF', board: BOARD })).documentId;
+    const made = ok(await k.tool('koralpaper_create_page', { documentId: d, name: 'Mixed', elements: [
+      { id: 'low', type: 'rect', x: 80, y: 900, w: 400, h: 160, text: 'Inside a box', font: 'Gelasio', size: 40, sketch: 0 },
+      { id: 'top', type: 'text', x: 80, y: 80, w: 500, wrap: true, text: 'A headline that wraps onto more lines', font: 'Inter Tight', weight: 800, size: 72, sketch: 0 },
+      { id: 'gr', type: 'text', x: 80, y: 600, text: '\u039A\u03B1\u03BB\u03B7\u03BC\u03AD\u03C1\u03B1 \u03BA\u03CC\u03C3\u03BC\u03B5 \u2713', font: 'Inter Tight', size: 48, sketch: 0 },
+    ] }));
+    const m = ok(await k.tool('koralpaper_measure', { documentId: d, elementIds: [made.ids.top] })).elements[0];
+    assert.ok(m.lineCount >= 3);
+    let r = ok(await k.tool('koralpaper_export', { documentId: d, format: 'pdf', folder: 'Carousels/Test', filenamePrefix: 'mixed' }));
+    let runs = pdfTexts(fs.readFileSync(r.paths[0]).toString('latin1'));
+    assert.deepEqual(runs.map(t => t.text), [...m.lines, '\u039A\u03B1\u03BB\u03B7\u03BC\u03AD\u03C1\u03B1 \u03BA\u03CC\u03C3\u03BC\u03B5 \u2713', 'Inside a box'],
+      'top to bottom, whatever order the elements were drawn in');
+    for (let i = 1; i < m.lines.length; i++) assert.ok(runs[i].y < runs[i - 1].y, 'each wrapped line sits below the one before');
+    const box = runs[runs.length - 1];
+    assert.ok(box.x > 80 && box.x < 480 && box.y > 1350 - 1060 && box.y < 1350 - 900, 'the box text sits inside its box');
+    assert.equal(r.scale, 2, 'pdf still renders at 2x by default');
+    assert.ok(Math.abs(runs[0].x - 80) < 1 && runs[0].size === 72, 'text positions are in page units, not pixels');
+
+    // a rotated element carries its angle
+    await k.page(`const el = state.elements.find(e => e.text === 'Inside a box'); el.angle = Math.PI / 2; commit(); return 0;`);
+    r = ok(await k.tool('koralpaper_export', { documentId: d, format: 'pdf', folder: 'Carousels/Test', filenamePrefix: 'mixed', overwrite: true }));
+    runs = pdfTexts(fs.readFileSync(r.paths[0]).toString('latin1'));
+    const turned = runs.find(t => t.text === 'Inside a box');
+    assert.deepEqual([Math.round(turned.cos), Math.round(turned.sin)], [0, -1], 'a quarter turn clockwise on the page');
+
+    // and it can be turned off
+    r = ok(await k.tool('koralpaper_export', { documentId: d, format: 'pdf', folder: 'Carousels/Test', filenamePrefix: 'plain', selectableText: false }));
+    const plain = fs.readFileSync(r.paths[0]).toString('latin1');
+    assert.equal(r.files[0].selectableText, false);
+    assert.equal(/\/Font|Tj|FontFile2/.test(plain), false);
+    assert.equal(plain.split('/Filter /DCTDecode').length - 1, 1);
   });
 
   test('an existing file is not overwritten unless asked', async () => {
@@ -296,20 +372,27 @@ describe('3. export', () => {
 
 /* ── 4. Custom fonts ──────────────────────────────── */
 describe('4. custom fonts', () => {
+  // what the brief asks for: Inter Tight 400 to 900 with italics, JetBrains Mono 400 to 700, Gelasio 400 and 700 with italics
   const FACES = [
-    ...[400, 500, 600, 700, 800, 900].map(w => ['Inter Tight', w, 'normal']),
-    ['Inter Tight', 400, 'italic'], ['Inter Tight', 700, 'italic'],
-    ['JetBrains Mono', 400, 'normal'], ['JetBrains Mono', 500, 'normal'], ['JetBrains Mono', 700, 'normal'],
+    ...[400, 500, 600, 700, 800, 900].flatMap(w => [['Inter Tight', w, 'normal'], ['Inter Tight', w, 'italic']]),
+    ...[400, 500, 600, 700].flatMap(w => [['JetBrains Mono', w, 'normal'], ['JetBrains Mono', w, 'italic']]),
     ['Gelasio', 400, 'normal'], ['Gelasio', 700, 'normal'], ['Gelasio', 400, 'italic'], ['Gelasio', 700, 'italic'],
   ];
+  const FILES = [
+    ...['latin', 'latin-ext', 'greek', 'greek-ext'].map(s => 'inter-tight-' + s),
+    ...['latin', 'latin-ext', 'greek'].map(s => 'jetbrains-mono-' + s),
+    ...['latin', 'latin-ext'].map(s => 'gelasio-' + s),
+  ].flatMap(f => [f + '-normal.woff2', f + '-italic.woff2']);
 
   test('every font file is in the fonts folder', () => {
-    const slug = { 'Inter Tight': 'inter-tight', 'JetBrains Mono': 'jetbrains-mono', 'Gelasio': 'gelasio' };
-    for (const [fam, w, style] of FACES){
-      const f = path.join(ROOT, 'fonts', `${slug[fam]}-latin-${w}-${style}.woff2`);
-      assert.ok(fs.existsSync(f) && fs.statSync(f).size > 5000, path.basename(f) + ' exists');
+    for (const name of FILES){
+      const f = path.join(ROOT, 'fonts', name);
+      assert.ok(fs.existsSync(f) && fs.statSync(f).size > 5000, name + ' exists');
       assert.equal(fs.readFileSync(f).subarray(0, 4).toString('latin1'), 'wOF2');
     }
+    assert.deepEqual(fs.readdirSync(path.join(ROOT, 'fonts')).filter(n => n.endsWith('.woff2')).sort(), [...FILES].sort(), 'no stray font files');
+    for (const lic of ['OFL-InterTight.txt', 'OFL-JetBrainsMono.txt', 'OFL-Gelasio.txt'])
+      assert.ok(fs.existsSync(path.join(ROOT, 'fonts', lic)), lic + ' ships with the fonts');
   });
 
   test('every weight and style loads from the fonts folder, not from the network', async () => {
@@ -318,15 +401,76 @@ describe('4. custom fonts', () => {
       const out = [];
       for (const [fam, w, style] of faces){
         const got = await document.fonts.load((style === 'italic' ? 'italic ' : '') + w + ' 40px "' + fam + '"');
-        const hit = got.find(f => f.family.replace(/["']/g, '') === fam && String(f.weight) === String(w) && f.style === style);
+        const hit = got.find(f => {
+          const [lo, hi] = String(f.weight).split(' ').map(Number);
+          return f.family.replace(/["']/g, '') === fam && f.style === style && w >= lo && w <= (hi || lo);
+        });
         out.push({ fam, w, style, loaded: !!hit && hit.status === 'loaded' });
       }
       const css = document.getElementById('kpLocalFonts').textContent;
       return JSON.stringify({ out, local: (css.match(/url\\("fonts\\//g) || []).length, remote: /https?:/.test(css) });`);
     const r = JSON.parse(res);
     for (const f of r.out) assert.equal(f.loaded, true, `${f.fam} ${f.w} ${f.style} loaded`);
-    assert.equal(r.local, FACES.length);
+    assert.equal(r.local, FILES.length);
     assert.equal(r.remote, false);
+  });
+
+  test('each weight and each italic really draws differently (no faked bold or slant)', async () => {
+    const ink = JSON.parse(await k.page(`
+      const c = document.createElement('canvas'); c.width = 900; c.height = 120;
+      const x = c.getContext('2d', { willReadFrequently: true });
+      const measure = (font, text) => {
+        x.fillStyle = '#fff'; x.fillRect(0, 0, 900, 120); x.fillStyle = '#000'; x.font = font; x.textBaseline = 'middle';
+        x.fillText(text, 10, 60);
+        const d = x.getImageData(0, 0, 900, 120).data; let n = 0;
+        for (let i = 0; i < d.length; i += 4) n += 255 - d[i];
+        return Math.round(n / 255);
+      };
+      const out = {};
+      for (const [fam, ws] of [['Inter Tight', [400, 500, 600, 700, 800, 900]], ['JetBrains Mono', [400, 500, 600, 700]], ['Gelasio', [400, 700]]]){
+        for (const w of ws) await document.fonts.load(w + ' 60px "' + fam + '"');
+        await document.fonts.load('italic 400 60px "' + fam + '"');
+        out[fam] = { up: ws.map(w => measure(w + ' 60px "' + fam + '"', 'Hamburgefonstiv')),
+          italic: measure('italic 400 60px "' + fam + '"', 'Hamburgefonstiv') };
+      }
+      return JSON.stringify(out);`));
+    for (const [fam, v] of Object.entries(ink)){
+      for (let i = 1; i < v.up.length; i++) assert.ok(v.up[i] > v.up[i - 1] * 1.02, `${fam}: each heavier weight puts down more ink (${v.up.join(', ')})`);
+      assert.notEqual(v.italic, v.up[0], fam + ' italic is its own drawing');
+    }
+  });
+
+  test('Greek is set in Inter Tight and JetBrains Mono themselves; Gelasio has none and falls back', async () => {
+    const g = JSON.parse(await k.page(`
+      const out = {};
+      const c = document.createElement('canvas').getContext('2d');
+      const width = (font, text) => { c.font = font; return c.measureText(text).width; };
+      for (const fam of ['Inter Tight', 'JetBrains Mono', 'Gelasio']){
+        const faces = await document.fonts.load('700 40px "' + fam + '"', '\u039A\u03B1\u03BB\u03B7\u03BC\u03AD\u03C1\u03B1');
+        out[fam] = { faces: faces.filter(f => f.status === 'loaded').length,
+          real: width('700 40px "' + fam + '"', '\u039A\u03B1\u03BB\u03B7\u03BC\u03AD\u03C1\u03B1 \u03BA\u03CC\u03C3\u03BC\u03B5'),
+          fallback: width('700 40px "no such font here"', '\u039A\u03B1\u03BB\u03B7\u03BC\u03AD\u03C1\u03B1 \u03BA\u03CC\u03C3\u03BC\u03B5') };
+      }
+      return JSON.stringify(out);`));
+    assert.ok(g['Inter Tight'].faces >= 1 && g['JetBrains Mono'].faces >= 1);
+    assert.notEqual(Math.round(g['Inter Tight'].real), Math.round(g['Inter Tight'].fallback), 'Greek in Inter Tight is not the fallback font');
+    assert.equal(Math.round(g['JetBrains Mono'].real * 10), Math.round(14 * 40 * 0.6 * 10), 'Greek in JetBrains Mono keeps the mono width');
+    assert.equal(g['Gelasio'].faces, 0, 'Gelasio has no Greek file');
+
+    const docId = ok(await k.tool('koralpaper_create_document', { name: 'Greek', board: BOARD })).documentId;
+    const made = ok(await k.tool('koralpaper_create_page', { documentId: docId, name: 'GR', elements: [
+      { id: 'a', type: 'text', x: 80, y: 80, w: 900, wrap: true, text: '\u03A0\u03AD\u03BD\u03C4\u03B5 \u03BC\u03CD\u03B8\u03BF\u03B9 \u03B3\u03B9\u03B1 \u03C4\u03B7\u03BD \u03C4\u03B5\u03C7\u03BD\u03B7\u03C4\u03AE \u03BD\u03BF\u03B7\u03BC\u03BF\u03C3\u03CD\u03BD\u03B7', font: 'Inter Tight', weight: 800, size: 80 },
+    ] }));
+    const m = ok(await k.tool('koralpaper_measure', { documentId: docId, elementIds: [made.ids.a] })).elements[0];
+    assert.equal(m.fontLoaded, true);
+    const widths = JSON.parse(await k.page(`
+      const c = document.createElement('canvas').getContext('2d');
+      const lines = ${JSON.stringify(m.lines)};
+      c.font = '800 80px "Inter Tight"'; const real = Math.max(...lines.map(l => c.measureText(l).width));
+      c.font = '800 80px "Helvetica Neue"'; const fb = Math.max(...lines.map(l => c.measureText(l).width));
+      return JSON.stringify({ real, fb });`));
+    assert.equal(Math.round(m.textWidth), Math.round(widths.real), 'measure used the real Greek glyphs');
+    assert.notEqual(Math.round(widths.real), Math.round(widths.fb));
   });
 
   test('font accepts the three names, with weight and italic, and reads them back', async () => {

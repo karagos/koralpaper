@@ -3,7 +3,7 @@
    Strategy: network-first with cache fallback, so updates arrive the
    moment they are online and the app still opens with no connection.
    The cache name carries the app version; bump it with APP_VERSION. */
-const CACHE = 'koralpaper-v3.84.1';
+const CACHE = 'koralpaper-v3.85.0';
 const SHELL = [
   './',
   './index.html',
@@ -17,21 +17,24 @@ const SHELL = [
   './icon-512.png',
   './apple-touch-icon.png',
   // bundled fonts: Inter Tight, JetBrains Mono, Gelasio
-  './fonts/gelasio-latin-400-italic.woff2',
-  './fonts/gelasio-latin-400-normal.woff2',
-  './fonts/gelasio-latin-700-italic.woff2',
-  './fonts/gelasio-latin-700-normal.woff2',
-  './fonts/inter-tight-latin-400-italic.woff2',
-  './fonts/inter-tight-latin-400-normal.woff2',
-  './fonts/inter-tight-latin-500-normal.woff2',
-  './fonts/inter-tight-latin-600-normal.woff2',
-  './fonts/inter-tight-latin-700-italic.woff2',
-  './fonts/inter-tight-latin-700-normal.woff2',
-  './fonts/inter-tight-latin-800-normal.woff2',
-  './fonts/inter-tight-latin-900-normal.woff2',
-  './fonts/jetbrains-mono-latin-400-normal.woff2',
-  './fonts/jetbrains-mono-latin-500-normal.woff2',
-  './fonts/jetbrains-mono-latin-700-normal.woff2',
+  './fonts/gelasio-latin-ext-italic.woff2',
+  './fonts/gelasio-latin-ext-normal.woff2',
+  './fonts/gelasio-latin-italic.woff2',
+  './fonts/gelasio-latin-normal.woff2',
+  './fonts/inter-tight-greek-ext-italic.woff2',
+  './fonts/inter-tight-greek-ext-normal.woff2',
+  './fonts/inter-tight-greek-italic.woff2',
+  './fonts/inter-tight-greek-normal.woff2',
+  './fonts/inter-tight-latin-ext-italic.woff2',
+  './fonts/inter-tight-latin-ext-normal.woff2',
+  './fonts/inter-tight-latin-italic.woff2',
+  './fonts/inter-tight-latin-normal.woff2',
+  './fonts/jetbrains-mono-greek-italic.woff2',
+  './fonts/jetbrains-mono-greek-normal.woff2',
+  './fonts/jetbrains-mono-latin-ext-italic.woff2',
+  './fonts/jetbrains-mono-latin-ext-normal.woff2',
+  './fonts/jetbrains-mono-latin-italic.woff2',
+  './fonts/jetbrains-mono-latin-normal.woff2',
 ];
 
 self.addEventListener('install', e => {

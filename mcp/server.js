@@ -15,7 +15,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const SERVER_VERSION = '1.5.0';
+const SERVER_VERSION = '1.6.0';
 
 const PORT = Number(process.env.KORALPAPER_PORT) || 8137;
 const CMD_TIMEOUT_MS = 30000;
@@ -239,7 +239,7 @@ const ELEMENT_SCHEMA = {
     size: { type: 'number', description: 'Font size in px (default 21; 16 for chips and arrow labels; up to 600 for poster headlines).' },
     bold: { type: 'boolean', description: 'true = render the whole text bold (headlines, table headers).' },
     italic: { type: 'boolean', description: 'true = render the whole text italic.' },
-    weight: { type: 'number', description: 'Font weight 100 to 900 for the whole text (400 regular, 600 semibold, 800 extrabold). Inter Tight has 400 to 900, JetBrains Mono 400/500/700, Gelasio 400/700.' },
+    weight: { type: 'number', description: 'Font weight 100 to 900 for the whole text (400 regular, 600 semibold, 800 extrabold). Inter Tight has every weight from 400 to 900, JetBrains Mono and Gelasio from 400 to 700, all with italics. Inter Tight and JetBrains Mono include Greek; Gelasio does not.' },
     font: { type: 'string', description: 'serif, sans, hand; a font that ships with the app by name: "Inter Tight", "JetBrains Mono", "Gelasio" (these work offline); a built-in key like playfair, spacegrotesk, caveat; or any Google font by its exact name.' },
     style: { type: 'string', description: 'Name of a text style defined with koralpaper_set_styles (e.g. "headline"). It supplies font, size, weight, colour and alignment; anything you also set here wins. Changing the style later restyles this element.' },
     align: { type: 'string', enum: ['left', 'center', 'right'] },
@@ -404,7 +404,7 @@ const TOOLS = [
   {
     name: 'koralpaper_export',
     annotations: { title: 'Export pages to files', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    description: 'Export pages as files on this computer and return their full paths. pdf = one multi-page PDF in the document\'s page order; png / jpg = one image per page, numbered by page ("name-01.png"). Files go to a folder inside ~/Documents (created if missing); nothing can be written outside it. The editor\'s grid and guides are not exported. In a PDF each page is a JPEG placed as-is at the artboard size, the same bytes a jpg export gives.' + ex({ documentId: 'doc_k3f9a2x1b7c4', pageIds: 'all', format: 'pdf', scale: 2, folder: 'Carousels/AI myths', filenamePrefix: 'ai-myths' }),
+    description: 'Export pages as files on this computer and return their full paths. pdf = one multi-page PDF in the document\'s page order; png / jpg = one image per page, numbered by page ("name-01.png"). Files go to a folder inside ~/Documents (created if missing); nothing can be written outside it. The editor\'s grid and guides are not exported. In a PDF each page is a JPEG placed as-is at the artboard size, the same bytes a jpg export gives, with the page\'s text laid over it as invisible real text, so the PDF can be searched, selected, copied and read aloud.' + ex({ documentId: 'doc_k3f9a2x1b7c4', pageIds: 'all', format: 'pdf', scale: 2, folder: 'Carousels/AI myths', filenamePrefix: 'ai-myths' }),
     inputSchema: {
       type: 'object',
       properties: {
@@ -415,6 +415,7 @@ const TOOLS = [
         folder: { type: 'string', description: 'Folder inside ~/Documents, e.g. "Carousels/AI myths". Default "KoralPaper Exports". A full path is accepted only if it is inside ~/Documents.' },
         filenamePrefix: { type: 'string', description: 'Start of the file names. Default: the document name.' },
         overwrite: { type: 'boolean', description: 'true = replace files that already have the same name. Default false: a number is added to the name instead.' },
+        selectableText: { type: 'boolean', description: 'pdf only. Default true: the text of each page is added as invisible real text over the picture. false = pictures only.' },
       },
       required: ['format'],
     },
@@ -570,10 +571,70 @@ function freeName(dir, stem, ext, overwrite){
   for (let n = 2; fs.existsSync(file); n++) file = path.join(dir, `${stem} (${n}).${ext}`);
   return file;
 }
+/* A font with one empty glyph, 500 units wide. It is what makes the text of a
+   PDF selectable without drawing anything: every character maps to that glyph,
+   and a ToUnicode table says which character each code stands for. */
+function glyphlessFont(){
+  const u16 = n => { const b = Buffer.alloc(2); b.writeUInt16BE(n & 0xFFFF); return b; };
+  const u32 = n => { const b = Buffer.alloc(4); b.writeUInt32BE(n >>> 0); return b; };
+  const tables = {
+    glyf: Buffer.alloc(12),                                             // one simple glyph with no contours
+    head: Buffer.concat([u32(0x00010000), u32(0x00010000), u32(0), u32(0x5F0F3CF5), u16(0), u16(1000),
+      Buffer.alloc(16), u16(0), u16(-200), u16(500), u16(800), u16(0), u16(8), u16(2), u16(0), u16(0)]),
+    hhea: Buffer.concat([u32(0x00010000), u16(800), u16(-200), u16(0), u16(500), u16(0), u16(0), u16(0),
+      u16(1), u16(0), u16(0), Buffer.alloc(8), u16(0), u16(1)]),
+    hmtx: Buffer.concat([u16(500), u16(0)]),
+    loca: Buffer.concat([u16(0), u16(6)]),
+    maxp: Buffer.concat([u32(0x00010000), u16(1), u16(0), u16(0), u16(0), u16(0), u16(2), Buffer.alloc(16)]),
+    post: Buffer.concat([u32(0x00030000), u32(0), u16(0), u16(0), u32(1), Buffer.alloc(16)]),
+  };
+  const sum = buf => {
+    let s = 0;
+    const padded = Buffer.concat([buf, Buffer.alloc((4 - buf.length % 4) % 4)]);
+    for (let i = 0; i < padded.length; i += 4) s = (s + padded.readUInt32BE(i)) >>> 0;
+    return s;
+  };
+  const tags = Object.keys(tables).sort();
+  const head = [u32(0x00010000), u16(tags.length), u16(64), u16(2), u16(tags.length * 16 - 64)];
+  let offset = 12 + tags.length * 16;
+  const dir = [], body = [];
+  for (const tag of tags){
+    const t = tables[tag];
+    dir.push(Buffer.from(tag, 'latin1'), u32(sum(t)), u32(offset), u32(t.length));
+    const padded = Buffer.concat([t, Buffer.alloc((4 - t.length % 4) % 4)]);
+    body.push(padded); offset += padded.length;
+  }
+  const font = Buffer.concat([...head, ...dir, ...body]);
+  const headAt = 12 + tags.length * 16 + body.slice(0, tags.indexOf('head')).reduce((n, b) => n + b.length, 0);
+  font.writeUInt32BE((0xB1B0AFBA - sum(font)) >>> 0, headAt + 8);       // checkSumAdjustment
+  return font;
+}
+const pdfHex = s => Buffer.from(String(s), 'utf16le').swap16().toString('hex').toUpperCase();
+const pdfNum = n => { const v = Math.round(Number(n) * 1000) / 1000; return Number.isFinite(v) ? String(v) : '0'; };
+/* the invisible text of one page: each painted line becomes one run of real
+   text, placed and stretched to cover exactly where the picture shows it */
+function pdfTextOps(texts, pageH){
+  const out = [];
+  for (const t of texts || []){
+    const str = String(t && t.text || '');
+    const units = str.length;                                            // UTF-16 code units, one glyph each
+    const size = Number(t.size), w = Number(t.w);
+    if (!units || !str.trim() || !(size > 0) || !(w > 0)) continue;
+    const ang = -(Number(t.angle) || 0);                                 // the page's y axis points down, a PDF's points up
+    const cos = Math.cos(ang), sin = Math.sin(ang);
+    const stretch = Math.max(1, Math.min(2000, 100 * w / (units * size * 0.5)));
+    out.push(`BT /KPT ${pdfNum(size)} Tf ${pdfNum(stretch)} Tz ${pdfNum(cos)} ${pdfNum(sin)} ${pdfNum(-sin)} ${pdfNum(cos)} ` +
+      `${pdfNum(t.x)} ${pdfNum(pageH - Number(t.y))} Tm <${pdfHex(str)}> Tj ET`);
+  }
+  return out.length ? '3 Tr\n' + out.join('\n') : '';
+}
 /* A PDF where each page is one JPEG, placed as-is (DCTDecode): the JPEG bytes
-   are copied in untouched, never decoded or re-compressed.
-   pages: [{ bytes: Buffer (JPEG), w, h (page size in points), pxW, pxH }] */
-function buildPDF(pages){
+   are copied in untouched, never decoded or re-compressed. A page may also
+   carry "texts": the lines painted on it, laid over the picture as invisible
+   real text so the PDF can be searched, selected, copied and read aloud.
+   pages: [{ bytes: Buffer (JPEG), w, h (page size in points), pxW, pxH, texts? }]
+   info:  { title } */
+function buildPDF(pages, info){
   const chunks = [];
   let offset = 0;
   const offs = [];
@@ -582,30 +643,61 @@ function buildPDF(pages){
     chunks.push(b); offset += b.length;
   };
   const obj = (n, body) => { offs[n] = offset; push(`${n} 0 obj\n${body}\nendobj\n`); };
+  const streamObj = (n, dict, bytes) => {
+    offs[n] = offset;
+    push(`${n} 0 obj\n<< ${dict} /Length ${bytes.length} >>\nstream\n`);
+    push(bytes);
+    push('\nendstream\nendobj\n');
+  };
   push('%PDF-1.4\n');
   push(Buffer.from([0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A]));
   const n = pages.length;
   const pageObj = i => 3 + i * 3, contObj = i => 4 + i * 3, imgObj = i => 5 + i * 3;
+  const ops = pages.map(p => pdfTextOps(p.texts, p.h));
+  const hasText = ops.some(Boolean);
+  let next = 3 + n * 3;
+  const fontObj = hasText ? next : 0;                                    // + 5 more: CIDFont, map, ToUnicode, descriptor, file
+  if (hasText) next += 6;
+  const infoObj = next++;
   obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
   obj(2, `<< /Type /Pages /Kids [${pages.map((_, i) => `${pageObj(i)} 0 R`).join(' ')}] /Count ${n} >>`);
   pages.forEach((p, i) => {
     obj(pageObj(i),
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${p.w} ${p.h}] ` +
-      `/Resources << /XObject << /Im${i} ${imgObj(i)} 0 R >> >> /Contents ${contObj(i)} 0 R >>`);
-    const stream = `q ${p.w} 0 0 ${p.h} 0 0 cm /Im${i} Do Q`;
-    obj(contObj(i), `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
-    offs[imgObj(i)] = offset;
-    push(`${imgObj(i)} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${p.pxW} /Height ${p.pxH} ` +
-      `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.bytes.length} >>\nstream\n`);
-    push(p.bytes);
-    push('\nendstream\nendobj\n');
+      `/Resources << /XObject << /Im${i} ${imgObj(i)} 0 R >>${ops[i] ? ` /Font << /KPT ${fontObj} 0 R >>` : ''} >> /Contents ${contObj(i)} 0 R >>`);
+    const stream = Buffer.from(`q ${p.w} 0 0 ${p.h} 0 0 cm /Im${i} Do Q` + (ops[i] ? '\n' + ops[i] : ''), 'latin1');
+    streamObj(contObj(i), '', stream);
+    streamObj(imgObj(i), `/Type /XObject /Subtype /Image /Width ${p.pxW} /Height ${p.pxH} ` +
+      '/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode', p.bytes);
   });
-  const total = 3 + n * 3;
+  if (hasText){
+    const zlib = require('zlib');
+    const font = glyphlessFont();
+    obj(fontObj, `<< /Type /Font /Subtype /Type0 /BaseFont /KoralPaperText /Encoding /Identity-H ` +
+      `/DescendantFonts [${fontObj + 1} 0 R] /ToUnicode ${fontObj + 3} 0 R >>`);
+    obj(fontObj + 1, `<< /Type /Font /Subtype /CIDFontType2 /BaseFont /KoralPaperText ` +
+      `/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> ` +
+      `/FontDescriptor ${fontObj + 4} 0 R /CIDToGIDMap ${fontObj + 2} 0 R /DW 500 >>`);
+    streamObj(fontObj + 2, '/Filter /FlateDecode', zlib.deflateSync(Buffer.alloc(131072)));   // every code → the one empty glyph
+    streamObj(fontObj + 3, '', Buffer.from(
+      '/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n' +
+      '/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n' +
+      '/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n' +
+      '1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n' +
+      '1 beginbfrange\n<0000> <FFFF> <0000>\nendbfrange\n' +
+      'endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n', 'latin1'));
+    obj(fontObj + 4, `<< /Type /FontDescriptor /FontName /KoralPaperText /Flags 5 /FontBBox [0 -200 500 800] ` +
+      `/ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 800 /StemV 80 /FontFile2 ${fontObj + 5} 0 R >>`);
+    streamObj(fontObj + 5, `/Length1 ${font.length}`, font);
+  }
+  const title = info && info.title ? ` /Title <FEFF${pdfHex(info.title)}>` : '';
+  obj(infoObj, `<<${title} /Producer (KoralPaper) /Creator (KoralPaper) >>`);
+  const total = next;
   const xrefOffset = offset;
   let xref = `xref\n0 ${total}\n0000000000 65535 f \n`;
   for (let i = 1; i < total; i++) xref += String(offs[i]).padStart(10, '0') + ' 00000 n \n';
   push(xref);
-  push(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+  push(`trailer\n<< /Size ${total} /Root 1 0 R /Info ${infoObj} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
   return Buffer.concat(chunks);
 }
 const appError = r => (r && r.error) ? new Error(r.error) : null;
@@ -623,9 +715,11 @@ async function runExport(args){
   const stem = safeFileStem(args.filenamePrefix, safeFileStem(info.name, 'koralpaper'));
   const pad = Math.max(2, String(info.totalPages || info.pages.length).length);
   const rendered = [];
+  const wantText = format === 'pdf' && args.selectableText !== false;
   for (const p of info.pages){
     const r = await call('export_page', {
       documentId: info.documentId, pageId: p.id, format: format === 'png' ? 'png' : 'jpg', scale,
+      texts: wantText,
     }, 90000);
     if (appError(r)) throw appError(r);
     rendered.push({ page: p, r, bytes: Buffer.from(r.data, 'base64') });
@@ -633,9 +727,13 @@ async function runExport(args){
   const files = [];
   if (format === 'pdf'){
     const file = freeName(dir, stem, 'pdf', args.overwrite === true);
-    const pdf = buildPDF(rendered.map(x => ({ bytes: x.bytes, w: x.r.w, h: x.r.h, pxW: x.r.pxW, pxH: x.r.pxH })));
+    const pdf = buildPDF(rendered.map(x => ({
+      bytes: x.bytes, w: x.r.w, h: x.r.h, pxW: x.r.pxW, pxH: x.r.pxH,
+      texts: wantText && Array.isArray(x.r.texts) ? x.r.texts : null,
+    })), { title: info.name });
     fs.writeFileSync(file, pdf);
-    files.push({ path: file, bytes: pdf.length, pages: rendered.map(x => ({ number: x.page.number, id: x.page.id, name: x.page.name })) });
+    const textLines = rendered.reduce((n, x) => n + (wantText && Array.isArray(x.r.texts) ? x.r.texts.length : 0), 0);
+    files.push({ path: file, bytes: pdf.length, selectableText: textLines > 0, textLines, pages: rendered.map(x => ({ number: x.page.number, id: x.page.id, name: x.page.name })) });
   } else {
     for (const x of rendered){
       const file = freeName(dir, `${stem}-${String(x.page.number).padStart(pad, '0')}`, format, args.overwrite === true);

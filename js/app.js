@@ -3426,12 +3426,12 @@ function requestFontLoad(key, weight){
   fontLoadRequested.add(tag);
   try {
     const fam = f.stack.split(',')[0];
-    document.fonts.load(`${weight || f.weight} 21px ${fam}`).catch(() => {});
-    // bundled fonts: bold and italic runs are separate files, fetch them alongside
     if (f.local){
-      document.fonts.load(`${weightUp(weight || f.weight)} 21px ${fam}`).catch(() => {});
-      if ((f.local.italic || []).length) document.fonts.load(`italic ${weight || f.weight} 21px ${fam}`).catch(() => {});
-    }
+      // bundled fonts: one file per style and script; fetch Latin and Greek, upright and italic
+      const sample = 'A\u03B1';
+      document.fonts.load(`${weight || f.weight} 21px ${fam}`, sample).catch(() => {});
+      if (f.local.italic) document.fonts.load(`italic ${weight || f.weight} 21px ${fam}`, sample).catch(() => {});
+    } else document.fonts.load(`${weight || f.weight} 21px ${fam}`).catch(() => {});
   } catch (e){}
 }
 if (document.fonts && document.fonts.addEventListener){

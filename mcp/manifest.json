@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "koralpaper",
   "display_name": "KoralPaper",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Let Claude design diagrams, decks and carousels directly on your KoralPaper paper.",
   "long_description": "Connects Claude Desktop to the KoralPaper app running in your browser. Describe a diagram, a deck or a carousel in plain words and Claude draws it as fully editable elements. Claude works in its own document so it never draws over other work, refuses to overwrite a page you changed since it last read it, measures real text so copy fits its box, uses named styles and a master page with automatic page numbers, reads and answers comments you pin to elements, and exports PDF, PNG or JPG into a folder inside Documents. Nothing leaves your machine except your conversation with Claude.",
   "author": {
@@ -71,7 +71,7 @@
     },
     {
       "name": "koralpaper_export",
-      "description": "Export pages as PDF, PNG or JPG files inside Documents."
+      "description": "Export pages as PDF (with selectable text), PNG or JPG files inside Documents."
     },
     {
       "name": "koralpaper_get_selection",

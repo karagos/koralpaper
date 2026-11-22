@@ -45,7 +45,7 @@ paper, including things you drew by hand.
 | `koralpaper_delete_elements` | Delete elements by id |
 | `koralpaper_render_page` | A picture of a page, to check the layout |
 | `koralpaper_measure` | Rendered line breaks, real height, overflow yes/no |
-| `koralpaper_export` | PDF, PNG or JPG files into a folder inside Documents |
+| `koralpaper_export` | PDF (with selectable text), PNG or JPG files into a folder inside Documents |
 | `koralpaper_get_selection` | What the user has selected |
 | `koralpaper_get_changes` | Added, changed and removed elements since a version |
 | `koralpaper_list_comments` | Comments pinned to elements |

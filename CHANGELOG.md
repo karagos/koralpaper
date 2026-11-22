@@ -1,5 +1,27 @@
 # KoralPaper — Changelog
 
+## v3.85.0 · connector v1.6.0
+
+**The three bundled fonts are now complete, and exported PDFs carry real text.**
+
+**Fonts**
+
+- **Every weight and every italic.** Inter Tight from 400 to 900, JetBrains Mono from 400 to 700 (600 was missing) and Gelasio from 400 to 700, each with a true italic at every weight. Before, a missing weight or italic was imitated from the nearest file.
+- **Greek.** Inter Tight and JetBrains Mono now set Greek text in the font itself, upright and italic. Gelasio has no Greek letters at its source, so Greek set in Gelasio still falls back to the next serif.
+- **Extended Latin** (accents used across European languages) for all three.
+- The files are the official variable fonts from Google Fonts under the Open Font License: 18 files, about 600 KB in total, one per style and script. The app fetches a script only when a text needs it.
+
+**PDF export**
+
+- **Selectable text.** Each PDF page is still the JPEG picture of the page, placed untouched. The text of the page is now laid over it as invisible real text, line by line, exactly where the picture shows it. The PDF can be searched, selected, copied and read aloud by a screen reader. Greek and other non-Latin text is included.
+- Lines come out in reading order (top to bottom, then left to right), and rotated text keeps its angle.
+- The PDF carries the document name as its title.
+- `koralpaper_export` has a new option, `selectableText` (default true). Set it to false for pictures only.
+
+**Checked in the real app.** The brief's walk-through (three 1080×1350 pages, a refused stale write, PDF and PNG export, measure on an overflowing box) was run through Claude Desktop against the live app and written to the real Documents folder, not only in the isolated test copy.
+
+83 automated tests.
+
 ## v3.84.1
 
 **Security: SVG import now keeps only what it knows is safe.** When Claude imports an SVG, the file is placed in the page for a moment so it can be measured. Until now the import removed a fixed list of dangerous parts (scripts, embedded pages, animations) and kept everything else. It now works the other way round: only plain drawing elements are kept, and anything unknown is dropped.

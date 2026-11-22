@@ -60,7 +60,7 @@ includes roasting your own diagram.
 </tr>
 </table>
 
-![Version](https://img.shields.io/badge/Version-3.84.1-1F1E1B)
+![Version](https://img.shields.io/badge/Version-3.85.0-1F1E1B)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 ![Works on: Mac, Windows, Linux, iPad](https://img.shields.io/badge/Works%20on-Mac%20·%20Windows%20·%20Linux%20·%20iPad-1F1E1B)
 ![Offline: 100%](https://img.shields.io/badge/Offline-100%25-2ea44f)
@@ -154,8 +154,9 @@ and Settings.
   Hand, Kalam, Architects Daughter, Shadows Into Light, Lobster Two,
   Playwrite NZ Guides, Unkempt, Kaushan Script), and Pixel & dot
   (Bitcount ×3, Tiny5, Doto), need internet once; system fallbacks
-  offline. Inter Tight, JetBrains Mono and Gelasio ship in the `fonts/`
-  folder and work with no internet at all
+  offline. Inter Tight (400 to 900), JetBrains Mono (400 to 700) and
+  Gelasio (400 to 700) ship in the `fonts/` folder with their italics and
+  work with no internet at all. Inter Tight and JetBrains Mono include Greek
 - **Design with Claude (MCP):** install the one-click **koralpaper.mcpb**
   extension (in the `mcp/` folder) into the free
   [Claude Desktop](https://claude.ai/download) app, keep KoralPaper open,
