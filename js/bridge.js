@@ -31,6 +31,7 @@ function newMeta(name){
     gone: [],            // removed elements: { id, p, v, b }
     comments: [],
     styles: { text: {}, colors: {} },
+    safe: 0,             // safe-area inset in px, shown as a guide on every page (0 = none)
     master: null,        // { rev, front, skip: [pageId], elements: [...] }
     starter: null,       // id of the blank first page of a document Claude just created
   };
@@ -66,6 +67,8 @@ function normalizeMeta(m){
       skip: Array.isArray(ms.skip) ? ms.skip.map(String) : [],
       elements: ms.elements.filter(e => e && typeof e.id === 'string' && typeof e.type === 'string') };
   out.starter = typeof m.starter === 'string' ? m.starter : null;
+  out.safe = Number(m.safe) > 0 ? Math.min(Math.round(Number(m.safe)), 10000) : 0;
+  if (typeof m.po === 'string') out.po = m.po;
   return out;
 }
 const elJson = el => JSON.stringify(el, (k, v) => k.startsWith('_') ? undefined : v);
@@ -104,6 +107,9 @@ function docTrack(){
     delete m.ev[id];
   }
   for (const pid of Object.keys(m.pv)) if (!livePages.has(pid)){ delete m.pv[pid]; tick(); }
+  // the order of the pages is part of the document: moving a page is a change too
+  const order = state.pages.map(p => p.id).join(',');
+  if (m.po !== order){ if (typeof m.po === 'string') tick(); m.po = order; }
   if (m.gone.length > 3000) m.gone.splice(0, m.gone.length - 3000);
   if (m.starter && !state.pages.some(p => p.id === m.starter && !p.elements.length)) m.starter = null;
 }
@@ -154,12 +160,124 @@ const libGet = (store, id) => libRun(store, 'readonly', s => s.get(id));
 const libAll = store => libRun(store, 'readonly', s => s.getAll());
 const libDel = (store, id) => libRun(store, 'readwrite', s => s.delete(id));
 
+/* ── the pictures of the open document ───────────────
+   The open document is autosaved to local storage, and a browser gives that
+   about 5 MB for everything. One full-size photo takes most of it, and a second
+   one used to switch autosave off. So a big picture is written once to a
+   database of its own, and the autosave only names it. Small pictures (icons,
+   marks) stay inside the autosave as before. Files, the document library and
+   snapshots are not affected: they always carry their pictures whole. */
+const PIX_INLINE_MAX = 60000;          // characters: a picture up to this size stays inside the autosave
+const PIX_SEEN_KEY = 'koralpaper.pix.seen';
+let pixStored = new Set();             // picture ids known to be safely in the database
+let pixWriting = new Set();            // ids being written right now
+let pixWaiting = new Set();            // ids the saved copy names whose pixels are still being read back
+let pixRestore = null;                 // a promise while pictures are being read back after a load
+let pixToken = 0;
+function pixRun(mode, fn){
+  return new Promise((res, rej) => {
+    const rq = indexedDB.open('koralpaper-pictures', 1);
+    rq.onupgradeneeded = () => { if (!rq.result.objectStoreNames.contains('pix')) rq.result.createObjectStore('pix'); };
+    rq.onerror = () => rej(rq.error);
+    rq.onsuccess = () => {
+      const db = rq.result;
+      let out;
+      try {
+        const t = db.transaction('pix', mode);
+        out = fn(t.objectStore('pix'));
+        t.oncomplete = () => { db.close(); res(out ? out.result : undefined); };
+        t.onerror = () => { db.close(); rej(t.error); };
+        t.onabort = () => { db.close(); rej(t.error); };
+      } catch (e){ db.close(); rej(e); }
+    };
+  });
+}
+const pixDay = () => Math.floor(Date.now() / 86400000);
+function pixSeen(){
+  try { const v = JSON.parse(localStorage.getItem(PIX_SEEN_KEY)); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; }
+  catch (e){ return {}; }
+}
+/* note which pictures are in use today; drop the ones no document has named for 30 days */
+function pixTouch(ids){
+  const seen = pixSeen(), today = pixDay();
+  let changed = false;
+  for (const id of ids) if (seen[id] !== today){ seen[id] = today; changed = true; }
+  const old = Object.keys(seen).filter(id => seen[id] < today - 30 && !ids.includes(id) && !pixWaiting.has(id));
+  for (const id of old){ delete seen[id]; pixStored.delete(id); changed = true; }
+  if (changed) try { localStorage.setItem(PIX_SEEN_KEY, JSON.stringify(seen)); } catch (e){}
+  if (old.length) pixRun('readwrite', st => { for (const id of old) st.delete(id); }).catch(() => {});
+}
+/* decide, for one autosave, which pictures travel inside it and which are only named */
+function pixSplit(images){
+  const inline = {}, refs = [], pending = [];
+  for (const [id, data] of Object.entries(images || {})){
+    if (typeof data !== 'string' || data.length <= PIX_INLINE_MAX) inline[id] = data;
+    else if (pixStored.has(id)) refs.push(id);
+    else { inline[id] = data; pending.push(id); }          // not in the database yet: it rides along this once
+  }
+  // pictures the saved copy names that are not back in memory (still loading, or not found) stay named
+  for (const id of pixWaiting) if (!refs.includes(id) && inline[id] === undefined) refs.push(id);
+  if (pending.length) pixStoreSoon(pending, images);
+  if (refs.length) pixTouch(refs);
+  return { inline, refs, pending };
+}
+function pixStoreSoon(ids, images){
+  const todo = ids.filter(id => !pixWriting.has(id));
+  if (!todo.length) return;
+  for (const id of todo) pixWriting.add(id);
+  pixRun('readwrite', st => { for (const id of todo) st.put(images[id], id); })
+    .then(() => {
+      for (const id of todo){ pixWriting.delete(id); pixStored.add(id); }
+      scheduleAutosave();                 // the next autosave names them instead of carrying them
+    })
+    .catch(e => {
+      for (const id of todo) pixWriting.delete(id);
+      console.error('pictures could not be stored:', e);
+      setStorageWarn(true);
+    });
+}
+/* after a load: read back the pictures the saved copy only named.
+   A picture the database does not give back is looked for in the library copy of
+   the same document. One that is still missing stays named (pixWaiting), and while
+   any is missing the library copy is not written over, so it keeps its pictures. */
+const pixTimed = (promise, ms) => Promise.race([promise, new Promise(res => setTimeout(() => res(undefined), ms))]).catch(() => undefined);
+function pixBeginRestore(ids){
+  const token = ++pixToken;
+  pixWaiting = new Set((Array.isArray(ids) ? ids : []).filter(id => typeof id === 'string' && state.images[id] === undefined));
+  pixRestore = null;
+  if (!pixWaiting.size) return;
+  const want = [...pixWaiting];
+  const job = (async () => {
+    const got = await Promise.all(want.map(id => pixTimed(pixRun('readonly', st => st.get(id)), 8000)));
+    if (token !== pixToken) return;                        // a different document was loaded meanwhile
+    let missing = want.filter((id, i) => typeof got[i] !== 'string');
+    if (missing.length && state.meta){
+      const rec = await pixTimed(libGet('docs', state.meta.id), 8000);
+      if (token !== pixToken) return;
+      let lib = {};
+      try { lib = (rec && JSON.parse(rec.payload).images) || {}; } catch (e){}
+      want.forEach((id, i) => { if (typeof got[i] !== 'string' && typeof lib[id] === 'string') got[i] = lib[id]; });
+      missing = want.filter((id, i) => typeof got[i] !== 'string');
+    }
+    want.forEach((id, i) => { if (typeof got[i] === 'string'){ state.images[id] = got[i]; pixWaiting.delete(id); } });
+    for (const p of state.pages) adoptImages(p.elements);
+    masterSig = null; masterSync();
+    try { buildPageStrip(); requestRender(); } catch (e){}
+    if (missing.length){
+      console.error('pictures missing from the store:', missing);
+      showHint(`${missing.length} picture${missing.length > 1 ? 's' : ''} could not be read back. The copy in ☰ → Documents is kept as it was: reload to try again, or open a saved file`);
+    } else scheduleAutosave();                             // pictures found in the library copy go back to the database
+  })();
+  pixRestore = job;
+  job.finally(() => { if (pixRestore === job) pixRestore = null; });
+}
+
 function libraryRecord(){
   docSyncName(); docTrack();
   return {
     id: state.meta.id, name: state.meta.name, updatedAt: Date.now(),
     pages: state.pages.length, version: state.meta.clock,
-    board: state.board ? { w: state.board.w, h: state.board.h, name: state.board.name } : null,
+    board: claudeBoardInfo(),
     payload: JSON.stringify(docPayload()),
   };
 }
@@ -170,6 +288,8 @@ function libraryTouch(){
   libTimer = setTimeout(() => { librarySaveCurrent(false).catch(() => {}); }, 1500);
 }
 async function librarySaveCurrent(force){
+  if (pixRestore) await pixRestore;      // never file a copy whose pictures are still being read back
+  if (pixWaiting.size) return false;     // ...or could not be: the library copy keeps the pictures it has
   if (!state.meta) return false;
   // an untouched blank document is not worth a library entry, unless it already has one
   if (!force && !docHasContent() && !libKnown.has(state.meta.id)) return false;
@@ -184,7 +304,7 @@ async function librarySaveCurrent(force){
 function docFork(name){
   if (!state.meta){ state.meta = newMeta(name); return; }
   clearTimeout(libTimer);
-  if (docHasContent() || libKnown.has(state.meta.id)){
+  if ((docHasContent() || libKnown.has(state.meta.id)) && !pixRestore && !pixWaiting.size){
     try { const rec = libraryRecord(); libKnown.add(rec.id); libPut('docs', rec).catch(() => {}); } catch (e){}
   }
   state.meta = newMeta(name || 'Untitled');
@@ -196,7 +316,7 @@ function docFork(name){
 function docAdopt(meta, name){
   const fresh = state.meta ? state.meta.id : ('doc_' + uid());
   const m = normalizeMeta(meta);
-  m.id = fresh; m.pv = {}; m.ev = {}; m.gone = []; m.starter = null;
+  m.id = fresh; m.pv = {}; m.ev = {}; m.gone = []; m.starter = null; delete m.po;
   if (name) m.name = name.slice(0, 120);
   state.meta = m;
   masterSig = null;
@@ -245,8 +365,10 @@ async function docCreate(name, board){
   state.elements = first.elements;
   state.meta.starter = first.id;
   state.images = {};
+  pixBeginRestore([]);                  // a new document waits for no pictures
   state.camera = { x: 0, y: 0, z: 1 };
   state.board = claudeBoard(board);
+  state.meta.safe = (state.board && claudeSafeArg(board)) || 0;
   state.bgColor = (brandActive() && brand.usePaper && brand.paper) ? brand.paper : null;
   if (typeof tl !== 'undefined' && tl.frames.length) tlRestore([]);
   docActivate();
@@ -260,20 +382,46 @@ async function docList(){
   if (state.meta && !out.some(r => r.open)){
     docSyncName(); docTrack();
     out.push({ id: state.meta.id, name: state.meta.name, pages: state.pages.length,
-      board: state.board ? { w: state.board.w, h: state.board.h, name: state.board.name } : null,
+      board: claudeBoardInfo(),
       version: state.meta.clock, updatedAt: Date.now(), open: true });
   }
-  for (const r of out) if (r.open){ r.name = state.meta.name; r.pages = state.pages.length; r.version = state.meta.clock; }
+  for (const r of out) if (r.open){ r.name = state.meta.name; r.pages = state.pages.length; r.version = state.meta.clock; r.board = claudeBoardInfo(); }
   out.sort((a, b) => (b.open - a.open) || (b.updatedAt - a.updatedAt));
   return out;
+}
+/* The safe area is a document setting (meta.safe), not part of the artboard
+   record: the artboard is replaced whole whenever its size is set again, and the
+   guide used to be lost with it. It only shows while there is an artboard. */
+function docSafe(){
+  const b = state.board, m = state.meta;
+  if (!b || !m || !(m.safe > 0)) return 0;
+  return clamp(Math.round(m.safe), 1, Math.max(1, Math.floor(Math.min(b.w, b.h) / 2) - 1));
+}
+function setSafeArea(v){
+  if (!state.meta) return;
+  const n = Number(v);
+  state.meta.safe = Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 10000) : 0;
+  scheduleAutosave(); requestRender();
+  if (typeof buildBoardMenuSel === 'function') buildBoardMenuSel();
+}
+/* documents saved before 3.86.0 kept the safe area inside the artboard record */
+function safeAreaAdopt(){
+  const b = state.board;
+  if (!b || !(b.safe > 0)) return;
+  if (state.meta && !(state.meta.safe > 0)) state.meta.safe = Math.round(b.safe);
+  delete b.safe;
 }
 function claudeBoard(b){
   if (!b || !(Number(b.w) > 0) || !(Number(b.h) > 0)) return null;
   const w = clamp(Math.round(Number(b.w)), 16, 20000), h = clamp(Math.round(Number(b.h)), 16, 20000);
-  const board = { name: typeof b.name === 'string' && b.name.trim() ? b.name.trim().slice(0, 60) : 'Custom', w, h, x: 0, y: 0 };
-  const safe = Number(b.safeArea);
-  if (safe > 0) board.safe = clamp(Math.round(safe), 1, Math.floor(Math.min(w, h) / 2) - 1);
-  return board;
+  return { name: typeof b.name === 'string' && b.name.trim() ? b.name.trim().slice(0, 60) : 'Custom', w, h, x: 0, y: 0 };
+}
+/* the safe area asked for in a board argument: a number, 0 to remove it, or
+   undefined when the argument says nothing about it (then it is left as it is) */
+function claudeSafeArg(b){
+  if (!b || typeof b !== 'object' || b.safeArea === undefined || b.safeArea === null) return undefined;
+  const n = Number(b.safeArea);
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 10000) : 0;
 }
 
 /* ════════════════════════════════════════════════════
@@ -393,6 +541,7 @@ function masterSync(){
         const c = JSON.parse(elJson(src));
         c.id = 'm_' + src.id + '_' + p.id;
         c.master = src.id; c.locked = true; c.groupId = null;
+        if (c.type === 'image' && c.imgId && state.images[c.imgId]) c._src = state.images[c.imgId];
         if (c.text){
           setTextKeepRuns(c, masterFill(c.text, i + 1, total));
           if (c.type === 'text'){
@@ -594,8 +743,8 @@ function bridgeInitUI(){
    Called from drawOverlay with the context already in scene coordinates. */
 function drawBridgeOverlay(c, z){
   if (presenting) return;
-  const b = state.board;
-  if (b && b.safe > 0){
+  const b = state.board, safe = docSafe();
+  if (safe > 0){
     c.save();
     /* a neutral grey, never an accent colour, so the guide is not mistaken for part
        of the design: darker on light paper, lighter on dark paper */
@@ -604,12 +753,12 @@ function drawBridgeOverlay(c, z){
     c.strokeStyle = guide;
     c.lineWidth = 1.2 / z;
     c.setLineDash([7 / z, 5 / z]);
-    c.strokeRect(b.x + b.safe, b.y + b.safe, b.w - b.safe * 2, b.h - b.safe * 2);
+    c.strokeRect(b.x + safe, b.y + safe, b.w - safe * 2, b.h - safe * 2);
     c.setLineDash([]);
     c.font = `600 ${11 / z}px ${FONTS.sans.stack}`;
     c.fillStyle = greyOn(outsideColor());             // the label sits above the artboard, on the workspace
     c.textAlign = 'right'; c.textBaseline = 'alphabetic';
-    c.fillText(`safe area · ${b.safe}px`, b.x + b.w, b.y - 8 / z);
+    c.fillText(`safe area · ${safe}px`, b.x + b.w, b.y - 8 / z);
     c.restore();
   }
   const m = state.meta;
@@ -651,7 +800,7 @@ const CLAUDE_BRIDGE = (() => {
   } catch (e){}
   return 'http://127.0.0.1:' + port;
 })();
-const CLAUDE_CAPS = 2;       // raised whenever the app learns new bridge commands
+const CLAUDE_CAPS = 3;       // raised whenever the app learns new bridge commands
 let claudeLinked = false;
 
 function setClaudeLinked(on){
@@ -700,7 +849,162 @@ function claudeWeight(el, w){
   el.fweight = Math.round(n / 100) * 100;
   ensureWeightCss(el.font); requestFontLoad(el.font, el.fweight);
 }
+/* ── what an element may be, and may carry ───────────
+   Anything else is refused by name before a single element is drawn. An unknown
+   type used to become a cream rectangle and an unknown property was dropped,
+   both without a word, so a mistake looked like success. */
+const CLAUDE_TYPES = ['rect', 'diamond', 'ellipse', 'polygon', 'chip', 'text', 'arrow', 'line', 'image'];
+const CLAUDE_PROPS = ['id', 'type', 'x', 'y', 'w', 'h', 'text', 'stroke', 'fill', 'textColor', 'fillStyle', 'dash',
+  'size', 'bold', 'italic', 'weight', 'font', 'style', 'align', 'valign', 'lineHeight', 'letterSpacing', 'wrap',
+  'maxHeight', 'locked', 'sketch', 'sw', 'opacity', 'fillOpacity', 'sides', 'radius', 'startHead', 'endHead',
+  'from', 'to', 'elbow', 'x2', 'y2', 'src', 'fit', 'focalX', 'focalY', 'alt'];
+const CLAUDE_PROPS_QUIET = ['round', 'folded', 'mindRoot'];       // older prompts send these; still accepted
+const CLAUDE_IMAGE_ONLY = ['src', 'fit', 'focalX', 'focalY', 'alt'];
+const CLAUDE_NOT_ON_IMAGE = ['stroke', 'sw', 'dash', 'sketch', 'text', 'fill', 'textColor', 'fillStyle', 'size', 'bold', 'italic', 'weight', 'font',
+  'style', 'align', 'valign', 'lineHeight', 'letterSpacing', 'wrap', 'maxHeight', 'sides', 'startHead', 'endHead',
+  'from', 'to', 'elbow', 'x2', 'y2', 'fillOpacity'];
+const CLAUDE_HINTS = {
+  borderRadius: '"radius"', cornerRadius: '"radius"', rx: '"radius"', ry: '"radius"', rounded: '"radius"', corners: '"radius"',
+  width: '"w"', height: '"h"', content: '"text"', label: '"text"', value: '"text"',
+  color: '"textColor" for text, "stroke" for an outline or "fill" for a fill', background: '"fill"', backgroundColor: '"fill"', bg: '"fill"',
+  fontSize: '"size"', fontWeight: '"weight"', fontFamily: '"font"', fontStyle: '"italic"', textAlign: '"align"',
+  verticalAlign: '"valign"', lineSpacing: '"lineHeight"', line_height: '"lineHeight"', letter_spacing: '"letterSpacing"', tracking: '"letterSpacing"',
+  strokeWidth: '"sw"', lineWidth: '"sw"', thickness: '"sw"', borderWidth: '"sw"', border: '"stroke" and "sw"',
+  path: 'src {"path": "..."}', file: 'src {"path": "..."}', url: 'src {"path": "..."} (a file on this computer)', href: 'src {"path": "..."}',
+  image: 'type "image" with src {"path": "..."}', objectFit: '"fit"', focal: '"focalX" and "focalY"', focalPoint: '"focalX" and "focalY"',
+  altText: '"alt"', description: '"alt"', name: '"id" for your own reference, or "alt" on an image',
+  maxH: '"maxHeight"', max_height: '"maxHeight"', x1: '"x"', y1: '"y"', endX: '"x2"', endY: '"y2"', rotation: 'nothing: elements cannot be rotated over the connector yet',
+  angle: 'nothing: elements cannot be rotated over the connector yet', tstyle: '"style"', lock: '"locked"',
+};
+const IMAGE_DATA_PREFIX = /^data:image\/(jpeg|png|gif|webp|svg\+xml);base64,/;
+const IMAGE_DATA_MAX = 28 * 1024 * 1024;              // characters of base64: about 20 MB of picture
+function claudeSrcProblem(src){
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return 'src must be an object like {"path": "~/Documents/photo.jpg"}.';
+  if (typeof src.data !== 'string'){
+    if (src.path !== undefined) return 'the picture file was not read. Reading a file needs KoralPaper connector 1.7.0 or newer: update the extension, then try again.';
+    return 'src needs a path, like {"path": "~/Documents/photo.jpg"}.';
+  }
+  if (!IMAGE_DATA_PREFIX.test(src.data.slice(0, 40))) return 'the picture is not a JPEG, PNG, GIF, WebP or SVG.';
+  if (src.data.length > IMAGE_DATA_MAX) return 'the picture is over 20 MB, too large to embed.';
+  return null;
+}
+/* one spec, checked. mode "new" = an element to create, "update" = a change to an
+   existing element of type elType (undefined when the id matches nothing). */
+function claudeSpecProblem(spec, label, mode, elType){
+  if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return `${label} is not an object.`;
+  for (const k of Object.keys(spec)){
+    if (CLAUDE_PROPS.includes(k) || CLAUDE_PROPS_QUIET.includes(k)) continue;
+    return `${label} has an unknown property "${k}".${CLAUDE_HINTS[k] ? ` Use ${CLAUDE_HINTS[k]} instead.` : ''} Known properties: ${CLAUDE_PROPS.join(', ')}.`;
+  }
+  let type = elType;
+  if (mode === 'new'){
+    if (spec.type === undefined) return `${label} has no type. Types: ${CLAUDE_TYPES.join(', ')}.`;
+    if (!CLAUDE_TYPES.includes(spec.type)) return `${label} has an unknown type "${spec.type}". Types: ${CLAUDE_TYPES.join(', ')}.`;
+    type = spec.type;
+  } else if (spec.type !== undefined && elType && spec.type !== elType){
+    return `${label}: the type of an element cannot be changed (it is "${elType}", you sent "${spec.type}"). Delete it and add a new one.`;
+  }
+  if (!type) return null;
+  for (const k of CLAUDE_IMAGE_ONLY)
+    if (spec[k] !== undefined && type !== 'image') return `${label}: "${k}" only applies to image elements, and this one is "${type}".`;
+  if (spec.radius !== undefined && spec.radius !== null){
+    if (!['rect', 'image'].includes(type)) return `${label}: "radius" applies to rect and image elements, and this one is "${type}". A chip is already a pill.`;
+    if (!(Number(spec.radius) >= 0)) return `${label}: "radius" must be a number from 0 (square corners) to 999 (a pill).`;
+  }
+  if (type === 'image'){
+    for (const k of CLAUDE_NOT_ON_IMAGE)
+      if (spec[k] !== undefined) return `${label}: "${k}" does not apply to an image. An image takes x, y, w, h, src, fit, focalX, focalY, radius, opacity, alt and locked.`;
+    if (mode === 'new' && spec.src === undefined) return `${label} is an image with no picture: give src {"path": "~/Documents/photo.jpg"}.`;
+    if (spec.src !== undefined){
+      const sp = claudeSrcProblem(spec.src);
+      if (sp) return `${label}: ${sp}`;
+    }
+    if (spec.fit !== undefined && !['cover', 'contain'].includes(spec.fit)) return `${label}: "fit" must be "cover" or "contain", not "${spec.fit}".`;
+    for (const k of ['focalX', 'focalY'])
+      if (spec[k] !== undefined && !(Number(spec[k]) >= 0 && Number(spec[k]) <= 1)) return `${label}: "${k}" must be a number from 0 to 1.`;
+    if (spec.alt !== undefined && spec.alt !== null && typeof spec.alt !== 'string') return `${label}: "alt" must be text.`;
+  }
+  return null;
+}
+const specLabel = (spec, i, where) => `${where || ''}element ${i + 1}` + (spec && spec.id != null ? ` ("${spec.id}")` : '');
+/* every picture is decoded before anything is drawn, so a file that is not
+   really a picture is refused instead of leaving an empty box on the page */
+async function claudeProbeImages(specs, where){
+  const jobs = [];
+  specs.forEach((sp, i) => {
+    if (sp && sp.src && typeof sp.src.data === 'string') jobs.push({ label: specLabel(sp, i, where), data: sp.src.data, e: getImageEntry(sp.src.data) });
+  });
+  if (!jobs.length) return null;
+  const broken = j => j.e.img.complete && !j.e.img.naturalWidth && !j.e.ready;
+  const t0 = Date.now();
+  while (jobs.some(j => !j.e.ready && !broken(j)) && Date.now() - t0 < 15000) await new Promise(res => setTimeout(res, 30));
+  const bad = jobs.find(j => !j.e.ready);
+  if (bad){
+    for (const j of jobs) if (!j.e.ready) IMG_CACHE.delete(j.data);
+    return `${bad.label}: the picture could not be read. Is the file a real JPEG, PNG, GIF, WebP or SVG?`;
+  }
+  return null;
+}
+/* returns the reason a list of new elements must be refused, or null */
+async function claudeVetNew(specs, where){
+  for (let i = 0; i < specs.length; i++){
+    const prob = claudeSpecProblem(specs[i], specLabel(specs[i], i, where), 'new');
+    if (prob) return prob;
+  }
+  return claudeProbeImages(specs, where);
+}
+const REFUSED = 'Refused, nothing was written: ';
+function claudeRadius(v){ return clamp(Number(v) || 0, 0, 999); }
+/* fit, focal point and alt text: the same on a new picture and on an update */
+function claudeImageProps(el, u){
+  if (u.fit === 'cover' || u.fit === 'contain') el.fit = u.fit;
+  if (u.focalX !== undefined || u.focalY !== undefined){
+    const f = Array.isArray(el.focal) ? el.focal.slice(0, 2) : [0.5, 0.5];
+    if (u.focalX !== undefined) f[0] = claudeNum(u.focalX, 0.5, 0, 1);
+    if (u.focalY !== undefined) f[1] = claudeNum(u.focalY, 0.5, 0, 1);
+    if (f[0] === 0.5 && f[1] === 0.5) delete el.focal; else el.focal = f;
+  }
+  if (u.alt !== undefined){
+    const a = typeof u.alt === 'string' ? u.alt.trim().slice(0, 300) : '';
+    if (a) el.alt = a; else delete el.alt;
+  }
+  delete el._prims; delete el._pkey; delete el._tintKey; delete el._tintCv;
+}
+function claudeSetPicture(el, src){
+  delete el.imgId; delete el.crop; delete el.tint;
+  el._src = src.data;
+  if (typeof src.name === 'string' && src.name) el.imgName = src.name.slice(0, 200); else delete el.imgName;
+  internImage(el);
+}
+/* a picture. Its pixels were decoded by claudeProbeImages, so its real size is known here. */
+function claudeBuildImage(spec, idMap){
+  const x = claudeNum(spec.x, 0, -CLAUDE_COORD, CLAUDE_COORD), y = claudeNum(spec.y, 0, -CLAUDE_COORD, CLAUDE_COORD);
+  const el = newElement('image', x, y, {});
+  el.x = x; el.y = y;
+  el.sketch = 0;                                         // a frame, if one is ever turned on, starts neat
+  if (spec.src.data.startsWith('data:image/svg')) el.stroke = 'none';   // an SVG keeps its own colours
+  claudeSetPicture(el, spec.src);
+  el.fit = 'cover';
+  claudeImageProps(el, spec);
+  const e = getImageEntry(spec.src.data);
+  const nw = e.img.naturalWidth || 300, nh = e.img.naturalHeight || 300;
+  const wPos = Number(spec.w) > 0 ? claudeNum(spec.w, 0, 1, CLAUDE_SIZE) : 0;
+  const hPos = Number(spec.h) > 0 ? claudeNum(spec.h, 0, 1, CLAUDE_SIZE) : 0;
+  if (wPos && hPos){ el.w = wPos; el.h = hPos; }
+  else if (wPos){ el.w = wPos; el.h = wPos * nh / nw; }           // one side given: the other follows the picture
+  else if (hPos){ el.h = hPos; el.w = hPos * nw / nh; }
+  else {                                                          // no size: its own, shrunk to fit the artboard
+    const b = state.board, k = Math.min(1, (b ? b.w : 1600) / nw, (b ? b.h : 1600) / nh);
+    el.w = nw * k; el.h = nh * k;
+  }
+  if (spec.radius != null) el.radius = claudeRadius(spec.radius);
+  if (spec.opacity != null) el.opacity = clamp(Number(spec.opacity), 0, 100);
+  if (spec.locked === true) el.locked = true;
+  if (spec.id) idMap.set(String(spec.id), el.id);
+  return el;
+}
 function claudeBuildElement(rawSpec, idMap, warnings){
+  if (rawSpec && rawSpec.type === 'image') return claudeBuildImage(rawSpec, idMap);
   const ex = claudeExpandSpec(rawSpec, warnings);
   const spec = ex.s;
   const kind = ['rect', 'diamond', 'ellipse', 'polygon', 'chip', 'text', 'arrow', 'line'].includes(spec.type)
@@ -778,6 +1082,8 @@ function claudeBuildElement(rawSpec, idMap, warnings){
   }
   if (el.text && (spec.bold || spec.italic)) setWholeRun(el, { b: !!spec.bold, i: !!spec.italic });
   if (kind === 'text') autosizeText(el);
+  // an exact corner radius belongs to this element alone: no brand kit rounds or squares it
+  if (kind === 'rect' && spec.radius != null) el.radius = claudeRadius(spec.radius);
   if (spec.locked === true) el.locked = true;
   claudeRemember(el, rawSpec, ex);
   if (spec.id) idMap.set(String(spec.id), el.id);
@@ -837,13 +1143,57 @@ function claudeApplyUpdate(el, u){
     }
     autosizeText(el);
   }
+  if (u.radius !== undefined && (el.type === 'rect' || el.type === 'image')){
+    if (u.radius === null) delete el.radius;
+    else { el.radius = claudeRadius(u.radius); if (el.type === 'rect') delete el.cornerRad; else delete el.imgRadius; }
+  }
+  if (el.type === 'image'){
+    if (u.src && typeof u.src.data === 'string') claudeSetPicture(el, u.src);
+    claudeImageProps(el, u);
+  }
   if (u.locked !== undefined) el.locked = u.locked === true;
   requestFontLoad(el.font, el.fweight);
   delete el._prims; delete el._pkey;
 }
+/* a picture as Claude reads it: what it is and how it sits, never its bytes */
+function claudeCompactImage(el){
+  const r4 = n => Math.round(n * 10000) / 10000;
+  const c = { id: el.id, type: 'image', x: Math.round(el.x), y: Math.round(el.y), w: Math.round(el.w), h: Math.round(el.h) };
+  const src = el._src || (el.imgId && state.images[el.imgId]) || '';
+  if (el.imgName) c.name = el.imgName;
+  if (!src){ c.missing = true; return c; }
+  c.format = imageKind(src).toLowerCase();
+  const e = getImageEntry(src);
+  if (e.img.naturalWidth){ c.naturalWidth = e.img.naturalWidth; c.naturalHeight = e.img.naturalHeight; }
+  const b64 = src.length - src.indexOf(',') - 1;
+  c.bytes = Math.max(0, Math.floor(b64 * 3 / 4) - (src.endsWith('==') ? 2 : src.endsWith('=') ? 1 : 0));
+  c.fit = el.fit === 'cover' || el.fit === 'contain' ? el.fit : 'stretch';
+  c.focalX = el.focal ? r4(el.focal[0]) : 0.5;
+  c.focalY = el.focal ? r4(el.focal[1]) : 0.5;
+  c.crop = el.crop ? { x: r4(el.crop[0]), y: r4(el.crop[1]), w: r4(el.crop[2] - el.crop[0]), h: r4(el.crop[3] - el.crop[1]) } : null;
+  const rad = imgCornerRad(el, el);
+  if (rad > 0 || el.radius != null) c.radius = Math.round(rad * 10) / 10;
+  if (el.alt) c.alt = el.alt;
+  const tok = el.tok || {};
+  const strokeOut = tok.stroke ? '$' + tok.stroke : el.stroke;
+  if (el.tint && c.format === 'svg') c.tint = strokeOut;          // an SVG recoloured with one colour
+  if (el.artStyle && el.artStyle !== 'photo'){ c.photoStyle = el.artStyle; c.stroke = strokeOut; }
+  if (el.frame && el.stroke !== 'none'){ c.frame = true; c.stroke = strokeOut; c.sw = Math.round(el.sw * 10) / 10; }
+  if (el.opacity != null && el.opacity < 100) c.opacity = el.opacity;
+  if (el.angle) c.angle = Math.round(el.angle * 180 / Math.PI * 10) / 10;
+  if (el.locked) c.locked = true;
+  return c;
+}
 function claudeCompact(el){
-  const c = { id: el.id, type: el.type, x: Math.round(el.x), y: Math.round(el.y),
-    w: Math.round(el.w), h: Math.round(el.h) };
+  if (el.type === 'image') return claudeCompactImage(el);
+  const linear = el.type === 'arrow' || el.type === 'line';
+  const c = { id: el.id, type: el.type, x: Math.round(el.x), y: Math.round(el.y) };
+  if (linear && Array.isArray(el.points) && el.points.length){
+    // a line has a start and an end, not a width and a height (those read back as 0)
+    const last = el.points[el.points.length - 1];
+    c.x = Math.round(el.x + el.points[0][0]); c.y = Math.round(el.y + el.points[0][1]);
+    c.x2 = Math.round(el.x + last[0]); c.y2 = Math.round(el.y + last[1]);
+  } else { c.w = Math.round(el.w); c.h = Math.round(el.h); }
   const tok = el.tok || {};
   if (el.text){
     c.text = el.text;
@@ -864,14 +1214,16 @@ function claudeCompact(el){
   }
   if (tok.stroke) c.stroke = '$' + tok.stroke; else if (el.stroke && el.stroke !== 'ink') c.stroke = el.stroke;
   if (tok.fill) c.fill = '$' + tok.fill; else if (el.fill && el.fill !== 'none') c.fill = el.fill;
-  if (el.sw != null) c.sw = Math.round(el.sw * 10) / 10;
+  if (el.sw != null && el.type !== 'text') c.sw = Math.round(el.sw * 10) / 10;   // a text has no outline
+  if (el.type === 'rect') c.radius = Math.round(rectCornerPx(el) * 10) / 10;
   if (el.sketch === 0) c.sketch = 0;
   if (el.fillStyle && el.fillStyle !== 'solid') c.fillStyle = el.fillStyle;
   if (el.opacity != null && el.opacity < 100) c.opacity = el.opacity;
   if (el.fillOpacity != null && el.fillOpacity < 100) c.fillOpacity = el.fillOpacity;
-  if (el.type === 'arrow' || el.type === 'line'){
+  if (linear){
     if (el.startBind) c.from = el.startBind;
     if (el.endBind) c.to = el.endBind;
+    if (el.elbow) c.elbow = true;
     if (el.startHead && el.startHead !== 'none') c.startHead = el.startHead;
     if (el.endHead) c.endHead = el.endHead;
   }
@@ -885,6 +1237,79 @@ function claudeCompact(el){
   return c;
 }
 const ownEls = p => p.elements.filter(e => !e.master);
+/* A page's elements copied for another page. Every copy gets a new id, and
+   groups and glued arrows point at the copies. Two pages must never share an
+   element id: versions are kept per id, and a shared one made both pages look
+   edited on every save. Master copies are left out; they are regenerated. */
+function copyPageElements(els){
+  const map = new Map(), groups = new Map();
+  const out = JSON.parse(JSON.stringify(els.filter(e => !e.master), (k, v) => k.startsWith('_') ? undefined : v));
+  for (const e of out){ const id = uid(); map.set(e.id, id); e.id = id; }
+  for (const e of out){
+    if (e.groupId){
+      if (!groups.has(e.groupId)) groups.set(e.groupId, uid());
+      e.groupId = groups.get(e.groupId);
+    }
+    if (e.startBind) e.startBind = map.get(e.startBind) || null;
+    if (e.endBind) e.endBind = map.get(e.endBind) || null;
+  }
+  adoptImages(out);
+  return { els: out, map };
+}
+/* documents made before 3.86.0 may hold pages duplicated by hand that share
+   element ids with their original. Give the later copies ids of their own. */
+function dedupePageElementIds(){
+  const seen = new Set();
+  for (const p of state.pages){
+    const remap = new Map();
+    for (const el of p.elements){
+      if (el.master) continue;
+      if (seen.has(el.id)){ const id = uid(); remap.set(el.id, id); el.id = id; }
+      seen.add(el.id);
+    }
+    if (!remap.size) continue;
+    for (const el of p.elements){
+      if (el.startBind && remap.has(el.startBind)) el.startBind = remap.get(el.startBind);
+      if (el.endBind && remap.has(el.endBind)) el.endBind = remap.get(el.endBind);
+    }
+  }
+}
+function claudePagesInfo(){
+  return state.pages.map((p, i) => {
+    const pg = { id: p.id, name: p.name, number: i + 1, version: pageVersion(p), elements: ownEls(p).length };
+    if (p.bg) pg.paper = p.bg;
+    return pg;
+  });
+}
+/* the page a page tool is aimed at, with the version check, without moving the user's view */
+async function claudePageTarget(args, needId, what){
+  if (needId && args.pageId == null) return { error: `Give the pageId of the page to ${what}. Page ids come from koralpaper_read_document.` };
+  if (editing) commitTextEdit();
+  const t = await claudeTarget(args, false);
+  if (t.error) return t;
+  if (args.ifVersion != null){
+    const cur = pageVersion(t.page);
+    if (Number(args.ifVersion) !== cur)
+      return { error: `${REFUSED}page "${t.page.name}" changed since version ${args.ifVersion} (it is now at version ${cur}). Someone edited it after you read it. Call koralpaper_read_document again, then retry with ifVersion ${cur}.` };
+  }
+  return t;
+}
+function claudeDocVersionProblem(args){
+  docTrack();
+  if (args.ifVersion == null || Number(args.ifVersion) === state.meta.clock) return null;
+  return `${REFUSED}document "${state.meta.name}" changed since version ${args.ifVersion} (it is now at version ${state.meta.clock}). Call koralpaper_read_document again, then retry with ifVersion ${state.meta.clock}.`;
+}
+/* after the page list or a page's own settings changed */
+function claudePagesCommit(hint){
+  if (typeof pageSel !== 'undefined') pageSel = new Set([state.pages[state.pageIndex].id]);
+  state.elements = state.pages[state.pageIndex].elements;
+  state.selection = new Set([...state.selection].filter(id => state.elements.some(e => e.id === id)));
+  updateBoundArrows(state.elements);
+  commit(); buildPageStrip(); syncPaperUI(); syncPanel(); requestRender();
+  docTrack();
+  if (hint) showHint(hint);
+}
+const claudePagesOut = extra => Object.assign({ ok: true, documentId: state.meta.id, documentVersion: state.meta.clock }, extra, { pages: claudePagesInfo() });
 
 /* every font face a set of elements needs is fetched before measuring or
    rendering, so numbers and pictures never come from a fallback font */
@@ -988,46 +1413,86 @@ function claudePageTexts(raw, sc){
   return ordered.flat();
 }
 
-/* what a text really does inside its box */
+/* What an element really does on the page.
+   Text (free text and text in shapes): the real line breaks and whether the
+   copy fits its box. Every element, pictures, shapes and lines included: whether
+   it stays on the artboard and inside the safe area, and by how much it leaves. */
 function claudeMeasureOne(el, page){
   const out = { id: el.id, pageId: page.id, type: el.type };
-  if (!canHaveText(el) || el.type === 'arrow' || el.type === 'line'){
-    out.error = 'This element holds no text box to measure.';
-    return out;
-  }
-  const isText = el.type === 'text';
-  const pad = el.type === 'chip' ? 10 : 12;
-  const availW = isText ? (el.wrap ? Math.max(40, el.w) : null) : Math.max(20, el.w - pad * 2);
-  const availH = isText ? (el.maxH || null) : Math.max(0, el.h - pad * 2);
-  const lay = layoutText(el, availW);
   const r1 = n => Math.round(n * 10) / 10;
   const reasons = [];
-  if (availH != null && lay.totalH > availH + 0.5)
-    reasons.push(`The text is ${r1(lay.totalH)}px tall but only ${r1(availH)}px fits: ${r1(lay.totalH - availH)}px too much.`);
-  if (availW != null && lay.w > availW + 0.5)
-    reasons.push(`The widest line is ${r1(lay.w)}px but only ${r1(availW)}px fits: a word is too long to wrap.`);
-  const box = isText ? { x: el.x, y: el.y, w: el.wrap ? el.w : lay.w, h: lay.totalH } : { x: el.x, y: el.y, w: el.w, h: el.h };
-  const b = state.board;
-  let outsideBoard = false, outsideSafe = null;
-  if (b){
-    outsideBoard = box.x < b.x - 0.5 || box.y < b.y - 0.5 || box.x + box.w > b.x + b.w + 0.5 || box.y + box.h > b.y + b.h + 0.5;
-    if (outsideBoard) reasons.push('The text box reaches past the edge of the artboard, so it is cut off in exports.');
-    if (b.safe > 0)
-      outsideSafe = box.x < b.x + b.safe - 0.5 || box.y < b.y + b.safe - 0.5
-        || box.x + box.w > b.x + b.w - b.safe + 0.5 || box.y + box.h > b.y + b.h - b.safe + 0.5;
+  const linear = el.type === 'arrow' || el.type === 'line';
+  const hasText = canHaveText(el) && !linear && el.type !== 'image';
+  const isText = el.type === 'text';
+  let box = boundsOf(el), textOverflow = false;
+  if (hasText){
+    const pad = el.type === 'chip' ? 10 : 12;
+    const availW = isText ? (el.wrap ? Math.max(40, el.w) : null) : Math.max(20, el.w - pad * 2);
+    const availH = isText ? (el.maxH || null) : Math.max(0, el.h - pad * 2);
+    const lay = layoutText(el, availW);
+    if (el.text && availH != null && lay.totalH > availH + 0.5)
+      reasons.push(`The text is ${r1(lay.totalH)}px tall but only ${r1(availH)}px fits: ${r1(lay.totalH - availH)}px too much.`);
+    if (el.text && availW != null && lay.w > availW + 0.5)
+      reasons.push(`The widest line is ${r1(lay.w)}px but only ${r1(availW)}px fits: a word is too long to wrap.`);
+    textOverflow = reasons.length > 0;
+    if (isText) box = { x: el.x, y: el.y, w: el.wrap ? el.w : lay.w, h: Math.max(lay.totalH, el.maxH || 0) };
+    Object.assign(out, {
+      font: (FONTS[el.font] && FONTS[el.font].label) || el.font, size: el.size,
+      fontLoaded: claudeFontLoaded(el),
+      lineHeight: lay.lh,
+      lines: lay.lines.map(l => l.text), lineCount: lay.lines.length,
+      textWidth: r1(lay.w), textHeight: r1(lay.totalH),
+      availableWidth: availW == null ? null : r1(availW),
+      availableHeight: availH == null ? null : r1(availH),
+    });
   }
-  Object.assign(out, {
-    box: { x: r1(box.x), y: r1(box.y), w: r1(box.w), h: r1(box.h) },
-    font: (FONTS[el.font] && FONTS[el.font].label) || el.font, size: el.size,
-    fontLoaded: claudeFontLoaded(el),
-    lineHeight: lay.lh,
-    lines: lay.lines.map(l => l.text), lineCount: lay.lines.length,
-    textWidth: r1(lay.w), textHeight: r1(lay.totalH),
-    availableWidth: availW == null ? null : r1(availW),
-    availableHeight: availH == null ? null : r1(availH),
-    overflow: reasons.length > 0, reasons,
-  });
-  if (outsideSafe !== null) out.outsideSafeArea = outsideSafe;
+  out.box = { x: r1(box.x), y: r1(box.y), w: r1(box.w), h: r1(box.h) };
+  // a turned element is checked by the space it really takes
+  const bb = el.angle ? boundsWithRotation({ x: box.x, y: box.y, w: box.w, h: box.h, angle: el.angle }) : box;
+  const b = state.board;
+  const what = isText ? 'text box' : el.type === 'image' ? 'picture' : linear ? el.type : 'shape';
+  const sides = (ex) => ['left', 'top', 'right', 'bottom'].filter(k => ex[k] > 0.5).map(k => `${r1(ex[k])}px on the ${k}`).join(', ');
+  let outsideBoard = false;
+  if (b){
+    const past = { left: b.x - bb.x, top: b.y - bb.y, right: bb.x + bb.w - (b.x + b.w), bottom: bb.y + bb.h - (b.y + b.h) };
+    outsideBoard = Object.values(past).some(v => v > 0.5);
+    out.outsideArtboard = outsideBoard;
+    if (outsideBoard) reasons.push(isText ? 'The text box reaches past the edge of the artboard, so it is cut off in exports.'
+      : `The ${what} reaches past the edge of the artboard (${sides(past)}), so that part is cut off in exports.`);
+    const safe = docSafe();
+    if (safe > 0){
+      const ex = { left: b.x + safe - bb.x, top: b.y + safe - bb.y, right: bb.x + bb.w - (b.x + b.w - safe), bottom: bb.y + bb.h - (b.y + b.h - safe) };
+      out.outsideSafeArea = Object.values(ex).some(v => v > 0.5);
+      if (out.outsideSafeArea){
+        out.safeAreaExcess = {};
+        for (const k of Object.keys(ex)) if (ex[k] > 0.5) out.safeAreaExcess[k] = r1(ex[k]);
+        reasons.push(`The ${what} leaves the ${safe}px safe area: ${sides(ex)}.`);
+      }
+    }
+  }
+  if (el.type === 'image'){
+    const src = el._src || '';
+    const e = src ? getImageEntry(src) : null;
+    if (e && e.img.naturalWidth){
+      const nw = e.img.naturalWidth, nh = e.img.naturalHeight;
+      const v = imageView(el, nw, nh);
+      const crop = (v && v.crop) || el.crop || [0, 0, 1, 1];
+      const shownW = v ? v.w : el.w;
+      const scale = shownW / Math.max(1, (crop[2] - crop[0]) * nw);
+      out.image = { naturalWidth: nw, naturalHeight: nh, fit: el.fit === 'cover' || el.fit === 'contain' ? el.fit : 'stretch',
+        shown: { x: r1(crop[0] * 100), y: r1(crop[1] * 100), w: r1((crop[2] - crop[0]) * 100), h: r1((crop[3] - crop[1]) * 100) },
+        scale: Math.round(scale * 100) / 100 };
+      if (out.image.fit === 'stretch'){
+        const want = ((crop[2] - crop[0]) * nw) / Math.max(1, (crop[3] - crop[1]) * nh), has = el.w / Math.max(1, el.h);
+        if (Math.abs(want / has - 1) > 0.02) out.note = 'The picture is stretched out of proportion: set fit to "cover" or "contain" to keep its shape.';
+      }
+      if (scale > 1.25 && !src.startsWith('data:image/svg'))
+        out.note = (out.note ? out.note + ' ' : '') + `The picture is shown at ${Math.round(scale * 100)}% of its real size, so it may look soft.`;
+    } else out.note = 'The picture has not loaded, so its real size is unknown.';
+  }
+  out.overflow = textOverflow || outsideBoard;
+  out.fits = !out.overflow && out.outsideSafeArea !== true;
+  out.reasons = reasons;
   if (isText && !el.wrap && !el.maxH && !b)
     out.note = 'A free text with no wrap width, no maxHeight and no artboard has nothing to overflow.';
   return out;
@@ -1277,7 +1742,7 @@ function claudeBoardInfo(){
   const b = state.board;
   if (!b) return null;
   const out = { w: b.w, h: b.h, name: b.name };
-  if (b.safe > 0) out.safeArea = b.safe;
+  if (docSafe() > 0) out.safeArea = docSafe();
   return out;
 }
 /* Find the document and page a command is aimed at.
@@ -1327,6 +1792,7 @@ const STYLE_NAME = /^[A-Za-z0-9_-]{1,40}$/;
 async function claudeExecute(action, args){
   args = (args && typeof args === 'object') ? args : {};
   if (!state.meta) state.meta = normalizeMeta(null);
+  if (pixRestore) await pixRestore;      // pictures are read back a moment after a reload
 
   if (action === 'app_info'){
     docTrack();
@@ -1370,6 +1836,7 @@ async function claudeExecute(action, args){
     if (t.error) return t;
     const only = args.pageId != null ? t.page.id : null;
     const m = state.meta;
+    await claudeImagesReady(state.pages.flatMap(p => p.elements).filter(e => e.type === 'image'));
     const out = {
       documentId: m.id, name: m.name, version: m.clock,
       board: claudeBoardInfo(),
@@ -1385,7 +1852,7 @@ async function claudeExecute(action, args){
     };
     if (Object.keys(m.styles.text).length || Object.keys(m.styles.colors).length)
       out.styles = { text: m.styles.text, colors: m.styles.colors };
-    if (m.master) out.master = { front: m.master.front, skipPageIds: m.master.skip, elements: m.master.elements.map(claudeCompact) };
+    if (m.master) out.master = { front: m.master.front, skipPageIds: m.master.skip.filter(id => state.pages.some(p => p.id === id)), elements: m.master.elements.map(claudeCompact) };
     const open = m.comments.filter(c => !c.resolved).length;
     if (open) out.openComments = open;
     return out;
@@ -1417,9 +1884,10 @@ async function claudeExecute(action, args){
   if (action === 'measure'){
     const t = await claudeTarget(args, false);
     if (t.error) return t;
-    const ids = (Array.isArray(args.elementIds) ? args.elementIds : []).map(String);
-    if (!ids.length) return { error: 'Give the ids of the elements to measure in elementIds.' };
-    const pages = args.pageId != null ? [t.page] : state.pages;
+    let ids = (Array.isArray(args.elementIds) ? args.elementIds : []).map(String);
+    if (!ids.length) ids = ownEls(t.page).map(e => e.id);            // no ids: everything on the page
+    if (!ids.length) return { error: `Page "${t.page.name}" has no elements to measure.` };
+    const pages = (args.pageId != null || !Array.isArray(args.elementIds) || !args.elementIds.length) ? [t.page] : state.pages;
     const found = [];
     for (const id of ids){
       let hit = null;
@@ -1427,8 +1895,12 @@ async function claudeExecute(action, args){
       found.push({ id, hit });
     }
     await claudeFontsReady(found.filter(f => f.hit).map(f => f.hit.el));
-    return { documentId: state.meta.id, board: claudeBoardInfo(),
-      elements: found.map(f => f.hit ? claudeMeasureOne(f.hit.el, f.hit.p) : { id: f.id, error: 'No element with this id.' }) };
+    await claudeImagesReady(found.filter(f => f.hit).map(f => f.hit.el));
+    const measured = found.map(f => f.hit ? claudeMeasureOne(f.hit.el, f.hit.p) : { id: f.id, error: 'No element with this id.' });
+    const res = { documentId: state.meta.id, board: claudeBoardInfo(), elements: measured,
+      notFitting: measured.filter(m => m.fits === false).map(m => m.id) };
+    if (state.board && !docSafe()) res.note = 'This document has no safe area, so only the artboard edge is checked. Set one with koralpaper_set_board.';
+    return res;
   }
   if (action === 'render_page'){
     const t = await claudeTarget(args, false);
@@ -1474,6 +1946,13 @@ async function claudeExecute(action, args){
     if (batch.length > 60) return { error: 'At most 60 pages in one call.' };
     for (const b of batch) if (!b || !Array.isArray(b.elements) || !b.elements.length)
       return { error: batch.length > 1 ? 'Every page in pages needs an elements list.' : 'No elements given.' };
+    for (let i = 0; i < batch.length; i++){
+      const where = batch.length > 1 ? `page ${i + 1}, ` : '';
+      const extra = Array.isArray(args.pages) ? Object.keys(batch[i]).find(k => !['name', 'paper', 'elements'].includes(k)) : null;
+      if (extra) return { error: REFUSED + `${where}unknown page property "${extra}". A page takes name, paper and elements.` };
+      const prob = await claudeVetNew(batch[i].elements, where);
+      if (prob) return { error: REFUSED + prob };
+    }
     if (args.documentId != null && String(args.documentId) !== state.meta.id){
       const t = await claudeTarget({ documentId: args.documentId }, false);
       if (t.error) return t;
@@ -1483,6 +1962,11 @@ async function claudeExecute(action, args){
     if (args.ifVersion != null && Number(args.ifVersion) !== state.meta.clock)
       return { error: `Refused, nothing was written: document "${state.meta.name}" changed since version ${args.ifVersion} (it is now at version ${state.meta.clock}). Call koralpaper_read_document again, then retry with ifVersion ${state.meta.clock}.` };
     syncPageRef();
+    // a board here sets the artboard size; the safe area stays unless this call names one
+    const board = claudeBoard(args.board);
+    if (board) state.board = board;
+    const safeArg = claudeSafeArg(args.board);
+    if (safeArg !== undefined) state.meta.safe = safeArg;
     const warnings = [], made = [];
     for (const b of batch){
       const idMap = new Map();
@@ -1502,8 +1986,6 @@ async function claudeExecute(action, args){
     state.pageIndex = state.pages.indexOf(last);
     state.elements = last.elements;
     state.selection = new Set();
-    const board = claudeBoard(args.board);
-    if (board) state.board = board;
     updateBoundArrows(state.elements);
     preloadDocFonts();
     syncToggles(); syncBoardBtn(); buildBoardMenuSel(); syncPaperUI();
@@ -1519,6 +2001,8 @@ async function claudeExecute(action, args){
   if (action === 'add_elements'){
     const specs = Array.isArray(args.elements) ? args.elements : [];
     if (!specs.length) return { error: 'No elements given.' };
+    const prob = await claudeVetNew(specs);
+    if (prob) return { error: REFUSED + prob };
     const t = await claudeTarget(args, true);
     if (t.error) return t;
     const idMap = new Map(), warnings = [];
@@ -1534,6 +2018,16 @@ async function claudeExecute(action, args){
   }
   if (action === 'update_elements'){
     const ups = Array.isArray(args.updates) ? args.updates : [];
+    const look = await claudeTarget(args, false);          // checked first, on the page as it is, without moving the view
+    if (look.error) return look;
+    for (let i = 0; i < ups.length; i++){
+      const u = ups[i];
+      const target = u && u.id != null ? look.page.elements.find(e => e.id === String(u.id)) : null;
+      const prob = claudeSpecProblem(u, `update ${i + 1}` + (u && u.id != null ? ` ("${u.id}")` : ''), 'update', target && !target.master ? target.type : undefined);
+      if (prob) return { error: REFUSED + prob };
+    }
+    const badPic = await claudeProbeImages(ups, 'update: ');
+    if (badPic) return { error: REFUSED + badPic };
     const t = await claudeTarget(args, true);
     if (t.error) return t;
     let touched = 0;
@@ -1593,6 +2087,115 @@ async function claudeExecute(action, args){
       elements: ownEls(r.page).map(claudeCompact) }, r.warnings);
   }
 
+  /* ── pages ── */
+  if (action === 'delete_page'){
+    const t = await claudePageTarget(args, true, 'delete');
+    if (t.error) return t;
+    if (state.pages.length <= 1) return { error: REFUSED + 'this is the only page, and a document always keeps one. Change its elements instead.' };
+    syncPageRef();
+    const cur = state.pages[state.pageIndex];
+    state.pages.splice(t.idx, 1);
+    // the master page's skip list is left as it is: Cmd+Z brings a cover back as a cover
+    const at = state.pages.indexOf(cur);
+    state.pageIndex = at >= 0 ? at : Math.min(t.idx, state.pages.length - 1);
+    claudePagesCommit('Claude deleted the page “' + t.page.name + '”: ⌘Z brings it back');
+    return claudePagesOut({ deleted: { id: t.page.id, name: t.page.name, elements: ownEls(t.page).length },
+      note: 'The page numbers of the master page follow. The user can bring the page back with Cmd+Z.' });
+  }
+  if (action === 'rename_page' || action === 'set_page'){
+    const t = await claudePageTarget(args, true, action === 'rename_page' ? 'rename' : 'change');
+    if (t.error) return t;
+    const hasName = args.name !== undefined, hasPaper = action === 'set_page' && args.paper !== undefined;
+    if (!hasName && !hasPaper) return { error: action === 'rename_page' ? 'Give the new name.' : 'Give a name, a paper colour, or both.' };
+    let name = null;
+    if (hasName){
+      name = typeof args.name === 'string' ? args.name.trim().slice(0, 80) : '';
+      if (!name) return { error: REFUSED + 'the page name is empty.' };
+    }
+    let paper;
+    if (hasPaper){
+      if (args.paper === null || args.paper === '' || args.paper === 'none') paper = null;
+      else if (typeof args.paper === 'string' && args.paper[0] === '$' && state.meta.styles.colors[args.paper.slice(1)]) paper = state.meta.styles.colors[args.paper.slice(1)];
+      else if (typeof args.paper === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(args.paper)) paper = args.paper;
+      else return { error: REFUSED + `"${args.paper}" is not a paper colour. Give a #hex value, a colour token like "$paper", or null for the document's own paper.` };
+    }
+    syncPageRef();
+    if (name) t.page.name = name;
+    if (hasPaper){ if (paper) t.page.bg = paper; else delete t.page.bg; }
+    claudePagesCommit(null);
+    const pg = { pageId: t.page.id, name: t.page.name, version: pageVersion(t.page) };
+    if (t.page.bg) pg.paper = t.page.bg;
+    return claudePagesOut(pg);
+  }
+  if (action === 'reorder_pages'){
+    if (editing) commitTextEdit();
+    const t = await claudeTarget({ documentId: args.documentId }, false);
+    if (t.error) return t;
+    const vp = claudeDocVersionProblem(args);
+    if (vp) return { error: vp };
+    const order = (Array.isArray(args.order) ? args.order : []).map(String);
+    const ids = state.pages.map(p => p.id);
+    const label = id => { const p = state.pages.find(x => x.id === id); return p ? `"${p.name}" (${id})` : `"${id}"`; };
+    const unknown = order.filter(id => !ids.includes(id));
+    const twice = [...new Set(order.filter((id, i) => order.indexOf(id) !== i))];
+    const missing = ids.filter(id => !order.includes(id));
+    if (unknown.length) return { error: REFUSED + `no page with id ${unknown.map(x => '"' + x + '"').join(', ')}. The pages are: ${ids.map(label).join(', ')}.` };
+    if (twice.length) return { error: REFUSED + `${twice.map(label).join(', ')} ${twice.length === 1 ? 'is' : 'are'} listed more than once.` };
+    if (missing.length) return { error: REFUSED + `the order must name every page once, and ${missing.map(label).join(', ')} ${missing.length === 1 ? 'is' : 'are'} missing.` };
+    syncPageRef();
+    const cur = state.pages[state.pageIndex];
+    const moved = order.some((id, i) => id !== ids[i]);
+    if (moved){
+      state.pages = order.map(id => state.pages.find(p => p.id === id));
+      state.pageIndex = state.pages.indexOf(cur);
+      claudePagesCommit('Claude put the pages in a new order');
+    }
+    return claudePagesOut({ moved, note: moved ? 'The page numbers of the master page follow the new order.' : 'The pages were already in that order.' });
+  }
+  if (action === 'duplicate_page'){
+    const t = await claudePageTarget(args, true, 'duplicate');
+    if (t.error) return t;
+    syncPageRef();
+    const src = t.page;
+    const { els, map } = copyPageElements(src.elements);
+    const name = (typeof args.name === 'string' && args.name.trim() ? args.name.trim() : src.name + ' copy').slice(0, 80);
+    const copy = { id: uid(), name, elements: els };
+    if (src.bg) copy.bg = src.bg;
+    const pos = Number(args.position);
+    const at = Number.isFinite(pos) && pos >= 1 ? clamp(Math.round(pos) - 1, 0, state.pages.length) : t.idx + 1;
+    state.pages.splice(at, 0, copy);
+    const m = state.meta;
+    if (m.master && m.master.skip.includes(src.id)) m.master.skip.push(copy.id);     // a cover's copy is a cover too
+    state.pageIndex = at;
+    claudePagesCommit('Claude duplicated the page “' + src.name + '”');
+    return claudePagesOut({ pageId: copy.id, name: copy.name, number: at + 1, version: pageVersion(copy),
+      copiedFrom: src.id, ids: Object.fromEntries(map),
+      note: 'ids maps each element id of the source page to its copy on the new page.' });
+  }
+  if (action === 'set_board'){
+    const t = await claudeTarget({ documentId: args.documentId }, false);
+    if (t.error) return t;
+    const extra = Object.keys(args).find(k => !['documentId', 'w', 'h', 'name', 'safeArea'].includes(k));
+    if (extra) return { error: REFUSED + `unknown property "${extra}". koralpaper_set_board takes documentId, w, h, name and safeArea.` };
+    const cur = state.board;
+    if (args.w !== undefined || args.h !== undefined){
+      const b = claudeBoard({ w: args.w !== undefined ? args.w : cur && cur.w, h: args.h !== undefined ? args.h : cur && cur.h,
+        name: args.name !== undefined ? args.name : cur && cur.name });
+      if (!b) return { error: REFUSED + 'give both w and h as positive numbers, e.g. {"w":1080,"h":1350}.' };
+      if (cur){ b.x = cur.x; b.y = cur.y; }
+      state.board = b;
+    } else if (!cur){
+      return { error: REFUSED + 'this document has no artboard yet, so there is nothing to put a safe area in. Give w and h.' };
+    } else if (typeof args.name === 'string' && args.name.trim()) cur.name = args.name.trim().slice(0, 60);
+    const safeArg = claudeSafeArg(args);
+    if (safeArg !== undefined) state.meta.safe = safeArg;
+    syncBoardBtn(); buildBoardMenuSel(); zoomToFit(); requestRender(); scheduleThumbRefresh(); flushAutosave();
+    docTrack();
+    return { ok: true, documentId: state.meta.id, documentVersion: state.meta.clock, board: claudeBoardInfo(),
+      note: docSafe() ? `The safe area is a dashed guide ${docSafe()}px inside every page edge. It is never exported; koralpaper_measure checks elements against it.`
+        : 'No safe area is set.' };
+  }
+
   /* ── styles and the master page ── */
   if (action === 'set_styles'){
     const t = await claudeTarget(args, false);
@@ -1646,6 +2249,10 @@ async function claudeExecute(action, args){
     if (editing) commitTextEdit();
     const m = state.meta, warnings = [];
     const specs = Array.isArray(args.elements) ? args.elements : [];
+    if (specs.length){
+      const prob = await claudeVetNew(specs, 'master ');
+      if (prob) return { error: REFUSED + prob };
+    }
     const rev = (m.master ? m.master.rev : 0) + 1;
     if (!specs.length) m.master = null;
     else {
@@ -1661,7 +2268,7 @@ async function claudeExecute(action, args){
     docTrack();
     const out = { ok: true, documentId: m.id, documentVersion: m.clock,
       master: m.master ? { front: m.master.front, skipPageIds: m.master.skip, elements: m.master.elements.map(claudeCompact),
-        onPages: state.pages.length - m.master.skip.length } : null };
+        onPages: state.pages.filter(p => !m.master.skip.includes(p.id)).length } : null };
     if (warnings.length) out.warnings = warnings;
     return out;
   }
@@ -1724,7 +2331,7 @@ async function claudeExecute(action, args){
     if (!applyDocData(data) || !docUsable()){ applyDocData(keep); state.meta = cur; docActivate(); return { error: 'That snapshot cannot be used.' }; }
     // versions keep counting forward: a restore is one more change, not a rewind of the clock
     const m = state.meta;
-    m.id = cur.id; m.name = cur.name; m.clock = cur.clock; m.pv = cur.pv; m.ev = cur.ev; m.gone = cur.gone; m.starter = null;
+    m.id = cur.id; m.name = cur.name; m.clock = cur.clock; m.pv = cur.pv; m.ev = cur.ev; m.gone = cur.gone; m.po = cur.po; m.starter = null;
     state.selection = new Set();
     masterSig = null;
     document.body.classList.toggle('dark', state.theme === 'dark');

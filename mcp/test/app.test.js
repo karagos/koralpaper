@@ -252,7 +252,7 @@ describe('the connector on its own', () => {
     const s = await spawnServer({ KORALPAPER_PORT: String(port) });
     try {
       const tools = (await s.rpc('tools/list')).result.tools;
-      assert.equal(tools.length, 21);
+      assert.equal(tools.length, 27);
       for (const t of tools){
         assert.match(t.name, /^koralpaper_[a-z_]+$/);
         assert.ok(t.description.length > 60, t.name + ' has a real description');

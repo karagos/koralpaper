@@ -1,5 +1,31 @@
 # KoralPaper — Changelog
 
+## v3.86.0 · connector v1.7.0
+
+**Second carousel round: what building a real 10-slide carousel turned up.** Five faults fixed, and two abilities added for Claude: pictures from files, and page tools.
+
+**Fixed**
+
+- **The image controls looked as if they had been removed.** They had not: the section that holds them (photo style, crop, adjustments) can be folded by clicking its title, the fold is remembered, and a folded section showed only a small turned arrow. One stray click made the controls vanish for good. A folded section now carries a clear **Show** label, the section is called **Image**, and it is opened once for everyone who had it folded. It also gained what was missing: the file name and real size of the picture, **Fill / Fit / Stretch**, and an alt text field.
+- **The safe area was lost as soon as pages were created.** It was stored inside the artboard record, and creating a page with an artboard size replaced that record, guide included. The safe area is now a setting of the document. It survives new pages, a change of artboard size, a reload and reopening the document, and it shows in `read_document`, `open_document` and `list_documents`. You can set it yourself at the bottom of the artboard menu.
+- **`koralpaper_measure` checks every kind of element.** Text, shapes, images and lines are each checked against the artboard edge and the safe area, with the number of px they leave on each side. A new `fits` flag is true only when nothing overflows and the element stays inside both. Without ids it checks the whole page.
+- **Unknown element types and properties are refused.** An unknown type used to be drawn as a cream rectangle and an unknown property was dropped, both without a word. Now the call is refused, nothing is drawn, and the message names what was wrong and offers the right name (`borderRadius` gets "use radius").
+- **Rectangles can have square corners.** Every rectangle Claude drew had soft corners, with or without a brand kit, and Claude had no way to say otherwise, so a full-page background showed the paper in its corners. Rect and image elements take a `radius` in px: 0 for square, 999 for a pill. It belongs to the element and no brand kit changes it. The Corners slider shows it and can take over.
+- **Lines and arrows read back with both ends** (`x`, `y`, `x2`, `y2`) instead of a width and height of 0.
+- **Pages duplicated by hand no longer share element ids** with their original. Shared ids made both pages look edited on every save, which could refuse Claude's next write for no reason.
+- **Reordering pages counts as a change** of the document version.
+- **An edit made in the last third of a second before a reload or a closed tab is saved**, not lost.
+
+**New for Claude**
+
+- **Image elements.** `type: "image"` with `src: {"path": ...}` in `create_page`, `add_elements`, `update_elements` and `set_master`. JPEG, PNG, GIF, WebP and SVG, up to 20 MB, read only from inside Documents or Desktop (paths that lead out, symbolic links included, are refused). The file's own bytes are embedded: a JPEG is never compressed again. `fit` is cover or contain, `focalX` and `focalY` choose what a cover keeps in view, plus `radius`, `opacity` and `alt`. Reads report the file name, format, real size, bytes, fit, focal point, crop and alt text, never the bytes.
+- **Page tools:** `koralpaper_delete_page`, `koralpaper_rename_page`, `koralpaper_reorder_pages`, `koralpaper_duplicate_page` (new ids, with a map from each original to its copy) and `koralpaper_set_page` (name and paper colour).
+- **`koralpaper_set_board`** sets the artboard size and the safe area of a document that already exists.
+
+**Photos and autosave.** A browser gives a page about 5 MB of local storage, and one full-size photo fills most of it: a second photo used to switch autosave off. Large pictures are now kept in the browser's own database and the autosave only names them, so a carousel full of photos autosaves and comes back whole after a reload. Saved files, the document library and snapshots carry their pictures whole, as before.
+
+Nothing changes in documents made before this version: their pictures keep the look they had. 27 tools (6 new). 143 automated tests, 47 of them new. An independent code review of the change found six defects, all fixed before release.
+
 ## v3.85.2
 
 **The safe-area guide is grey.** It was drawn in a reddish accent colour, which could be mistaken for part of the design. It is now a neutral grey dashed line: a darker grey on light paper, a lighter grey on dark paper, so it reads on both. The small "safe area" label above the artboard is grey too. As before, the guide shows in the editor only and is never exported.

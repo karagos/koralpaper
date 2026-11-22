@@ -2,7 +2,7 @@
    No dependencies. Everything renders from plain element objects. */
 'use strict';
 
-const APP_VERSION = '3.85.2';
+const APP_VERSION = '3.86.0';
 const TAU = Math.PI * 2;
 
 /* ── utils ─────────────────────────────────────────── */
@@ -601,12 +601,21 @@ function polygonOutline(x, y, w, h, sides){
   }
   return pts;
 }
+/* A rectangle's corner radius in px. Three sources, most specific first:
+   el.radius   an exact radius in px (0 = square, anything past half the short
+               side = a pill), set per element and never touched by a brand kit;
+   el.cornerRad  the Corners slider, a percent of the short side;
+   el.round    the soft default corner, which is what a brand kit switches. */
+function rectCornerPx(el){
+  const half = Math.min(el.w, el.h) / 2;
+  if (el.radius != null) return clamp(Number(el.radius) || 0, 0, half);
+  if (el.cornerRad != null) return Math.min(el.w, el.h) * (el.cornerRad / 100);
+  return el.round ? Math.min(18, Math.min(el.w, el.h) * .25) : 0;
+}
 function shapeOutline(el){
   const { x, y, w, h } = el;
   switch (el.type){
-    case 'rect': return roundedRectOutline(x, y, w, h,
-      el.cornerRad != null ? Math.min(w, h) * (el.cornerRad / 100)
-        : el.round ? Math.min(18, Math.min(w,h)*.25) : 0);
+    case 'rect': return roundedRectOutline(x, y, w, h, rectCornerPx(el));
     case 'chip': return roundedRectOutline(x, y, w, h, h / 2);
     case 'ellipse': return ellipseOutline(x + w/2, y + h/2, w/2, h/2);
     case 'diamond': return diamondOutline(x, y, w, h);
@@ -2224,13 +2233,66 @@ function drawImageFrame(ctx, el, pal, b){
   ctx.restore();
 }
 function imgCornerRad(el, b){
+  if (el.radius != null) return clamp(Number(el.radius) || 0, 0, Math.min(b.w, b.h) / 2);
   return el.imgRadius ? Math.min(b.w, b.h) * (el.imgRadius / 100) : 0;
 }
-function drawImageEl(ctx, el, pal){
+/* How a picture sits in its box.
+   No fit (every image made before 3.86, and any image dropped in by hand): the
+   picture is stretched to the box, which has the picture's own proportions.
+   fit "cover": the picture fills the box and what does not fit is cut off; the
+   focal point (0 to 1 across and down the picture) is kept as near the middle
+   of the box as the picture allows.
+   fit "contain": the whole picture shows inside the box; the focal point places
+   it there (0 = left / top, 0.5 = centred, 1 = right / bottom).
+   Returns null when nothing changes, else the part of the picture to show
+   (crop, as fractions of the whole picture) and where it lands. */
+function imageView(el, nw, nh){
+  if ((el.fit !== 'cover' && el.fit !== 'contain') || !(nw > 0) || !(nh > 0) || !(el.w > 0) || !(el.h > 0)) return null;
+  const c = el.crop || [0, 0, 1, 1];
+  const sw = Math.max(1e-6, (c[2] - c[0]) * nw), sh = Math.max(1e-6, (c[3] - c[1]) * nh);
+  const fx = el.focal ? clamp(Number(el.focal[0]), 0, 1) : 0.5;
+  const fy = el.focal ? clamp(Number(el.focal[1]), 0, 1) : 0.5;
+  if (el.fit === 'cover'){
+    const k = Math.max(el.w / sw, el.h / sh);
+    const vw = el.w / k, vh = el.h / k;                       // the part of the picture that shows, in its own px
+    const x0 = clamp(fx * sw - vw / 2, 0, sw - vw), y0 = clamp(fy * sh - vh / 2, 0, sh - vh);
+    const u0 = c[0] + x0 / nw, v0 = c[1] + y0 / nh;
+    return { crop: [u0, v0, u0 + vw / nw, v0 + vh / nh], x: el.x, y: el.y, w: el.w, h: el.h };
+  }
+  const k = Math.min(el.w / sw, el.h / sh);
+  const dw = sw * k, dh = sh * k;
+  return { crop: el.crop || null, x: el.x + (el.w - dw) * fx, y: el.y + (el.h - dh) * fy, w: dw, h: dh };
+}
+/* the element as it is painted: itself, or a stand-in whose box and crop are
+   what the fit works out to. The stand-in reads everything else from the real
+   element, and what the painter caches on it is handed back afterwards. */
+const IMAGE_CACHE_KEYS = ['_prims', '_pkey', '_tintCv', '_tintKey'];
+function imageDrawEl(el){
+  if (el.fit !== 'cover' && el.fit !== 'contain') return el;
+  const entry = el._src ? getImageEntry(el._src) : null;
+  const v = entry && entry.ready ? imageView(el, entry.img.naturalWidth, entry.img.naturalHeight) : null;
+  if (!v) return el;
+  const dv = Object.create(el);
+  dv.x = v.x; dv.y = v.y; dv.w = v.w; dv.h = v.h; dv.crop = v.crop;
+  dv._real = el;
+  return dv;
+}
+function imageDrawDone(dv){
+  const el = dv._real;
+  if (!el) return;
+  for (const k of IMAGE_CACHE_KEYS) if (Object.prototype.hasOwnProperty.call(dv, k)) el[k] = dv[k];
+}
+function drawImageEl(ctx, real, pal){
+  if (!real._src) return;
+  const entry = getImageEntry(real._src);
+  const el = imageDrawEl(real);
+  try { drawImageView(ctx, el, pal, entry, boundsOf(real)); }
+  finally { imageDrawDone(el); }
+}
+function drawImageView(ctx, el, pal, entry, box){
   const b = boundsOf(el);
-  if (!el._src) return;
-  const entry = getImageEntry(el._src);
   if (!entry.ready){
+    b.x = box.x; b.y = box.y; b.w = box.w; b.h = box.h;
     ctx.strokeStyle = pal.grid;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 5]);
@@ -2826,7 +2888,9 @@ function renderSceneSVG(elements, opts){
     return `<circle cx="${svgNum(g.circ[0])}" cy="${svgNum(g.circ[1])}" r="${svgNum(g.circ[2])}" ${attrs}/>`;
   };
 
-  for (const el of elements){
+  for (const real of elements){
+    // a picture with a fit is written the way it is painted: see imageDrawEl
+    const el = real.type === 'image' ? imageDrawEl(real) : real;
     const eb = boundsOf(el);
     const parts = [];
 
@@ -3031,10 +3095,12 @@ function renderSceneSVG(elements, opts){
     const op = (el.opacity == null ? 100 : el.opacity) / 100;
     let transform = '';
     if (el.angle){
-      const cx = eb.x + eb.w/2, cy = eb.y + eb.h/2;
+      const rb = boundsOf(real);                       // turn about the box, not about the fitted picture
+      const cx = rb.x + rb.w/2, cy = rb.y + rb.h/2;
       transform = ` transform="rotate(${svgNum(el.angle * 180 / Math.PI)} ${svgNum(cx)} ${svgNum(cy)})"`;
     }
-    body.push(`<g${transform}${op < 1 ? ` opacity="${op}"` : ''}>${parts.join('')}</g>`);
+    const altTitle = (real.type === 'image' && real.alt) ? `<title>${svgEsc(real.alt)}</title>` : '';
+    body.push(`<g${transform}${op < 1 ? ` opacity="${op}"` : ''}>${altTitle}${parts.join('')}</g>`);
   }
 
   const usedFonts = new Set(

@@ -249,7 +249,21 @@
     <div class="row" id="rowSides"><label>Sides <span class="labelval" id="sidesVal"></span></label>
       <input type="range" id="sidesRange" min="3" max="12" step="1" value="6">
     </div>
-    <div class="row" id="rowArt"><label>Photo style</label>
+    <div class="row" id="rowArt"><label>Image</label>
+      <div class="imginfo" id="imgInfo"></div>
+      <div class="sublabel">Fit in its box</div>
+      <div class="segment" id="imgFitSeg">
+        <button data-fit="cover" title="Fill: the picture covers the whole box and what does not fit is cut off">Fill</button>
+        <button data-fit="contain" title="Fit: the whole picture shows inside the box">Fit</button>
+        <button data-fit="stretch" title="Stretch: the picture is pulled to the exact shape of the box">Stretch</button>
+      </div>
+      <div class="segment">
+        <button id="cropBtn" title="Crop: click, then drag across the image">Crop</button>
+        <button id="cropResetBtn" title="Restore the full image">Uncrop</button>
+      </div>
+      <input type="text" class="altinput" id="imgAlt" maxlength="300" placeholder="Alt text: describe the picture"
+        title="A short description of the picture. It is saved with the image and written into SVG exports.">
+      <div class="sublabel">Photo style</div>
       <div class="segment" id="artSeg">
         <button data-art="photo" title="Original photo">Photo</button>
         <button data-art="halftone" title="Halftone dots">Dots</button>
@@ -270,10 +284,7 @@
         <button data-detail="2" title="Medium">Medium</button>
         <button data-detail="3" title="Fine">Fine</button>
       </div>
-      <div class="segment">
-        <button id="cropBtn" title="Crop: click, then drag across the image">Crop</button>
-        <button id="cropResetBtn" title="Restore the full image">Uncrop</button>
-      </div>
+      <div class="sublabel">Adjust</div>
       <div class="adjrow"><span>Bright</span><input type="range" id="adjBright" min="-80" max="80" step="2" value="0"></div>
       <div class="adjrow"><span>Contrast</span><input type="range" id="adjContrast" min="-80" max="80" step="2" value="0"></div>
       <div class="adjrow"><span>Gamma</span><input type="range" id="adjGamma" min="40" max="260" step="5" value="100"></div>

@@ -619,6 +619,10 @@ function usedImages(){
         used[el.imgId] = state.images[el.imgId];
       else if (el.imgFillId && state.images[el.imgFillId] !== undefined)
         used[el.imgFillId] = state.images[el.imgFillId];
+  // a master page that every page skips still owns its pictures
+  const ms = state.meta && state.meta.master;
+  if (ms) for (const el of ms.elements)
+    if (el.type === 'image' && el.imgId && state.images[el.imgId] !== undefined) used[el.imgId] = state.images[el.imgId];
   return used;
 }
 function commit(){
@@ -674,6 +678,7 @@ function syncHistoryButtons(){
 }
 
 let autosaveTimer = null;
+let autosavePending = false;          // an edit is waiting for its autosave
 let autosaveFailing = false;
 function setStorageWarn(on){
   if (on === autosaveFailing) return;
@@ -694,13 +699,37 @@ function docPayload(){
     camera: state.camera, grid: state.grid, gridSize: state.gridSize, snap: state.snap,
     theme: state.theme, bgColor: state.bgColor, board: state.board,
     timelapse: tl.frames.length ? { frames: tl.frames } : undefined,
-    meta: state.meta || undefined,
+    meta: metaForSave(),
   };
 }
+/* the document record as it is stored. Master elements are kept like page
+   elements: without the runtime fields (a picture's pixels live in images). */
+function metaForSave(){
+  const m = state.meta;
+  if (!m) return undefined;
+  if (!m.master) return m;
+  const els = JSON.parse(JSON.stringify(m.master.elements, (k, v) => k.startsWith('_') ? undefined : v));
+  return Object.assign({}, m, { master: Object.assign({}, m.master, { elements: els }) });
+}
 function writeAutosave(){
+  autosavePending = false;
   try {
     docTrack();                        // page and element versions are current before they are stored
-    localStorage.setItem(STORE_KEY, JSON.stringify(docPayload()));
+    const payload = docPayload();
+    // big pictures live in their own database; the autosave names them (see pixSplit in bridge.js)
+    const split = pixSplit(payload.images);
+    payload.images = split.inline;
+    if (split.refs.length) payload.imageRefs = split.refs;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(payload)); }
+    catch (e){
+      /* Too big while new pictures still ride along. The last good autosave is left
+         as it is: naming a picture before it is safely in the database could lose
+         it. pixStoreSoon saves again the moment the pictures are stored, and turns
+         the warning on if they cannot be. */
+      if (!split.pending.length) throw e;
+      autosavePending = true;
+      return false;
+    }
     setStorageWarn(false);
     libraryTouch();                    // the document library keeps its copy of this document fresh
     return true;
@@ -714,6 +743,7 @@ function writeAutosave(){
 }
 function scheduleAutosave(){
   clearTimeout(autosaveTimer);
+  autosavePending = true;
   autosaveTimer = setTimeout(writeAutosave, 350);
 }
 // write right now, skipping the debounce
@@ -751,6 +781,7 @@ function applyDocData(data){
       state.pages = [{ id: uid(), name: 'Page 1', elements: migrateElements(data.elements, data.v) }];
       state.pageIndex = 0;
     } else return false;
+    dedupePageElementIds();
     state.elements = state.pages[state.pageIndex].elements;
     /* before 3.85.1 a text's stored Text position meant nothing and its text always
        started at the top of the box. Keep it there now that the position counts. */
@@ -759,6 +790,7 @@ function applyDocData(data){
         if (el.type === 'text' && el.maxH && el.valign !== 'top') el.valign = 'top';
     state.images = data.images || {};
     for (const p of state.pages) adoptImages(p.elements);
+    pixBeginRestore(data.imageRefs);     // pictures the autosave only named are read back in a moment
     if (data.camera) state.camera = data.camera;
     state.grid = typeof data.grid === 'string' ? data.grid : (data.grid !== false ? 'grid' : 'off');
     state.gridSize = clamp(Number(data.gridSize) || GRID, 6, 120);
@@ -769,6 +801,7 @@ function applyDocData(data){
     if (data.timelapse && Array.isArray(data.timelapse.frames)) tlRestore(data.timelapse.frames);
     else if (typeof tl !== 'undefined' && tl.frames.length) tlRestore([]);
     state.meta = normalizeMeta(data.meta);
+    safeAreaAdopt();
     return true;
   } catch (e){ return false; }
 }
@@ -1922,7 +1955,7 @@ function reorder(mode){
 }
 
 /* ── copy / paste style ────────────────────────────── */
-const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor','frame','fweight','imgRadius','cornerRad'];
+const STYLE_PROPS = ['stroke','sw','dash','sketch','fill','fillStyle','round','opacity','font','size','align','lh','pgap','lspace','valign','textColor','frame','fweight','imgRadius','cornerRad','radius'];
 let styleClipboard = null;
 let sizeClipboard = null;
 function copyStyle(){
@@ -2557,11 +2590,17 @@ function syncPanel(){
   show('rowImgRadius', has('image') || has('rect'));
   if (document.activeElement !== $('imgRadiusRange')){
     const firstRad = sel.find(e => e.type === 'image' || e.type === 'rect');
+    // an exact radius in px (set by Claude) shows as px; the slider itself works in percent
+    const exact = firstRad && firstRad.radius != null ? Number(firstRad.radius) || 0 : null;
+    const half = firstRad ? Math.min(firstRad.w, firstRad.h) / 2 : 0;
     const rv = !firstRad ? 0
+      : exact != null ? Math.round(clamp(half > 0 ? Math.min(exact, half) / (half * 2) * 100 : 0, 0, 50))
       : firstRad.type === 'image' ? (firstRad.imgRadius || 0)
       : (firstRad.cornerRad != null ? firstRad.cornerRad : (firstRad.round ? 'auto' : 0));
     $('imgRadiusRange').value = rv === 'auto' ? 8 : rv;
-    $('imgRadiusVal').textContent = rv === 'auto' ? 'auto' : rv ? rv + '%' : 'sharp';
+    $('imgRadiusVal').textContent = exact != null
+      ? (exact <= 0 ? 'sharp' : exact >= half ? 'pill' : Math.round(exact) + 'px')
+      : rv === 'auto' ? 'auto' : rv ? rv + '%' : 'sharp';
   }
   show('rowRound', has('rect'));
   show('rowCurve', has('arrow','line'));
@@ -2626,6 +2665,9 @@ function syncPanelDetails(sel, tool){
   $('cropResetBtn').disabled = !soloImage || !soloImage.crop;
   const firstImg = sel.find(e => e.type === 'image');
   if (firstImg){
+    $('imgInfo').textContent = imageInfoLine(firstImg);
+    markSel('#imgFitSeg button', b => b.dataset.fit === (firstImg.fit || 'stretch'));
+    if (document.activeElement !== $('imgAlt')) $('imgAlt').value = firstImg.alt || '';
     $('adjBright').value = firstImg.bright || 0;
     $('adjContrast').value = firstImg.contrast || 0;
     $('adjGamma').value = Math.round((firstImg.gamma || 1) * 100);
@@ -2703,9 +2745,10 @@ document.addEventListener('click', ev => {
     if (t.dataset.dash) applyStyle({ dash: t.dataset.dash });
     else if (t.dataset.v) applyStyle({ sketch: Number(t.dataset.v), dash: 'solid' });
   }
-  else if (t.closest('#roundSeg') && t.dataset.v) applyStyle({ round: Number(t.dataset.v), cornerRad: null });
+  else if (t.closest('#roundSeg') && t.dataset.v) applyStyle({ round: Number(t.dataset.v), cornerRad: null, radius: null });
   else if (t.closest('#curveSeg') && t.dataset.elbow) applyStyle({ elbow: true, elbowPts: null });
   else if (t.closest('#curveSeg') && t.dataset.v) applyStyle({ curve: Number(t.dataset.v), elbow: false, elbowPts: null });
+  else if (t.closest('#imgFitSeg') && t.dataset.fit) setImageFit(t.dataset.fit);
   else if (t.closest('#artSeg') && t.dataset.art) applyStyle({ artStyle: t.dataset.art });
   else if (t.closest('#artDetailSeg') && t.dataset.detail) applyStyle({ detail: Number(t.dataset.detail) });
   else if (t.closest('#sizeSeg') && t.dataset.v) applyStyle({ size: Number(t.dataset.v) });
@@ -2756,6 +2799,45 @@ $('cropResetBtn').addEventListener('click', () => {
   if (sel.length === 1 && sel[0].type === 'image') resetCrop(sel[0]);
 });
 
+/* what a picture is, in one line: its file name, real size and kind */
+function imageKind(src){
+  const m = /^data:image\/([a-z0-9.+-]+)/i.exec(src || '');
+  const k = m ? m[1].toLowerCase() : '';
+  return k === 'svg+xml' ? 'SVG' : k === 'jpeg' ? 'JPEG' : k ? k.toUpperCase() : '';
+}
+function imageInfoLine(el){
+  const src = el._src || (el.imgId && state.images[el.imgId]) || '';
+  const parts = [];
+  if (el.imgName) parts.push(el.imgName);
+  const e = src ? getImageEntry(src) : null;
+  if (e && e.img.naturalWidth) parts.push(`${e.img.naturalWidth} × ${e.img.naturalHeight} px`);
+  const kind = imageKind(src);
+  if (kind) parts.push(kind);
+  return parts.join(' · ');
+}
+/* Fill / Fit / Stretch for the selected pictures */
+function setImageFit(mode){
+  const imgs = selected().filter(e => e.type === 'image' && !e.locked);
+  if (!imgs.length) return;
+  for (const el of imgs){
+    if (mode === 'cover' || mode === 'contain') el.fit = mode;
+    else { delete el.fit; delete el.focal; }
+    delete el._prims; delete el._pkey; delete el._tintKey; delete el._tintCv;
+  }
+  commit(); syncPanel(); requestRender();
+  showHint(mode === 'cover' ? 'Fill: the picture covers its box. Resize the box to choose what shows'
+    : mode === 'contain' ? 'Fit: the whole picture shows inside its box'
+    : 'Stretch: the picture takes the exact shape of its box');
+}
+$('imgAlt').addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') ev.target.blur(); });
+$('imgAlt').addEventListener('change', ev => {
+  const v = ev.target.value.trim().slice(0, 300);
+  const imgs = selected().filter(e => e.type === 'image');
+  if (!imgs.length) return;
+  for (const el of imgs){ if (v) el.alt = v; else delete el.alt; }
+  commit();
+});
+
 /* photo adjustment sliders — live preview debounced (LUT rebuild is cheap,
    but stipple-fine regeneration deserves a small breather) */
 const ADJ_SLIDERS = [
@@ -2767,8 +2849,8 @@ const ADJ_SLIDERS = [
 $('imgRadiusRange').addEventListener('input', ev => {
   const v = clamp(Math.round(Number(ev.target.value)), 0, 50);
   for (const el of selected()){
-    if (el.type === 'image') el.imgRadius = v || null;
-    else if (el.type === 'rect') el.cornerRad = v || (v === 0 ? 0 : null);
+    if (el.type === 'image'){ el.imgRadius = v || null; delete el.radius; }
+    else if (el.type === 'rect'){ el.cornerRad = v || (v === 0 ? 0 : null); delete el.radius; }
   }
   $('imgRadiusVal').textContent = v ? v + '%' : 'sharp';
   requestRender();
@@ -4097,11 +4179,12 @@ function pasteImageIntoShape(file, shapeId){
   });
   reader.readAsDataURL(file);
 }
-function placeImageEl(dataURL, w, h, sx, sy, idx, svg){
+function placeImageEl(dataURL, w, h, sx, sy, idx, svg, name){
   let cx = sx, cy = sy;
   if (cx == null){ [cx, cy] = toScene(canvas.clientWidth / 2, canvas.clientHeight / 2); }
   const el = newElement('image', cx - w/2 + idx * 26, cy - h/2 + idx * 26, {});
   el._src = dataURL; el.w = w; el.h = h;
+  if (name) el.imgName = String(name).slice(0, 200);
   if (svg) el.stroke = 'none';        // keep the SVG's own colors until a Tint is picked
   internImage(el);
   state.elements.push(el);
@@ -4124,7 +4207,7 @@ function insertImageFiles(files, sx, sy){
         probe.onload = () => {
           const s = Math.min(1, 420 / Math.max(probe.naturalWidth || 300, probe.naturalHeight || 300));
           placeImageEl(src, Math.max(24, Math.round((probe.naturalWidth||300)*s)),
-            Math.max(24, Math.round((probe.naturalHeight||300)*s)), sx, sy, idx, true);
+            Math.max(24, Math.round((probe.naturalHeight||300)*s)), sx, sy, idx, true, f.name);
         };
         probe.onerror = () => alert('Could not read that SVG file.');
         probe.src = src;
@@ -4146,6 +4229,7 @@ function insertImageFiles(files, sx, sy){
         }
         const el = newElement('image', cx - w/2 + idx * 26, cy - h/2 + idx * 26, {});
         el._src = dataURL; el.w = w; el.h = h;
+        if (f.name) el.imgName = String(f.name).slice(0, 200);
         internImage(el);
         state.elements.push(el);
         setTool('select');
@@ -4225,8 +4309,9 @@ function deletePage(i){
 function duplicatePage(i){
   syncPageRef();
   const src = state.pages[i];
-  const copy = JSON.parse(JSON.stringify(src.elements, (k, v) => k.startsWith('_') ? undefined : v));
-  state.pages.splice(i + 1, 0, { id: uid(), name: src.name + ' copy', elements: copy });
+  // every copy gets its own id: two pages sharing element ids confuse the page versions
+  const copy = copyPageElements(src.elements).els;
+  state.pages.splice(i + 1, 0, { id: uid(), name: src.name + ' copy', bg: src.bg || null, elements: copy });
   state.pageIndex = i + 1;
   state.elements = state.pages[state.pageIndex].elements;
   state.selection = new Set();
@@ -4472,7 +4557,7 @@ function duplicatePages(){
   if (!idxs.length) return;
   const copies = idxs.map(i => {
     const src2 = state.pages[i];
-    const els = JSON.parse(JSON.stringify(src2.elements, (k, v) => k.startsWith('_') ? undefined : v));
+    const els = copyPageElements(src2.elements).els;
     return { id: uid(), name: src2.name + ' copy', bg: src2.bg || null, elements: els };
   });
   const at = idxs[idxs.length - 1] + 1;
@@ -4588,6 +4673,25 @@ function buildBoardMenu(){
       menu.appendChild(b);
     }
   }
+  const head = document.createElement('div');
+  head.className = 'menuhead';
+  head.textContent = 'Safe area';
+  const row = document.createElement('label');
+  row.className = 'saferow';
+  row.title = 'A dashed guide this far inside the artboard edge. It is never exported. Claude checks designs against it.';
+  const inp = document.createElement('input');
+  inp.type = 'number'; inp.id = 'safeAreaInput'; inp.min = '0'; inp.step = '1'; inp.placeholder = '0';
+  const unit = document.createElement('span'); unit.className = 'dim'; unit.textContent = 'px from each edge';
+  row.append(inp, unit);
+  row.addEventListener('click', ev => ev.stopPropagation());
+  inp.addEventListener('change', () => {
+    if (!state.board){ inp.value = ''; return; }
+    setSafeArea(inp.value);
+    inp.value = docSafe() || '';
+    showHint(docSafe() ? `Safe area: ${docSafe()}px from each edge (a guide, never exported)` : 'Safe area guide removed');
+  });
+  inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') inp.blur(); });
+  free.after(head, row);                 // at the top of the menu, where it is seen without scrolling
   buildBoardMenuSel();
 }
 function buildBoardMenuSel(){
@@ -4597,6 +4701,12 @@ function buildBoardMenuSel(){
       : !!b.dataset.free;
     b.classList.toggle('sel', isSel);
   });
+  const inp = $('safeAreaInput');
+  if (inp && document.activeElement !== inp){
+    inp.disabled = !state.board;
+    inp.value = docSafe() || '';
+    inp.max = state.board ? String(Math.floor(Math.min(state.board.w, state.board.h) / 2) - 1) : '0';
+  }
 }
 $('boardBtn').addEventListener('click', ev => {
   ev.stopPropagation();
@@ -5246,6 +5356,7 @@ function newDocument(){
   state.board = null;
   state.bgColor = (brandActive() && brand.usePaper && brand.paper) ? brand.paper : null;
   state.images = {};
+  pixBeginRestore([]);                  // these pictures are all in memory: none is waiting to be read back
   state.camera = { x: 0, y: 0, z: 1 };
   try { localStorage.removeItem('asterisk.docname'); } catch (e){}
   buildPageStrip();
@@ -6242,6 +6353,7 @@ function snapRestore(id){
   state.pageIndex = clamp(Number(d.pageIndex) || 0, 0, state.pages.length - 1);
   state.elements = state.pages[state.pageIndex].elements;
   state.images = d.images || {};
+  pixBeginRestore([]);                  // these pictures are all in memory: none is waiting to be read back
   for (const p of state.pages) adoptImages(p.elements);
   state.bgColor = (typeof d.bgColor === 'string' && d.bgColor[0] === '#') ? d.bgColor : null;
   state.board = (d.board && d.board.w > 0 && d.board.h > 0) ? d.board : null;
@@ -6441,9 +6553,11 @@ fileInput.addEventListener('change', () => {
       }
       state.elements = state.pages[state.pageIndex].elements;
       state.images = data.images || {};
+      pixBeginRestore([]);                  // these pictures are all in memory: none is waiting to be read back
       for (const pg of state.pages) adoptImages(pg.elements);
       // an opened file is its own document: keep its comments, styles and master page
       docAdopt(data.meta, /\.json$/i.test(f.name) ? f.name.replace(/\.json$/i, '') : null);
+      if (!data.appState) state.meta.safe = 0;        // no artboard came with the file, so no safe area either
       buildPageStrip();
       if (data.appState){
         state.theme = data.appState.theme === 'dark' ? 'dark' : 'light';
@@ -6455,6 +6569,7 @@ fileInput.addEventListener('change', () => {
         state.bgColor = (typeof data.appState.bgColor === 'string' && data.appState.bgColor[0] === '#')
           ? data.appState.bgColor : null;
         state.board = (data.appState.board && data.appState.board.w > 0) ? data.appState.board : null;
+        safeAreaAdopt();
         paintSwatches(); syncToggles(); syncPaperUI(); syncBoardBtn(); buildBoardMenuSel();
       }
       tlRestore(data.timelapse && Array.isArray(data.timelapse.frames) ? data.timelapse.frames : []);
@@ -9210,11 +9325,23 @@ const FOLD_KEY = 'koralpaper.panelfold';
 {
   let folded = {};
   try { folded = JSON.parse(localStorage.getItem(FOLD_KEY)) || {}; } catch (e){}
+  /* Before 3.86.0 a folded section showed only a small turned arrow, so a fold made
+     by one stray click on a title looked as if the controls had been removed. The
+     image section (styles, crop, adjustments) is the one that went missing this way,
+     so it is opened once; from here on every fold is labelled "Show". */
+  try {
+    if (localStorage.getItem(FOLD_KEY + '.v') !== '2'){
+      delete folded.rowArt;
+      localStorage.setItem(FOLD_KEY, JSON.stringify(folded));
+      localStorage.setItem(FOLD_KEY + '.v', '2');
+    }
+  } catch (e){}
   document.querySelectorAll('#stylePanel .row[id]').forEach(row => {
     const label = row.querySelector(':scope > label');
     if (!label || row.id === 'rowActions') return;
     row.classList.add('foldable');
     if (folded[row.id]) row.classList.add('foldedrow');
+    label.title = 'Click to fold or show this section';
     label.addEventListener('click', () => {
       row.classList.toggle('foldedrow');
       folded[row.id] = row.classList.contains('foldedrow');
@@ -9291,6 +9418,9 @@ tabCheck();
 tabBeat();
 setInterval(() => { tabCheck(); tabBeat(); }, 2500);
 window.addEventListener('pagehide', () => {
+  // an edit made in the last third of a second is still waiting for its autosave:
+  // write it now, or a quick reload or a closed tab loses it
+  if (autosavePending) flushAutosave();
   // a reload must not scare the reborn tab with its own ghost beat
   try {
     const b = JSON.parse(localStorage.getItem(BEAT_KEY) || 'null');

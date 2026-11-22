@@ -38,13 +38,13 @@ paper, including things you drew by hand.
 | `koralpaper_list_documents` | Every document in the app, with its snapshots |
 | `koralpaper_create_document` | A new, separate document with an artboard |
 | `koralpaper_open_document` | Show an existing document |
-| `koralpaper_read_document` | Pages and elements, with a version per page |
-| `koralpaper_create_page` | One page, or several in one call |
+| `koralpaper_read_document` | Pages and elements (images and line ends included), with a version per page |
+| `koralpaper_create_page` | One page, or several in one call, with shapes, text and pictures from files |
 | `koralpaper_add_elements` | Add elements to a page |
 | `koralpaper_update_elements` | Change elements by id |
 | `koralpaper_delete_elements` | Delete elements by id |
 | `koralpaper_render_page` | A picture of a page, to check the layout |
-| `koralpaper_measure` | Rendered line breaks, real height, overflow yes/no |
+| `koralpaper_measure` | Text, shapes, images and lines: line breaks, overflow, artboard edge, safe area |
 | `koralpaper_export` | PDF (with selectable text), PNG or JPG files into a folder inside Documents |
 | `koralpaper_get_selection` | What the user has selected |
 | `koralpaper_get_changes` | Added, changed and removed elements since a version |
@@ -54,6 +54,12 @@ paper, including things you drew by hand.
 | `koralpaper_restore` | Put a document back to a snapshot |
 | `koralpaper_set_styles` | Named text styles and colour tokens |
 | `koralpaper_set_master` | Elements on every page, with automatic page numbers |
+| `koralpaper_set_board` | The artboard size and the safe area of a document |
+| `koralpaper_delete_page` | Delete one page |
+| `koralpaper_rename_page` | Rename a page |
+| `koralpaper_set_page` | A page's name and paper colour |
+| `koralpaper_reorder_pages` | Put the pages in a new order |
+| `koralpaper_duplicate_page` | Copy a page with everything on it |
 | `koralpaper_import_svg` | An SVG as a page of editable elements |
 
 Every drawing and reading tool takes an optional `documentId` and `pageId`.

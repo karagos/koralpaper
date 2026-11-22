@@ -15,7 +15,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const SERVER_VERSION = '1.6.0';
+const SERVER_VERSION = '1.7.0';
 
 const PORT = Number(process.env.KORALPAPER_PORT) || 8137;
 const CMD_TIMEOUT_MS = 30000;
@@ -227,9 +227,10 @@ const ELEMENT_SCHEMA = {
   type: 'object',
   properties: {
     id: { type: 'string', description: 'Your own short id (e.g. "start", "step2") so arrows and later updates can reference this element.' },
-    type: { type: 'string', enum: ['rect', 'diamond', 'ellipse', 'polygon', 'chip', 'text', 'arrow', 'line'], description: 'rect = box/sticky, diamond = decision, ellipse = start/end, polygon = regular N-gon (set sides), chip = small label pill, text = free text, arrow/line = connector.' },
+    type: { type: 'string', enum: ['rect', 'diamond', 'ellipse', 'polygon', 'chip', 'text', 'arrow', 'line', 'image'], description: 'rect = box/sticky, diamond = decision, ellipse = start/end, polygon = regular N-gon (set sides), chip = small label pill, text = free text, arrow/line = connector, image = a picture from a file (give src). Any other type is refused.' },
     x: { type: 'number' }, y: { type: 'number' },
-    w: { type: 'number' }, h: { type: 'number' },
+    w: { type: 'number', description: 'Width in px. For an image: give w and h for an exact box; give only one and the other follows the picture\'s proportions; give neither for its real size (shrunk to fit the artboard).' },
+    h: { type: 'number', description: 'Height in px.' },
     text: { type: 'string', description: 'Text inside the shape, the free text, or the label riding an arrow.' },
     stroke: { type: 'string', description: 'Outline / text color: ' + STROKES },
     fill: { type: 'string', description: 'Fill color: ' + FILLS },
@@ -254,6 +255,12 @@ const ELEMENT_SCHEMA = {
     opacity: { type: 'number', description: 'Opacity of the WHOLE element (outline + fill + text) from 0 (invisible) to 100 (solid, default). Use for ghosted/faded elements.' },
     fillOpacity: { type: 'number', description: 'Transparency of the FILL ONLY, 0 (transparent fill) to 100 (opaque, default). The outline and text stay solid. Use for translucent highlight boxes, tints behind text, overlapping shapes that should show through each other, or Venn-style overlaps.' },
     sides: { type: 'number', description: 'Polygon only: number of sides, 3 (triangle) to 12 (dodecagon). 5 = pentagon, 6 = hexagon, 8 = octagon.' },
+    radius: { type: ['number', 'null'], description: 'rect and image only: corner radius in px, 0 to 999. 0 = square corners: use it for page backgrounds, panels and anything that must reach an edge cleanly. 999 = a pill. It belongs to this element, and no brand kit changes it. Omit on a rect = the app\'s soft default corner (up to 18px), which a brand kit may round or square. In an update, null = back to that default.' },
+    src: { type: 'object', properties: { path: { type: 'string', description: 'The picture file: an absolute path, a path starting with ~/, or a path relative to ~/Documents.' } }, required: ['path'], description: 'image only: the picture to show, e.g. {"path":"~/Documents/Carousels/team.jpg"}. JPEG, PNG, GIF, WebP or SVG, up to 20 MB, and only from inside ~/Documents or ~/Desktop. A copy is embedded in the document with its bytes untouched: a JPEG is never compressed again.' },
+    fit: { type: 'string', enum: ['cover', 'contain'], description: 'image only. cover (default) = the picture fills the box and what does not fit is cut off. contain = the whole picture shows inside the box.' },
+    focalX: { type: 'number', description: 'image only, 0 to 1 (default 0.5). With cover: the point of the picture to keep in view, as a fraction across it (0 = its left edge, 1 = its right edge). With contain: where the picture sits in the box (0 = left, 1 = right).' },
+    focalY: { type: 'number', description: 'image only, 0 to 1 (default 0.5). The same, down the picture (0 = top, 1 = bottom).' },
+    alt: { type: 'string', description: 'image only: a short description of the picture (up to 300 characters). Saved with it and written into SVG exports.' },
     startHead: { type: 'string', enum: ['none','arrow','triangle','triangle-filled','diamond','diamond-filled','circle','circle-filled','bar'], description: 'Arrows/lines only: the marker at the START point. Default none.' },
     endHead: { type: 'string', enum: ['none','arrow','triangle','triangle-filled','diamond','diamond-filled','circle','circle-filled','bar'], description: 'Arrows/lines only: the marker at the END point. Default arrow for arrows, none for lines. "-filled" variants are solid; "bar" is a perpendicular stop.' },
     from: { type: 'string', description: 'Arrows only: id of the shape this arrow starts from (it glues to the border and follows).' },
@@ -264,7 +271,7 @@ const ELEMENT_SCHEMA = {
   },
   required: ['type'],
 };
-const COORDS_HELP = 'Coordinates: y grows downward, origin is the artboard top-left. Typical shape: 190 wide × 92 tall; leave 100 to 120 px gaps. On a 1920×1080 board keep everything inside 60 px margins. Styling: set sketch:0 for clean/precise diagrams and tables (1 is hand-drawn); control line weight with sw (1.5 thin, 3.3 medium, 5 thick); use fillOpacity for translucent fills and opacity to fade a whole element; pick per-end arrowheads with startHead/endHead.';
+const COORDS_HELP = 'Unknown element types and unknown properties are refused by name and nothing is drawn, so a typo never passes silently. Coordinates: y grows downward, origin is the artboard top-left. Typical shape: 190 wide × 92 tall; leave 100 to 120 px gaps. On a 1920×1080 board keep everything inside 60 px margins. Styling: set sketch:0 for clean/precise diagrams and tables (1 is hand-drawn); control line weight with sw (1.5 thin, 3.3 medium, 5 thick); use fillOpacity for translucent fills and opacity to fade a whole element; pick per-end arrowheads with startHead/endHead.';
 
 /* the three arguments that aim a tool at a document, a page, and a known state */
 const DOC_ID = { type: 'string', description: 'The document to act on (ids come from koralpaper_create_document, koralpaper_list_documents or koralpaper_read_document). If another document is on screen, this one is opened first and the other is kept in the app\'s Documents list. Omit = the document on screen.' };
@@ -274,7 +281,7 @@ const BOARD = {
   type: 'object',
   properties: {
     w: { type: 'number' }, h: { type: 'number' }, name: { type: 'string' },
-    safeArea: { type: 'number', description: 'Optional inset in px. Draws a dashed safe-area guide in the editor (never exported), and koralpaper_measure reports text that leaves it.' },
+    safeArea: { type: 'number', description: 'Optional inset in px, kept with the document. Draws a dashed safe-area guide on every page in the editor (never exported), and koralpaper_measure reports any element that leaves it. 0 removes it.' },
   },
   description: 'Artboard, e.g. {w:1920,h:1080} for a slide or {w:1080,h:1350,safeArea:80} for a LinkedIn carousel. One artboard size applies to the whole document.',
 };
@@ -328,7 +335,7 @@ const TOOLS = [
   {
     name: 'koralpaper_read_document',
     annotations: { title: 'Read the document', readOnlyHint: true, openWorldHint: false },
-    description: 'Read a KoralPaper document: its id and version, and every page with its id, its version and its elements (positions, sizes, text, fonts, colors, arrow connections, locks). Also returns named styles, the master page and the number of open comments. Use it before editing so you work with what is really on the paper, and keep each page\'s version for ifVersion. With pageId only that page\'s elements are listed.' + ex({ documentId: 'doc_k3f9a2x1b7c4' }),
+    description: 'Read a KoralPaper document: its id and version, its artboard and safe area, and every page with its id, its version and its elements (positions, sizes, text, fonts, colors, corner radius, arrow connections, locks). A line or arrow reads back as its start x, y and end x2, y2. An image reads back with its file name, format, real size in px, bytes, fit, focal point, crop and alt text, never its bytes. Also returns named styles, the master page and the number of open comments. Use it before editing so you work with what is really on the paper, and keep each page\'s version for ifVersion. With pageId only that page\'s elements are listed.' + ex({ documentId: 'doc_k3f9a2x1b7c4' }),
     inputSchema: { type: 'object', properties: { documentId: DOC_ID, pageId: PAGE_ID } },
   },
   {
@@ -340,7 +347,7 @@ const TOOLS = [
       properties: {
         documentId: DOC_ID,
         name: { type: 'string', description: 'Page name shown in the page strip (single page).' },
-        board: Object.assign({}, BOARD, { description: 'Optional artboard for the document, e.g. {w:1920,h:1080} for a slide or {w:1080,h:1350} for a LinkedIn carousel. Omit to keep the current one (or an unlimited canvas).' }),
+        board: Object.assign({}, BOARD, { description: 'Optional: set the document\'s artboard size here, e.g. {w:1920,h:1080}. Omit it when koralpaper_create_document already set one. A safe area already set is kept unless safeArea is given here.' }),
         paper: { type: 'string', description: 'Optional paper color as #hex (e.g. "#FFFFFF" for white), single page.' },
         elements: { type: 'array', items: ELEMENT_SCHEMA, description: 'Elements of the single page. Use this OR pages.' },
         pages: { type: 'array', items: PAGE_SPEC, description: 'Several pages in one call, created in this order. Element ids are local to each page.' },
@@ -389,16 +396,15 @@ const TOOLS = [
   },
   {
     name: 'koralpaper_measure',
-    annotations: { title: 'Measure text', readOnlyHint: true, openWorldHint: false },
-    description: 'Measure how text really renders, with the real fonts loaded. For each element: the rendered line breaks, the real text height and width, the space available, and overflow true/false with the reason (taller than its box or maxHeight, a word too long to wrap, or past the artboard edge). Call it after writing copy into fixed boxes, then shorten the text or lower the size until overflow is false.' + ex({ documentId: 'doc_k3f9a2x1b7c4', elementIds: ['a1b2c3d4e5f6', 'g7h8i9j0k1l2'] }),
+    annotations: { title: 'Measure elements', readOnlyHint: true, openWorldHint: false },
+    description: 'Check how elements really sit on the page, with the real fonts and pictures loaded. Works on any element: text, shapes, images and lines. For text: the rendered line breaks, the real text height and width, the space available, and overflow true/false with the reason (taller than its box or maxHeight, a word too long to wrap, or past the artboard edge). For every element: outsideArtboard, and when the document has a safe area, outsideSafeArea with safeAreaExcess (how many px it leaves on each side). For images: real size, the part shown, and a note when the picture is enlarged enough to look soft. "fits" is true only when nothing overflows and the element stays on the artboard and inside the safe area; notFitting lists the ids that fail. Without elementIds every element on the page is checked. A full-page background is meant to leave the safe area, so judge those yourself. Call it after writing copy into fixed boxes, then fix until fits is true.' + ex({ documentId: 'doc_k3f9a2x1b7c4', elementIds: ['a1b2c3d4e5f6', 'g7h8i9j0k1l2'] }),
     inputSchema: {
       type: 'object',
       properties: {
         documentId: DOC_ID,
         pageId: Object.assign({}, PAGE_ID, { description: 'Optional: look for the elements on this page only. Omit = search every page of the document.' }),
-        elementIds: { type: 'array', items: { type: 'string' }, description: 'Real element ids, as returned by the drawing tools or koralpaper_read_document.' },
+        elementIds: { type: 'array', items: { type: 'string' }, description: 'Real element ids, as returned by the drawing tools or koralpaper_read_document. Omit = every element on the page (pageId, or the page on screen).' },
       },
-      required: ['elementIds'],
     },
   },
   {
@@ -521,6 +527,79 @@ const TOOLS = [
     },
   },
   {
+    name: 'koralpaper_set_board',
+    annotations: { title: 'Set the artboard and safe area', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    description: 'Set a document\'s artboard size, its safe area, or both, without drawing anything. The safe area is a dashed guide the given number of px inside every page edge: it is kept with the document, shown on every page, never exported, and koralpaper_measure checks elements against it. Send only safeArea to add or change the guide on an existing document; safeArea 0 removes it.' + ex({ documentId: 'doc_k3f9a2x1b7c4', w: 1080, h: 1350, safeArea: 80 }),
+    inputSchema: {
+      type: 'object',
+      properties: {
+        documentId: DOC_ID,
+        w: { type: 'number', description: 'Artboard width in px. Omit to keep the current size.' },
+        h: { type: 'number', description: 'Artboard height in px. Omit to keep the current size.' },
+        name: { type: 'string', description: 'Optional artboard name, e.g. "LinkedIn carousel".' },
+        safeArea: { type: 'number', description: 'Inset in px from every edge. 0 removes the safe area. Omit to leave it as it is.' },
+      },
+    },
+  },
+  {
+    name: 'koralpaper_delete_page',
+    annotations: { title: 'Delete a page', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+    description: 'Delete one page and everything on it. The last page of a document cannot be deleted. Master page numbers follow, and the user can bring the page back with Cmd+Z. Returns the remaining pages in order.' + ex({ documentId: 'doc_k3f9a2x1b7c4', pageId: 'k2j4h6g8a1b2', ifVersion: 9 }),
+    inputSchema: {
+      type: 'object',
+      properties: { documentId: DOC_ID, pageId: { type: 'string', description: 'The page to delete (required). Ids come from koralpaper_read_document.' },
+        ifVersion: Object.assign({}, IF_VERSION, { description: 'Safety check: the page version you last read. If the page changed since, it is not deleted.' }) },
+      required: ['pageId'],
+    },
+  },
+  {
+    name: 'koralpaper_rename_page',
+    annotations: { title: 'Rename a page', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    description: 'Give a page a new name (shown in the page strip and in exports\' page lists).' + ex({ documentId: 'doc_k3f9a2x1b7c4', pageId: 'k2j4h6g8a1b2', name: '03 · The proof' }),
+    inputSchema: {
+      type: 'object',
+      properties: { documentId: DOC_ID, pageId: { type: 'string', description: 'The page to rename (required).' }, name: { type: 'string', description: 'The new name, up to 80 characters.' }, ifVersion: IF_VERSION },
+      required: ['pageId', 'name'],
+    },
+  },
+  {
+    name: 'koralpaper_set_page',
+    annotations: { title: 'Set a page\'s name and paper', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    description: 'Change a page\'s own settings: its name, its paper (background) colour, or both. The paper colour fills the whole page edge to edge with square corners, so prefer it to a full-page rectangle. Send paper null to go back to the document\'s own paper.' + ex({ documentId: 'doc_k3f9a2x1b7c4', pageId: 'k2j4h6g8a1b2', paper: '#0B1A33' }),
+    inputSchema: {
+      type: 'object',
+      properties: { documentId: DOC_ID, pageId: { type: 'string', description: 'The page to change (required).' },
+        name: { type: 'string', description: 'A new name for the page.' },
+        paper: { type: ['string', 'null'], description: 'Paper colour as #hex, or a colour token like "$paper". null = the document\'s own paper.' },
+        ifVersion: IF_VERSION },
+      required: ['pageId'],
+    },
+  },
+  {
+    name: 'koralpaper_reorder_pages',
+    annotations: { title: 'Reorder pages', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    description: 'Put a document\'s pages in a new order. Send every page id exactly once, in the order you want; anything missing, unknown or repeated is refused and nothing moves. Master page numbers follow the new order.' + ex({ documentId: 'doc_k3f9a2x1b7c4', order: ['p1cover00aaaa', 'p3proof00cccc', 'p2myth000bbbb'] }),
+    inputSchema: {
+      type: 'object',
+      properties: { documentId: DOC_ID, order: { type: 'array', items: { type: 'string' }, description: 'Every page id of the document, once each, in the new order.' },
+        ifVersion: { type: 'number', description: 'Safety check: the DOCUMENT version you last read. If the document changed since, nothing moves.' } },
+      required: ['order'],
+    },
+  },
+  {
+    name: 'koralpaper_duplicate_page',
+    annotations: { title: 'Duplicate a page', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    description: 'Copy a page with everything on it: elements, images, paper colour. The copy lands right after the original unless position says otherwise. Every element gets a new id; "ids" in the result maps each original id to its copy, so you can edit the copy straight away. Use it to make the next slide from one that already has the right layout.' + ex({ documentId: 'doc_k3f9a2x1b7c4', pageId: 'k2j4h6g8a1b2', name: '04 · Step two' }),
+    inputSchema: {
+      type: 'object',
+      properties: { documentId: DOC_ID, pageId: { type: 'string', description: 'The page to copy (required).' },
+        name: { type: 'string', description: 'Name of the copy. Default: the original name with " copy".' },
+        position: { type: 'number', description: 'Where the copy goes, counting from 1 (1 = first page). Default: right after the original.' },
+        ifVersion: IF_VERSION },
+      required: ['pageId'],
+    },
+  },
+  {
     name: 'koralpaper_import_svg',
     annotations: { title: 'Import an SVG as a page', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     description: 'Turn an SVG into a new page of editable elements. Text stays text, with its font, size, weight and colour; rectangles, circles, ellipses and lines become shapes; a full-size first rectangle becomes the paper colour. Anything else (paths, polygons, gradients, clipped art) is kept together as one vector picture behind them, and reported. Scripts and external links are removed.' + ex({ documentId: 'doc_k3f9a2x1b7c4', pageName: 'Imported cover', svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1350"><rect width="1080" height="1350" fill="#111111"/><text x="80" y="300" font-family="Inter Tight" font-size="96" font-weight="800" fill="#FFFFFF">Hello</text></svg>' }),
@@ -559,6 +638,79 @@ function resolveExportFolder(folder){
   const realRoot = fs.realpathSync(root), realTarget = fs.realpathSync(target);
   if (!isInside(realRoot, realTarget)) throw refuse();
   return realTarget;
+}
+/* ── pictures: this process reads the file, the app embeds it ──
+   Only files inside ~/Documents or ~/Desktop are read, checked the same way as
+   export folders: "../" tricks, absolute paths elsewhere and symlinks that lead
+   out are all refused. The bytes go to the app untouched, as a data URL. */
+const IMAGE_MAX_BYTES = 20 * 1024 * 1024;
+function imageRoots(){
+  // in the test suite the real Desktop is never readable: only what the test points at
+  const desk = process.env.KORALPAPER_DOCS_DIR ? process.env.KORALPAPER_DESKTOP_DIR : path.join(os.homedir(), 'Desktop');
+  return [documentsRoot()].concat(desk ? [path.resolve(desk)] : []);
+}
+function sniffImage(buf){
+  if (buf.length >= 3 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return 'image/jpeg';
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))) return 'image/png';
+  const head = buf.subarray(0, 12).toString('latin1');
+  if (head.startsWith('GIF87a') || head.startsWith('GIF89a')) return 'image/gif';
+  if (head.startsWith('RIFF') && head.slice(8, 12) === 'WEBP') return 'image/webp';
+  const text = buf.subarray(0, 4096).toString('utf8').replace(/^\uFEFF/, '').trimStart();
+  if ((text.startsWith('<?xml') || text.startsWith('<!--') || text.startsWith('<!DOCTYPE svg') || text.startsWith('<svg')) && /<svg[\s>]/.test(text)) return 'image/svg+xml';
+  return null;
+}
+function readImageSource(src, label, cache){
+  const example = '{"path": "~/Documents/photo.jpg"}';
+  if (!src || typeof src !== 'object' || Array.isArray(src)) throw new Error(`${label}: src must be an object like ${example}.`);
+  const extra = Object.keys(src).find(k => k !== 'path');
+  if (extra) throw new Error(`${label}: src takes only a path, like ${example}. "${extra}" is not accepted: a picture is read from a file on this computer, never from a URL or from pasted data.`);
+  if (typeof src.path !== 'string' || !src.path.trim()) throw new Error(`${label}: src needs a path, like ${example}.`);
+  let f = src.path.trim();
+  if (f.includes('\0')) throw new Error(`${label}: the path is not valid.`);
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(f) && !/^file:\/\//i.test(f)) throw new Error(`${label}: "${src.path}" is a web address. A picture is read from a file on this computer: ask the user to save it inside ~/Documents or ~/Desktop.`);
+  if (/^file:\/\//i.test(f)){ try { f = decodeURIComponent(f.replace(/^file:\/\//i, '')); } catch (e){} }
+  if (f === '~' || f.startsWith('~/')) f = path.join(os.homedir(), f.slice(1));
+  const roots = imageRoots();
+  const target = path.isAbsolute(f) ? path.resolve(f) : path.resolve(roots[0], f);
+  const refuse = () => new Error(`${label}: pictures can only be read from inside ${roots.join(' or ')}. "${src.path}" is outside. Ask the user to put the file there.`);
+  if (!roots.some(r => isInside(r, target))) throw refuse();
+  let real;
+  try { real = fs.realpathSync(target); }
+  catch (e){ throw new Error(`${label}: no file at "${src.path}" (looked for ${target}).`); }
+  const realRoots = roots.map(r => { try { return fs.realpathSync(r); } catch (e){ return null; } }).filter(Boolean);
+  if (!realRoots.some(r => isInside(r, real))) throw refuse();
+  if (cache.has(real)) return cache.get(real);
+  let st;
+  try { st = fs.statSync(real); } catch (e){ throw new Error(`${label}: "${src.path}" could not be read (${e.code || e.message}).`); }
+  if (!st.isFile()) throw new Error(`${label}: "${src.path}" is a folder, not a picture file.`);
+  if (!st.size) throw new Error(`${label}: "${src.path}" is an empty file.`);
+  if (st.size > IMAGE_MAX_BYTES) throw new Error(`${label}: "${path.basename(real)}" is ${(st.size / 1048576).toFixed(1)} MB. Pictures up to 20 MB can be embedded: export a smaller copy.`);
+  let buf;
+  try { buf = fs.readFileSync(real); }
+  catch (e){ throw new Error(`${label}: "${src.path}" could not be read (${e.code || e.message}). If macOS asked whether Claude may open that folder, allow it and try again.`); }
+  const mime = sniffImage(buf);
+  if (!mime) throw new Error(`${label}: "${path.basename(real)}" is not a JPEG, PNG, GIF, WebP or SVG picture.`);
+  const out = { data: `data:${mime};base64,${buf.toString('base64')}`, name: path.basename(real), bytes: buf.length };
+  cache.set(real, out);
+  return out;
+}
+/* every src {path} in a drawing call becomes the file's bytes; returns how many pictures were read */
+function resolveImageSources(args){
+  const cache = new Map();
+  let count = 0;
+  const walk = (list, where) => {
+    if (!Array.isArray(list)) return;
+    list.forEach((sp, i) => {
+      if (!sp || typeof sp !== 'object' || sp.src === undefined) return;
+      const label = `${where}element ${i + 1}` + (sp.id != null ? ` ("${sp.id}")` : '');
+      sp.src = readImageSource(sp.src, label, cache);
+      count++;
+    });
+  };
+  walk(args.elements, '');
+  walk(args.updates, 'update: ');
+  if (Array.isArray(args.pages)) args.pages.forEach((pg, i) => { if (pg && typeof pg === 'object') walk(pg.elements, `page ${i + 1}, `); });
+  return count;
 }
 function safeFileStem(s, fallback){
   let out = String(s == null ? '' : s).replace(/[\/\\:*?"<>|\x00-\x1f]/g, '-').replace(/\s+/g, ' ').trim();
@@ -776,7 +928,21 @@ async function handleToolCall(id, name, args){
       return;
     }
     const action = name.replace('koralpaper_', '');
-    const result = await call(action, args);
+    let timeout;
+    if (['create_page', 'add_elements', 'update_elements', 'set_master'].includes(action)){
+      args = JSON.parse(JSON.stringify(args || {}));
+      let pictures;
+      try { pictures = resolveImageSources(args); }
+      catch (e){ text('Refused, nothing was written: ' + String(e && e.message || e), true); return; }
+      if (pictures){
+        // an app from before 3.86.0 would draw a box where the picture should be
+        let info = null;
+        try { info = await call('app_info', {}, 6000); } catch (e){ info = null; }
+        if (!info || !(info.caps >= 3)){ text(OLD_APP, true); return; }
+        timeout = 120000;
+      }
+    }
+    const result = await call(action, args, timeout);
     if (result && result.error){
       const msg = /^Unknown action/.test(result.error) ? OLD_APP : 'KoralPaper reported: ' + result.error;
       text(msg, true);
@@ -820,7 +986,8 @@ function onMessage(msg){
       capabilities: { tools: {} },
       serverInfo: { name: 'koralpaper', version: SERVER_VERSION },
       instructions: 'These tools draw directly in the KoralPaper app (a design studio for diagrams, slides and carousels) running in the user\'s browser. '
-        + 'Workflow for new work: koralpaper_status → koralpaper_create_document (always start a carousel or deck in its own document, never on top of what is open) → koralpaper_set_styles and koralpaper_set_master if the design repeats → koralpaper_create_page (several pages in one call) → koralpaper_measure on text in fixed boxes → koralpaper_render_page to check each page with your own eyes → koralpaper_export. '
+        + 'Workflow for new work: koralpaper_status → koralpaper_create_document with its artboard and safe area (always start a carousel or deck in its own document, never on top of what is open) → koralpaper_set_styles and koralpaper_set_master if the design repeats → koralpaper_create_page (several pages in one call) → koralpaper_measure on each page (text in fixed boxes, and everything against the safe area) → koralpaper_render_page to check each page with your own eyes → koralpaper_export. '
+        + 'Pictures are elements of type "image" with src {"path": ...} pointing at a file inside ~/Documents or ~/Desktop. Give a page its background with paper (in koralpaper_create_page or koralpaper_set_page) or a rect with radius 0; a rect without radius has soft corners. Unknown types and properties are refused, never guessed. Pages can be duplicated, renamed, reordered and deleted with the page tools. '
         + 'Workflow for existing work: koralpaper_read_document, keep each page\'s version, and pass documentId, pageId and ifVersion on every write; if a write is refused the user changed the page, so read again (or koralpaper_get_changes) before retrying. Check koralpaper_list_comments for requests, and take a koralpaper_snapshot before a big rework.',
     });
     return;

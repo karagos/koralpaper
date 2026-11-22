@@ -600,10 +600,15 @@ describe('5. measure', () => {
     assert.equal(m.lineCount, 1);
   });
 
-  test('ids that are not text, or do not exist, are reported per element', async () => {
+  test('a line is measured by where it sits, an unknown id is reported, and no ids means the whole page', async () => {
     const r = ok(await k.tool('koralpaper_measure', { documentId: docId, elementIds: [ids.arrow, 'nope'] })).elements;
-    assert.match(r[0].error, /no text box/);
+    assert.equal(r[0].error, undefined);
+    assert.equal(r[0].type, 'line');
+    assert.equal(typeof r[0].fits, 'boolean');
+    assert.equal(r[0].lines, undefined, 'a line has no text box');
     assert.match(r[1].error, /No element with this id/);
-    assert.equal((await k.tool('koralpaper_measure', { documentId: docId, elementIds: [] })).isError, true);
+    const all = ok(await k.tool('koralpaper_measure', { documentId: docId, elementIds: [] }));
+    assert.ok(all.elements.length >= 2, 'every element on the page was measured');
+    assert.ok(Array.isArray(all.notFitting));
   });
 });

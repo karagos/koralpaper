@@ -716,7 +716,12 @@ body.dark .charterr{color:#F09070;}
   transition:transform .15s, opacity .12s;
 }
 .stylePanel .row.foldable > label:hover::after{opacity:1;}
-.stylePanel .row.foldedrow > label::after{transform:rotate(-90deg);}
+/* a folded section says so in words: a turned arrow alone read as "nothing here" */
+.stylePanel .row.foldedrow > label::after{
+  content:'Show'; transform:none; opacity:1;
+  font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; line-height:1;
+  padding:4px 9px; border-radius:999px; background:var(--ink); color:var(--card);
+}
 .stylePanel .row.foldedrow > :not(label){display:none;}
 .stylePanel .row.foldedrow{gap:0;}
 .labelval{margin-left:auto; margin-right:14px; font-size:11px; font-weight:700; color:var(--ink); text-transform:none; letter-spacing:0;}
@@ -1009,3 +1014,21 @@ body.dark #tooltip{box-shadow:0 4px 14px -4px rgba(0,0,0,.7);}
 .cmtacts .minipill{flex:0 0 auto; width:auto; padding:6px 12px;}
 #docsList .tplrow, #commentsList .cmtrow{flex:0 0 auto;}
 .cmtdone{font-size:12.5px; color:var(--ink-soft); display:flex; align-items:center; gap:6px; margin-right:auto;}
+
+/* ── image section of the style panel ── */
+.stylePanel .sublabel{font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-soft); margin-top:4px;}
+.stylePanel .imginfo{font-size:11.5px; line-height:1.35; color:var(--ink-soft); overflow-wrap:anywhere;}
+.stylePanel .imginfo:empty{display:none;}
+.stylePanel .altinput{
+  width:100%; box-sizing:border-box; font:inherit; font-size:12px; color:var(--ink);
+  background:var(--card-2); border:1.5px solid var(--line-soft); border-radius:8px; padding:6px 8px;
+}
+.stylePanel .altinput:focus{outline:none; border-color:var(--ink);}
+/* ── safe-area field in the artboard menu ── */
+.menu .saferow{display:flex; align-items:center; gap:8px; padding:4px 12px 8px; cursor:default;}
+.menu .saferow input{
+  width:72px; font:inherit; font-size:13px; color:var(--ink);
+  background:var(--card-2); border:1.5px solid var(--line-soft); border-radius:8px; padding:5px 7px;
+}
+.menu .saferow input:focus{outline:none; border-color:var(--ink);}
+.menu .saferow input:disabled{opacity:.45;}

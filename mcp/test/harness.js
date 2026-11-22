@@ -94,12 +94,12 @@ async function spawnServer(env){
 async function start(opts = {}){
   const bridgePort = await freePort(), webPort = await freePort(), dbgPort = await freePort();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'koralpaper-test-'));
-  const docsDir = path.join(tmp, 'Documents');
-  fs.mkdirSync(docsDir);
+  const docsDir = path.join(tmp, 'Documents'), desktopDir = path.join(tmp, 'Desktop');
+  fs.mkdirSync(docsDir); fs.mkdirSync(desktopDir);
   const profile = path.join(tmp, 'chrome-profile');
 
   /* the MCP server */
-  const serverEnv = { KORALPAPER_PORT: String(bridgePort), KORALPAPER_DOCS_DIR: docsDir };
+  const serverEnv = { KORALPAPER_PORT: String(bridgePort), KORALPAPER_DOCS_DIR: docsDir, KORALPAPER_DESKTOP_DIR: desktopDir };
   const { server, rpc, tool } = await spawnServer(serverEnv);
 
   /* the app, in headless Chrome */
@@ -191,7 +191,7 @@ async function start(opts = {}){
     }
     throw new Error('the app did not come back after a reload');
   };
-  return { tool, rpc, page, shot, reload, stop, docsDir, tmp, bridgePort, serverEnv, sleep };
+  return { tool, rpc, page, shot, reload, stop, docsDir, desktopDir, tmp, bridgePort, serverEnv, sleep };
 }
 
 module.exports = { start, spawnServer, freePort, sleep, ROOT };

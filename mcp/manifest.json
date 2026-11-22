@@ -2,9 +2,9 @@
   "manifest_version": "0.2",
   "name": "koralpaper",
   "display_name": "KoralPaper",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Let Claude design diagrams, decks and carousels directly on your KoralPaper paper.",
-  "long_description": "Connects Claude Desktop to the KoralPaper app running in your browser. Describe a diagram, a deck or a carousel in plain words and Claude draws it as fully editable elements. Claude works in its own document so it never draws over other work, refuses to overwrite a page you changed since it last read it, measures real text so copy fits its box, uses named styles and a master page with automatic page numbers, reads and answers comments you pin to elements, and exports PDF, PNG or JPG into a folder inside Documents. Nothing leaves your machine except your conversation with Claude.",
+  "long_description": "Connects Claude Desktop to the KoralPaper app running in your browser. Describe a diagram, a deck or a carousel in plain words and Claude draws it as fully editable elements. Claude works in its own document so it never draws over other work, refuses to overwrite a page you changed since it last read it, places pictures from files inside Documents or Desktop, measures real text and checks every element against the safe area, uses named styles and a master page with automatic page numbers, duplicates, reorders and deletes pages, reads and answers comments you pin to elements, and exports PDF, PNG or JPG into a folder inside Documents. Nothing leaves your machine except your conversation with Claude.",
   "author": {
     "name": "Stefanos Karagos, CAIO Group",
     "url": "https://wearecaio.com"
@@ -43,11 +43,11 @@
     },
     {
       "name": "koralpaper_read_document",
-      "description": "Read every page and element, with a version per page."
+      "description": "Read every page and element, images and line ends included, with a version per page."
     },
     {
       "name": "koralpaper_create_page",
-      "description": "Create one or several pages and draw editable elements on them."
+      "description": "Create one or several pages and draw editable elements and pictures on them."
     },
     {
       "name": "koralpaper_add_elements",
@@ -67,7 +67,7 @@
     },
     {
       "name": "koralpaper_measure",
-      "description": "Measure rendered text: line breaks, real height, overflow."
+      "description": "Check text, shapes, images and lines: line breaks, overflow, artboard and safe area."
     },
     {
       "name": "koralpaper_export",
@@ -104,6 +104,30 @@
     {
       "name": "koralpaper_set_master",
       "description": "Set the elements repeated on every page, with page numbers."
+    },
+    {
+      "name": "koralpaper_set_board",
+      "description": "Set a document's artboard size and safe area."
+    },
+    {
+      "name": "koralpaper_delete_page",
+      "description": "Delete one page."
+    },
+    {
+      "name": "koralpaper_rename_page",
+      "description": "Rename a page."
+    },
+    {
+      "name": "koralpaper_set_page",
+      "description": "Set a page's name and paper colour."
+    },
+    {
+      "name": "koralpaper_reorder_pages",
+      "description": "Put the pages in a new order."
+    },
+    {
+      "name": "koralpaper_duplicate_page",
+      "description": "Copy a page with everything on it."
     },
     {
       "name": "koralpaper_import_svg",
