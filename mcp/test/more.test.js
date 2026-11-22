@@ -328,6 +328,45 @@ describe('12. SVG import', () => {
     assert.equal(/script|onclick/i.test(src), false);
     assert.match(src, /<path/);
   });
+  test('a hostile SVG is cut down to plain drawing elements (allow list)', async () => {
+    const out = await k.page(`
+      const src = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:h="http://www.w3.org/1999/xhtml" viewBox="0 0 100 100" onload="window.__pwned = true">'
+        + '<h:img src="x" onerror="window.__pwned = true"/><h:iframe src="https://example.com/"/>'
+        + '<a xlink:href="javascript:window.__pwned = true"><rect id="inA" width="5" height="5"/></a>'
+        + '<animate attributeName="href" to="javascript:window.__pwned = true"/><set attributeName="onclick" to="x"/>'
+        + '<madeup><rect id="inMadeup" width="5" height="5"/></madeup>'
+        + '<style>@import url(https://example.com/x.css); rect { fill: red }</style>'
+        + '<style>.ok { fill: #00ff00 }</style>'
+        + '<use xlink:href="https://example.com/a.svg#x"/><use id="localUse" href="#keep"/>'
+        + '<image id="remote" href="https://example.com/a.png" width="5" height="5"/>'
+        + '<image id="svgData" href="data:image/svg+xml;base64,PHN2Zy8+" width="5" height="5"/>'
+        + '<image id="png" href="data:image/png;base64,iVBORw0KGgo=" width="5" height="5"/>'
+        + '<rect id="keep" class="ok" width="10" height="10" OnClick="window.__pwned = true" style="fill: url(https://example.com/p.png)" filter="url(#f)" fill="url(https://example.com/#g)"/>'
+        + '<rect id="jsAttr" width="1" height="1" fill="java\\nscript:alert(1)"/>'
+        + '</svg>';
+      const doc = new DOMParser().parseFromString(src, 'image/svg+xml');
+      const root = doc.documentElement;
+      const okRoot = svgSanitize(root);
+      const names = [...root.querySelectorAll('*')].map(n => n.localName);
+      const attr = (id, a) => { const n = root.querySelector('#' + id); return n ? n.getAttribute(a) : 'MISSING'; };
+      return { okRoot, names, text: new XMLSerializer().serializeToString(root),
+        rootOnload: root.hasAttribute('onload'), keepFilter: attr('keep', 'filter'), keepStyle: attr('keep', 'style'),
+        keepFill: attr('keep', 'fill'), localUse: attr('localUse', 'href'), remote: attr('remote', 'href'),
+        svgData: attr('svgData', 'href'), png: attr('png', 'href'), jsAttr: attr('jsAttr', 'fill'),
+        foreignRoot: svgSanitize(new DOMParser().parseFromString('<html xmlns="http://www.w3.org/1999/xhtml"/>', 'application/xml').documentElement) };`);
+    assert.equal(out.okRoot, true);
+    assert.equal(out.foreignRoot, false, 'a root that is not an SVG element is refused');
+    assert.deepEqual([...new Set(out.names)].sort(), ['image', 'rect', 'style', 'use']);
+    assert.equal(out.names.filter(n => n === 'style').length, 1, 'the stylesheet with an import is dropped, the plain one is kept');
+    assert.equal(out.names.filter(n => n === 'use').length, 2);
+    assert.equal(/example\.com|javascript|onload|onclick|onerror|iframe|animate|@import|inA|inMadeup/i.test(out.text), false, out.text);
+    assert.equal(out.rootOnload, false);
+    assert.equal(out.keepFilter, 'url(#f)', 'a reference inside the file is kept');
+    assert.deepEqual([out.keepStyle, out.keepFill, out.remote, out.svgData, out.jsAttr], [null, null, null, null, null]);
+    assert.equal(out.localUse, '#keep');
+    assert.match(out.png, /^data:image\/png/);
+    assert.equal(await k.page(`return window.__pwned === true`), false);
+  });
   test('the imported text is editable like any other, and the page renders', async () => {
     const hello = els.find(e => e.text === 'Hello world');
     ok(await k.tool('koralpaper_update_elements', { documentId: docId, updates: [{ id: hello.id, text: 'Hello again' }] }));

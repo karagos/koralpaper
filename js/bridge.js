@@ -1003,16 +1003,42 @@ function cssToHex(v){
   if (m[4] !== undefined && parseFloat(m[4]) === 0) return null;
   return '#' + [m[1], m[2], m[3]].map(n => clamp(Math.round(Number(n)), 0, 255).toString(16).padStart(2, '0')).join('').toUpperCase();
 }
+// An allow list, not a block list: only known drawing elements in the SVG namespace survive,
+// and only attributes that cannot run code or reach outside the file. Anything unknown is dropped.
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const SVG_OK_ELEMENTS = new Set(['svg', 'g', 'rect', 'circle', 'ellipse', 'line', 'path', 'polygon', 'polyline',
+  'text', 'tspan', 'title', 'desc', 'defs', 'symbol', 'use', 'image', 'style',
+  'linearGradient', 'radialGradient', 'stop', 'pattern', 'marker', 'clipPath', 'mask', 'filter',
+  'feBlend', 'feColorMatrix', 'feComponentTransfer', 'feComposite', 'feDropShadow', 'feFlood', 'feFuncA', 'feFuncB',
+  'feFuncG', 'feFuncR', 'feGaussianBlur', 'feMerge', 'feMergeNode', 'feMorphology', 'feOffset', 'feTurbulence']);
+const SVG_OK_ATTR_NS = new Set([null, 'http://www.w3.org/1999/xlink', 'http://www.w3.org/XML/1998/namespace', 'http://www.w3.org/2000/xmlns/']);
+function svgCssSafe(css){
+  // no imports, no escapes that could hide one, and url() may only point inside the file
+  if (/@import|\\|expression\s*\(|javascript:/i.test(css)) return false;
+  for (const m of css.matchAll(/url\(\s*(['"]?)([^)]*)/gi)) if (!m[2].trim().startsWith('#')) return false;
+  return true;
+}
 function svgSanitize(root){
-  const bad = ['script', 'foreignObject', 'iframe', 'object', 'embed', 'audio', 'video', 'animate', 'set', 'animateTransform', 'animateMotion'];
-  for (const n of [...root.querySelectorAll('*')]){
-    if (bad.includes(n.localName)){ n.remove(); continue; }
+  for (const n of [root, ...root.querySelectorAll('*')]){
+    if (n !== root && !root.contains(n)) continue;       // already dropped with its parent
+    if (n.namespaceURI !== SVG_NS || !SVG_OK_ELEMENTS.has(n.localName)){
+      if (n === root) return false;
+      n.remove(); continue;
+    }
+    if (n.localName === 'style' && !svgCssSafe(n.textContent || '')){ n.remove(); continue; }
     for (const a of [...n.attributes]){
-      const name = a.name.toLowerCase(), val = a.value.trim().toLowerCase();
-      if (name.startsWith('on')) n.removeAttribute(a.name);
-      else if ((name === 'href' || name === 'xlink:href') && !val.startsWith('#') && !val.startsWith('data:image/')) n.removeAttribute(a.name);
+      const local = (a.localName || a.name).toLowerCase(), val = a.value.replace(/[\u0000- ]+/g, '').toLowerCase();
+      let keep = SVG_OK_ATTR_NS.has(a.namespaceURI) && !local.startsWith('on');
+      if (keep && local === 'href'){
+        const picture = n.localName === 'image' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(val);
+        keep = val.startsWith('#') || picture;
+      } else if (keep && local === 'style') keep = svgCssSafe(a.value);
+      else if (keep && (/javascript:|data:text|vbscript:/.test(val))) keep = false;
+      else if (keep && /url\(/.test(val)) keep = svgCssSafe(a.value);
+      if (!keep) n.removeAttributeNode(a);
     }
   }
+  return true;
 }
 async function claudeImportSvg(svgText, pageName){
   if (typeof svgText !== 'string' || !svgText.trim()) return { error: 'No SVG given.' };
@@ -1021,7 +1047,7 @@ async function claudeImportSvg(svgText, pageName){
   const root0 = parsed.documentElement;
   if (!root0 || root0.localName !== 'svg' || parsed.querySelector('parsererror'))
     return { error: 'That text is not a readable SVG.' };
-  svgSanitize(root0);
+  if (!svgSanitize(root0)) return { error: 'That text is not a readable SVG.' };
   const vb = (root0.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
   let W = parseFloat(root0.getAttribute('width')), H = parseFloat(root0.getAttribute('height'));
   if (vb.length === 4 && vb[2] > 0 && vb[3] > 0){ W = vb[2]; H = vb[3]; }

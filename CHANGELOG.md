@@ -1,5 +1,16 @@
 # KoralPaper — Changelog
 
+## v3.84.1
+
+**Security: SVG import now keeps only what it knows is safe.** When Claude imports an SVG, the file is placed in the page for a moment so it can be measured. Until now the import removed a fixed list of dangerous parts (scripts, embedded pages, animations) and kept everything else. It now works the other way round: only plain drawing elements are kept, and anything unknown is dropped.
+
+- Elements outside the SVG standard, links, animations and embedded HTML are removed, together with what is inside them.
+- Event handlers are removed everywhere, including on the outer `<svg>` tag, which the old check skipped.
+- Links may only point inside the file. Pictures may only be embedded PNG, JPEG, GIF or WebP data.
+- Stylesheets and style attributes that import other files or point outside the file are removed.
+
+The app's content security policy already stopped such code from running, so this closes a second line of defence, not a known break-in. Found by an automated security review of v3.84.0. The connector is unchanged at 1.5.0.
+
 ## v3.84.0 · connector v1.5.0
 
 **Claude can now build and maintain carousels safely, in its own document, without touching your other work.** The Claude connector grows from 7 tools to 21. Everything that worked before works the same way when the new options are left out.
